@@ -1,0 +1,16 @@
+/* Always show badges by default */
+.card .size-badges {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* On medium (md) screens and up: hide by default, show on hover */
+@media (min-width: 768px) {
+  .card .size-badges {
+    opacity: 0;
+  }
+
+  .card:hover .size-badges {
+    opacity: 1;
+  }
+}

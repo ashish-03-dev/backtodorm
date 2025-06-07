@@ -6,8 +6,9 @@ export default function AboutSection() {
       <div className="container">
         <h2 className="mb-3">About PosterVibe</h2>
         <p className="text-muted mx-auto" style={{ maxWidth: '700px' }}>
-          We're passionate about curating unique, high-quality posters to reflect your personality and upgrade your space. Posters that aren’t just decor — they’re identity.
-        </p>
+  Elevate your dorm life with curated decor that inspires. Our products are more than just items — they're expressions of your personality, creativity, and comfort.
+</p>
+
       </div>
     </section>
   );
