@@ -1,9 +1,10 @@
 import React from 'react';
+import '../../styles/CartSidebar.css';
 
 export default function CartSidebar({ cartItems }) {
   return (
     <div
-      className="offcanvas offcanvas-end"
+      className="offcanvas offcanvas-end custom-cart-offcanvas"
       tabIndex="-1"
       id="cartOffcanvas"
       aria-labelledby="cartOffcanvasLabel"
@@ -17,18 +18,31 @@ export default function CartSidebar({ cartItems }) {
           aria-label="Close"
         ></button>
       </div>
+
       <div className="offcanvas-body">
         {cartItems.length === 0 ? (
           <p>No items in cart yet.</p>
         ) : (
           cartItems.map((item, index) => (
             <div key={index} className="mb-2 border-bottom pb-2">
+              <img
+                  src={item.image}
+                  alt={item.title}
+                  style={{ width: "60px", height: "60px", objectFit: "cover" }}
+                  className="me-3 rounded"
+                />
               <h6 className="mb-1">{item.title}</h6>
               <p className="mb-0 text-muted">{item.price}</p>
             </div>
           ))
         )}
-        <button className="btn btn-dark w-100 mt-3">Go to Checkout</button>
+        
+        {/* Checkout Section */}
+        <div className="border-top pt-3">
+          <h6 className="fw-semibold">Total: ₹{cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0)}</h6>
+          <button className="btn btn-dark w-100 mt-3">Go to Checkout</button>
+        </div>
+
       </div>
     </div>
   );

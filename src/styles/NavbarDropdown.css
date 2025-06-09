@@ -12,7 +12,7 @@
   top: 100%;
   left: 0;
   width: 100%;
-  /* max-width: 1496px; */
+  min-height: 16rem;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-20px);

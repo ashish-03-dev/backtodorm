@@ -1,0 +1,14 @@
+.trending-cards {
+    width: 16rem;
+}
+
+@media (max-width: 576px) {
+    .trending-cards {
+        width: 12rem;
+    }
+
+    .trending-cards img {
+        height: 15em !important;
+    }
+
+}

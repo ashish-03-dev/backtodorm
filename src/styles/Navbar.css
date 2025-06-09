@@ -1,9 +1,0 @@
-.custom-font {
-  font-size: 17px;
-}
-.dropdown-menu {
-  display: none;
-}
-.nav-item:hover .dropdown-menu {
-  display: block;
-}

@@ -33,7 +33,7 @@ export default function AccountDropdown({ isLoggedIn }) {
         >
             {/* Account Icon Button */}
             <button
-                className="btn border p-0 d-flex align-items-center px-3 mx-2"
+                className="btn border p-0 d-flex align-items-center px-2 mx-1 mx-md-2 bg-light"
                 onClick={toggleDropdown}
                 onMouseEnter={handleMouseEnter}
                 style={{ cursor: "pointer", backdropFilter: "blur(10px)" }}
@@ -43,11 +43,10 @@ export default function AccountDropdown({ isLoggedIn }) {
 
             {/* Dropdown menu */}
             <div
-                className={`fullwidth-dropdown p-4 bg-white shadow-sm rounded-bottom position-absolute end-0 ${showDropdown ? "show slide-down d-block" : "d-none"}`}
+                className={`fullwidth-dropdown p-4 bg-white border-top shadow-sm rounded-bottom position-absolute end-0 ${showDropdown ? "show slide-down d-block" : "d-none"}`}
                 style={{
-                    width: "100%",   // approx width of col-md-3 (or use 360px for col-md-4 etc.)
+                    width: "100%",
                     top: "100%",
-                    // left:-30,
                     zIndex: 1050
                 }}
             >

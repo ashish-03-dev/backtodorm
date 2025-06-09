@@ -85,7 +85,7 @@ export default function TrendingPosters() {
 
   return (
     <section
-      className="py-5 px-3 position-relative"
+      className="py-4 py-md-5 px-3 position-relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -128,8 +128,8 @@ export default function TrendingPosters() {
           <Link
             to={`/product/${item.id}`}
             key={index}
-            className="text-decoration-none text-dark flex-shrink-0"
-            style={{ width: "16rem", scrollSnapAlign: "start" }}
+            className="text-decoration-none text-dark flex-shrink-0 trending-cards"
+            style={{scrollSnapAlign: "start" }}
           >
             <div
               className="card shadow-sm border-0 position-relative"

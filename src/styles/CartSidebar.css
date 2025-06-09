@@ -1,0 +1,11 @@
+/* Default width (desktop) */
+.custom-cart-offcanvas {
+  width: 400px;
+}
+
+/* Reduced width on mobile */
+@media (max-width: 768px) {
+  .custom-cart-offcanvas {
+    width: 300px !important; /* or set specific px like 300px */
+  }
+}

@@ -11,7 +11,7 @@ export default function NewArrivals() {
           {newPosters.map((poster, i) => (
             <div
               key={i}
-              className="col-12 col-sm-6 col-md-4 col-lg-3 d-flex align-items-stretch"
+              className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch"
             >
               <div
                 className="border rounded shadow-sm w-100 bg-white overflow-hidden"
@@ -33,7 +33,7 @@ export default function NewArrivals() {
                   alt={poster.title}
                   className="w-100"
                   style={{
-                    height: 'auto',
+                    height: '22rem',
                     objectFit: 'cover',
                   }}
                 />

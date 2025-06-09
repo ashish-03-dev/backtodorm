@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import bestsellers from '../data/bestsellers';
+import '../styles/trendingPosters.css';
 
 export default function Trending() {
   const items = [
@@ -92,7 +93,7 @@ export default function Trending() {
 
   return (
     <section
-      className="py-5 px-3 position-relative"
+      className="py-4 py-md-5 px-3 position-relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -135,11 +136,11 @@ export default function Trending() {
           <Link
             to={`/product/${item.id}`}
             key={index}
-            className="text-decoration-none text-dark flex-shrink-0"
-            style={{ width: "16rem", scrollSnapAlign: "start" }}
+            className="text-decoration-none text-dark flex-shrink-0 trending-cards"
+            style={{scrollSnapAlign: "start" }}
           >
             <div
-              className="card shadow-sm border-0 position-relative"
+              className="card shadow-sm border-0  position-relative"
               style={{ width: "100%" }}
             >
               {/* Size Badges */}

@@ -1,10 +1,9 @@
 import React, { useState } from "react";
-import "bootstrap/dist/css/bootstrap.min.css";
-import CartSidebar from "./CartSidebar";
-import AccountDropdown from "./AccountDropDown";
-import MobileSidebar from './MobileSidebar';
-import '../../styles/Navbar.css';
 import NavLinks from "./Navlinks";
+import AccountDropdown from "./AccountDropDown";
+import CartSidebar from "./CartSidebar";
+import MobileSidebar from './MobileSidebar';
+import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function NavbarComponent({ cartItems }) {
   // const isLoggedIn = false;
@@ -13,17 +12,17 @@ export default function NavbarComponent({ cartItems }) {
 
   return (
     <>
-      <nav className="d-flex sticky-top w-100 px-3 px-md-5 justify-content-between align-items-center position-relative bg-white shadow-sm" role="banner" style={{ height: "70px" }}>
+      <nav className="d-flex sticky-top w-100 px-2 px-md-5 justify-content-between align-items-center bg-white shadow-sm" role="banner" style={{ height: "65px" }}>
 
         <nav className="col-md-3 d-flex align-items-center">
           <button
-            className="btn d-md-none "
+            className="btn d-md-none me-2"
             onClick={() => setShowSidebar(true)}
             aria-label="Open Shop Categories"
           >
             <i className="bi bi-list fs-4"></i>
           </button>
-          <a className="navbar-brand fw-bold fs-4 mb-0" href="/">Back To Dorm</a>
+          <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">BackToDorm</a>
         </nav>
 
         <NavLinks />
@@ -32,7 +31,7 @@ export default function NavbarComponent({ cartItems }) {
           <AccountDropdown isLoggedIn={isLoggedIn} />
 
           <button
-            className="btn position-relative px-3 mx-2 border"
+            className="btn bg-light position-relative px-3 mx-1 mx-md-2 border"
             type="button"
             data-bs-toggle="offcanvas"
             data-bs-target="#cartOffcanvas"
