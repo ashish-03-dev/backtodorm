@@ -1,15 +1,20 @@
 import React from 'react';
 import posters from '../data/posters'; // adjust based on your actual path
-import PosterCard from './PosterCard';
 
 export default function PosterGrid({ addToCart }) {
   return (
     <section className="py-5 bg-light">
       <div className="container">
         <h2 className="text-center fw-bold fs-2 mb-4">You may also like</h2>
-        <div className="row g-4">
+        <div className="d-flex overflow-auto gap-3 pb-2" style={{ scrollSnapType: "x mandatory" }}>
           {posters.map((poster) => (
-            <div key={poster.id} className="col-12 col-sm-6 col-lg-4 d-flex align-items-stretch">
+            <div key={poster.id} className="flex-shrink-0"
+              style={{
+                width: "80%", // mobile default
+                maxWidth: "18rem", // limit card size on large screens
+                scrollSnapAlign: "start",
+              }}
+            >
               <div
                 className="border rounded shadow-sm w-100 bg-white overflow-hidden"
                 style={{
@@ -27,10 +32,9 @@ export default function PosterGrid({ addToCart }) {
                 <img
                   src={poster.img}
                   alt={poster.title}
-                  className="w-100"
                   style={{
                     width: '100%',
-                    height: 'auto',      // Let height adjust naturally
+                    aspectRatio: "4/5",
                     objectFit: 'cover',  // Cover to fill the width nicely
                     display: 'block',    // Remove any inline space below image
                     borderRadius: '0.5rem 0.5rem 0 0' // Round only top corners, optional
@@ -39,7 +43,7 @@ export default function PosterGrid({ addToCart }) {
                 />
                 <div className="p-3 text-center">
                   <h3 className="fs-6 fw-semibold mb-1 text-truncate">{poster.title}</h3>
-                  <p className="text-muted small mb-2">₹{poster.price}</p>
+                  <p className="" style={{ fontSize: "16px" }} >From ₹{poster.price}</p>
                   <button
                     onClick={() => addToCart(poster)}
                     className="btn btn-dark btn-sm rounded-pill px-4"

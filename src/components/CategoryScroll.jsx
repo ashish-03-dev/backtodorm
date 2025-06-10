@@ -1,68 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import '../styles/CategoryGrid.css';
-
-const categoryCards = [
-  {
-    title: "Pop Culture",
-    link: "/collections/pop-culture",
-    images: [
-      "/images/trending/image1.png",
-      "/images/trending/image2.png",
-      "/images/trending/image3.png",
-    ],
-  },
-  {
-    title: "Nature & Cosmos",
-    link: "/collections/nature",
-    images: [
-      "/images/trending/image4.png",
-      "/images/trending/image5.png",
-      "/images/trending/image6.png",
-      "/images/trending/image7.png",
-      "/images/trending/image8.png",
-      "/images/trending/image9.png",
-    ],
-  },
-  {
-    title: "Styles & Aesthetic",
-    link: "/collections/style",
-    images: [
-      "/images/trending/image7.png",
-      "/images/trending/image8.png",
-      "/images/trending/image9.png",
-    ],
-  },
-  {
-    title: "Pop Culture",
-    link: "/collections/pop-culture",
-    images: [
-      "/images/trending/image10.png",
-      "/images/trending/image11.png",
-      "/images/trending/image12.png",
-    ],
-  },
-  {
-    title: "Nature & Cosmos",
-    link: "/collections/nature",
-    images: [
-      "/images/trending/image5.png",
-      "/images/trending/image6.png",
-      "/images/trending/image7.png",
-      "/images/trending/image8.png",
-      "/images/trending/image9.png",
-    ],
-  },
-  {
-    title: "Styles & Aesthetic",
-    link: "/collections/style",
-    images: [
-      "/images/trending/image10.png",
-      "/images/trending/image11.png",
-      "/images/trending/image12.png",
-    ],
-  },
-];
+import '../styles/CategoryScroll.css';
+import categoryCards from "../data/categoryCards";
 
 export default function ShopByCategory() {
   const [isHovered, setIsHovered] = useState(false);
@@ -98,7 +37,7 @@ export default function ShopByCategory() {
 
       <div
         ref={scrollRef}
-        className="d-flex overflow-auto pb-2 container-category"
+        className="d-flex overflow-auto pb-2 gap-2 gap-md-3 container-category"
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
@@ -133,7 +72,7 @@ function SlidingCard({ title, link, images }) {
 
   return (
     <Link to={link} className="text-decoration-none text-dark" style={{ scrollSnapAlign: "start" }}>
-      <div className="card shadow-sm flex-shrink-0 border-0 rounded-1 category-card d-flex-flex-column" style={{ overflow: "hidden" }}>
+      <div className="card shadow-sm flex-shrink-0 border-0 rounded-1 d-flex-flex-column category-card" style={{ overflow: "hidden" }}>
         <div
           className="d-flex"
           style={{
@@ -147,7 +86,6 @@ function SlidingCard({ title, link, images }) {
               key={i}
               src={src}
               alt={`${title} ${i}`}
-              className="w-100"
               style={{
                 height: "17rem",
                 objectFit: "cover",

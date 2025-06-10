@@ -1,14 +1,14 @@
 import React from 'react';
-import newPosters from '../data/bestsellers';
+import newArrivals from '../data/newArrivals';
 
 export default function NewArrivals() {
   return (
-    <section className="py-5 px-3 bg-white">
+    <section className="bg-white">
       <div className="container">
         <h2 className="fs-2 fw-bold mb-4 text-center">New Arrivals</h2>
 
         <div className="row g-4">
-          {newPosters.map((poster, i) => (
+          {newArrivals.map((poster, i) => (
             <div
               key={i}
               className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch"
@@ -33,7 +33,8 @@ export default function NewArrivals() {
                   alt={poster.title}
                   className="w-100"
                   style={{
-                    height: '22rem',
+                    // height: 'auto',
+                    aspectRatio: "4/5",
                     objectFit: 'cover',
                   }}
                 />
@@ -41,7 +42,7 @@ export default function NewArrivals() {
                   <h3 className="fs-6 fw-semibold mb-1 text-truncate">
                     {poster.title}
                   </h3>
-                  <p className="text-muted small mb-0">₹{poster.price}</p>
+                  <p className="" style={{ fontSize: "16px" }} >From ₹{poster.price}</p>
                 </div>
               </div>
             </div>

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import HeroBanner from '../components/HeroBanner';
-import CategoryGrid from '../components/CategoryGrid';
+import CategoryScroll from '../components/CategoryScroll';
 import TrendingPosters from '../components/TrendingPosters';
 import PopularPicks from '../components/PopularPicks';
 import CollectionScroll from '../components/CollectionScroll';
 import NewArrivals from '../components/NewArrivals';
-import PosterGrid from '../components/PosterGrid';
+import Optional from '../components/Optional';
 import CustomerReviews from '../components/Home/CustomerReviews';
 import WhyChooseUs from '../components/Home/WhyChooseUs';
 import AboutSection from '../components/Home/AboutSection';
@@ -20,12 +20,12 @@ export default function MainLanding() {
     return (
         <>
             <HeroBanner />
-            <CategoryGrid title="Shop by Category"/>
+            <CategoryScroll title="Shop by Category"/>
             <TrendingPosters />
             <PopularPicks />
             <CollectionScroll title="Collections"/>
             <NewArrivals />
-            <PosterGrid addToCart={addToCart} />
+            <Optional addToCart={addToCart} />
             <CustomerReviews />
             <WhyChooseUs />
             <AboutSection />

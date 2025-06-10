@@ -32,7 +32,7 @@ export default function CategoryCollectionsPage() {
                     src={poster.img}
                     alt={poster.title}
                     className="card-img-top"
-                    style={{ height: "14rem", objectFit: "cover", borderRadius: ".375rem" }}
+                    style={{ aspectRatio:"20/23", objectFit: "cover", borderRadius: ".375rem" }}
                   />
                   <div className="card-body text-center">
                     <h6 className="fw-semibold text-truncate mb-1">{poster.title}</h6>

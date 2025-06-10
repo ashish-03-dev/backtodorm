@@ -1,5 +1,3 @@
-// src/data/collections.js
-
 const collections = {
   minimal: [
     {

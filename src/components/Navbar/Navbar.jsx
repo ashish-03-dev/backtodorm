@@ -12,15 +12,16 @@ export default function NavbarComponent({ cartItems }) {
 
   return (
     <>
-      <nav className="d-flex sticky-top w-100 px-2 px-md-5 justify-content-between align-items-center bg-white shadow-sm" role="banner" style={{ height: "65px" }}>
+      <nav className="d-flex sticky-top w-100 px-3 px-md-5 justify-content-between align-items-center bg-white shadow-sm" role="banner" style={{ height: "65px" }}>
 
         <nav className="col-md-3 d-flex align-items-center">
           <button
-            className="btn d-md-none me-2"
+            className="btn btn-outline-dark d-lg-none me-3"
             onClick={() => setShowSidebar(true)}
             aria-label="Open Shop Categories"
           >
-            <i className="bi bi-list fs-4"></i>
+            {/* <i className="bi bi-list fs-4"></i> */}
+            <i className="fas fa-bars"></i> {/* Bootstrap hamburger icon */}
           </button>
           <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">BackToDorm</a>
         </nav>

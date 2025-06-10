@@ -1,75 +1,8 @@
-import React,{useRef, useEffect,useState} from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-
-// import trending from '../data/trending';
+import trending from '../data/trending';
 
 export default function TrendingPosters() {
- const items = [
-    {
-      id: "anime-hero-collage",
-      title: "Anime Hero Collage",
-      image: "/images/trending/image1.png",
-      price: 249,
-      sizes: ["A4", "A3"]
-    },
-    {
-      id: "classic-car-sideview",
-      title: "Classic Car Sideview",
-      image: "/images/trending/image2.png",
-      price: 199,
-      sizes: ["Multi-Part"]
-    },
-    {
-      id: "minimal-plant-study",
-      title: "Minimal Plant Study",
-      image: "/images/trending/image3.png",
-      price: 149,
-      sizes: ["A4", "A3"]
-    },
-    {
-      id: "nature-landscapes",
-      title: "Nature Landscapes",
-      image: "/images/trending/image4.png",
-      price: 299,
-      sizes: ["A3", "A2"]
-    },
-    {
-      id: "inspirational-quotes-pack",
-      title: "Inspirational Quotes Pack",
-      image: "/images/trending/image5.png",
-      price: 199,
-      sizes: ["A4"]
-    },
-    {
-      id: "anime-classics-collection",
-      title: "Anime Classics Collection",
-      image: "/images/trending/image6.png",
-      price: 399,
-      sizes: ["A2"]
-    },
-    {
-      id: "poster-mega-pack",
-      title: "50 Poster Mega Pack",
-      image: "/images/trending/image7.png",
-      price: 999,
-      sizes: ["Multi-Part"]
-    },
-    {
-      id: "ultimate-anime-pack",
-      title: "Ultimate Anime Pack",
-      image: "/images/trending/image8.png",
-      price: 699,
-      sizes: ["A4", "A3"]
-    },
-    {
-      id: "aesthetic-wall-collection",
-      title: "Aesthetic Wall Collection",
-      image: "/images/trending/image9.png",
-      price: 299,
-      sizes: ["A4", "A3", "A2"]
-    }
-  ];
-
 
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -115,7 +48,7 @@ export default function TrendingPosters() {
       {/* Scrollable Poster List */}
       <div
         ref={scrollRef}
-        className="d-flex overflow-auto gap-3 pb-2"
+        className="d-flex overflow-auto gap-2 pb-2"
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
@@ -124,15 +57,15 @@ export default function TrendingPosters() {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        {items.map((item, index) => (
+        {trending.map((item, index) => (
           <Link
-            to={`/product/${item.id}`}
+            to={`/poster/${item.id}`}
             key={index}
             className="text-decoration-none text-dark flex-shrink-0 trending-cards"
-            style={{scrollSnapAlign: "start" }}
+            style={{ scrollSnapAlign: "start" }}
           >
             <div
-              className="card shadow-sm border-0 position-relative"
+              className="card border-0 rounded-0 position-relative"
               style={{ width: "100%" }}
             >
               {/* Size Badges */}
@@ -152,14 +85,20 @@ export default function TrendingPosters() {
                 alt={item.title}
                 className="w-100"
                 style={{
-                  height: "20rem",
+                  aspectRatio: "4/5",
                   objectFit: "cover",
-                  borderRadius: ".375rem",
                 }}
               />
-              <div className="card-body p-2 fs-5 fw-medium">
-                <h6 className="card-title text-truncate mb-1">{item.title}</h6>
-                <p className="text-muted small mb-0">From ₹{item.price}</p>
+              <div className="pt-3 d-flex flex-column text-center">
+                <h6 className="card-title mb-1 text-truncate">{item.title}</h6>
+                {/* <p className="text-muted small mb-2">{item.description}</p> */}
+                <p className="" style={{ fontSize: "16px" }} >From ₹{item.price}</p>
+                <button
+                  // onClick={() => addToCart(item)}
+                  className="btn btn-dark mt-auto"
+                >
+                  Add to Cart
+                </button>
               </div>
             </div>
           </Link>
