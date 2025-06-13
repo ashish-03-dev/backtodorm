@@ -10,6 +10,9 @@ import {
     updateProfile,
     PhoneAuthProvider,
     linkWithCredential,
+    deleteUser,
+    reauthenticateWithCredential,
+    reauthenticateWithPopup,
 } from 'firebase/auth';
 
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
@@ -54,13 +57,30 @@ export const FirebaseProvider = (props) => {
     const putData = (key, data) => { set(ref(database, key), data) };
 
     const logout = () => signOut(auth);
-
     const setUpRecaptcha = async (containerId, phoneNumber) => {
-        const verifier = new RecaptchaVerifier(containerId, { size: "invisible" }, auth);
-        await verifier.render();
-        const res = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, verifier);
-        setConfirmationResult(res);
-        return res;
+        try {
+            if (window.location.hostname === "localhost") {
+                auth.settings.appVerificationDisabledForTesting = true;
+            }
+
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+                    size: "invisible",
+                    callback: () => {
+                        console.log("reCAPTCHA solved");
+                    },
+                });
+                await window.recaptchaVerifier.render();
+            }
+
+            const appVerifier = window.recaptchaVerifier;
+            const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, appVerifier);
+            setConfirmationResult(result);
+            return result;
+        } catch (error) {
+            console.error("Error in setUpRecaptcha:", error);
+            throw error;
+        }
     };
 
     const verifyOtp = (otp) => {
@@ -97,10 +117,50 @@ export const FirebaseProvider = (props) => {
         return await linkWithCredential(auth.currentUser, await signInWithPopup(auth, provider).then(res => res.credential));
     };
 
+    const deleteUserAccount = async (setUpRecaptcha) => {
+        if (!auth.currentUser) return alert("User not signed in");
+        const user = auth.currentUser;
+
+        try {
+            await deleteUser(user);
+            alert("Account deleted successfully");
+        } catch (err) {
+            if (err.code === "auth/requires-recent-login") {
+                alert("Please re-authenticate to delete your account.");
+                const providerId = user.providerData[0]?.providerId;
+
+                try {
+                    if (providerId === "google.com") {
+                        const provider = new GoogleAuthProvider();
+                        await reauthenticateWithPopup(user, provider);
+                    } else if (providerId === "phone") {
+                        const phoneNumber = user.phoneNumber?.replace("+91", "");
+                        const result = await setUpRecaptcha("recaptcha-container", phoneNumber);
+                        const otp = prompt("Enter the OTP sent to your phone:");
+                        const credential = PhoneAuthProvider.credential(result.verificationId, otp);
+                        await reauthenticateWithCredential(user, credential);
+                    } else {
+                        throw new Error("Unsupported provider for re-authentication.");
+                    }
+
+                    await deleteUser(user);
+                    alert("Account deleted successfully after re-authentication.");
+                } catch (reauthErr) {
+                    console.error("Re-authentication failed:", reauthErr);
+                    alert("Re-authentication failed: " + reauthErr.message);
+                }
+            } else {
+                console.error("Delete failed:", err);
+                alert("Delete failed: " + err.message);
+            }
+        }
+    };
+
     return (
         <FirebaseContext.Provider value={{
             logout,
             user,
+            firestore,
             putData,
             setUpRecaptcha,
             verifyOtp,
@@ -109,6 +169,7 @@ export const FirebaseProvider = (props) => {
             updateUserProfile,
             linkPhoneNumber,
             linkGoogleAccount,
+            deleteUserAccount,
         }}>
             {props.children}
         </FirebaseContext.Provider>

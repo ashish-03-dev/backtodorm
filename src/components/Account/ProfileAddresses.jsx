@@ -1,72 +1,72 @@
 import React, { useEffect, useState } from "react";
-import { useFirebase } from "../../context/FirebaseContext";
-import { doc, collection, addDoc, getDocs } from "firebase/firestore";
+import { useAddress } from '../../context/AddressContext';
+import AddressForm from './AddressForm';
 
 export default function AddressBook() {
-  const { user, firestore } = useFirebase();
+  const { getAddressList, addAddress, deleteAddress, updateAddress } = useAddress();
+  const [showForm, setShowForm] = useState(false);
   const [addresses, setAddresses] = useState([]);
-  const [newAddress, setNewAddress] = useState("");
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.uid) fetchAddresses();
-  }, [user]);
+    fetchAddresses();
+  }, []);
 
   const fetchAddresses = async () => {
-    const userDocRef = doc(firestore, "users", user.uid);
-    const addressColRef = collection(userDocRef, "addresses");
-    const snap = await getDocs(addressColRef);
-    const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setAddresses(data);
-  };
+    const list = await getAddressList();
+    setAddresses(list);
+  }
 
-  const handleAddAddress = async () => {
-    if (!newAddress.trim()) return;
-    setLoading(true);
+  const handleDelete = async (id) => {
     try {
-      const userDocRef = doc(firestore, "users", user.uid);
-      const addressColRef = collection(userDocRef, "addresses");
-
-      await addDoc(addressColRef, {
-        address: newAddress,
-        createdAt: new Date(),
-      });
-
-      setNewAddress("");
-      await fetchAddresses();
+      await deleteAddress(id);
+      const updated = await getAddressList();
+      setAddresses(updated); // Assuming you're managing `addresses` via useState
     } catch (error) {
-      console.error("Error adding address:", error);
+      console.error("Delete failed:", error);
     }
-    setLoading(false);
   };
 
   return (
     <div>
-      <h4 className="mb-3">Address Book</h4>
+      <h4 className="mb-3">Saved Addresses</h4>
+
+      {!showForm && (
+        <button className="btn btn-outline-primary mb-3" onClick={() => setShowForm(true)}>
+          Add New Address
+        </button>
+      )}
+
+      {showForm && <AddressForm setShowForm={setShowForm} fetchAddresses={fetchAddresses} addAddress={addAddress} />}
 
       {addresses.map((addr) => (
         <div key={addr.id} className="card p-3 mb-3">
-          <p className="mb-1">Saved Address</p>
-          <small className="text-muted">{addr.address}</small>
+          <div className="d-flex justify-content-between align-items-start">
+            <div>
+              <p className="mb-1">
+                <span>{addr.name}</span>
+                <span className="ms-2">{addr.phone}</span>
+              </p>
+              <small className="text-muted">
+                {addr.address}, {addr.locality}, {addr.city},
+                {addr.landmark && `, Landmark: ${addr.landmark}`}
+              </small>
+              <br />
+              <small className="text-muted">
+                {addr.state} - {addr.pincode}
+              </small>
+            </div>
+            <button
+              className="btn btn-sm btn-outline-danger"
+              onClick={() => handleDelete(addr.id)}
+            >
+              <i className="bi bi-trash"></i>
+            </button>
+          </div>
         </div>
       ))}
 
-      <div className="mb-3">
-        <textarea
-          className="form-control mb-2"
-          placeholder="Enter new address"
-          value={newAddress}
-          onChange={(e) => setNewAddress(e.target.value)}
-          rows={3}
-        />
-        <button
-          className="btn btn-outline-primary"
-          onClick={handleAddAddress}
-          disabled={loading}
-        >
-          {loading ? "Saving..." : "Add New Address"}
-        </button>
-      </div>
+
+
     </div>
   );
 }
