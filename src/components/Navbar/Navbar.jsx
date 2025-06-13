@@ -4,10 +4,11 @@ import AccountDropdown from "./AccountDropDown";
 import CartSidebar from "./CartSidebar";
 import MobileSidebar from './MobileSidebar';
 import "bootstrap/dist/css/bootstrap.min.css";
+import { useFirebase } from "../../context/FirebaseContext";
 
 export default function NavbarComponent({ cartItems }) {
-  // const isLoggedIn = false;
-  const isLoggedIn = true;
+  const { user, logout } = useFirebase(); // 👈 access user from context
+  const isLoggedIn = !!user; 
   const [showSidebar, setShowSidebar] = useState(false);
 
   return (
@@ -29,7 +30,7 @@ export default function NavbarComponent({ cartItems }) {
         <NavLinks />
 
         <div className="col-md-3 h-100 d-flex align-items-center justify-content-center position-relative">
-          <AccountDropdown isLoggedIn={isLoggedIn} />
+          <AccountDropdown isLoggedIn={isLoggedIn} logout={logout}/>
 
           <button
             className="btn bg-light position-relative px-3 mx-1 mx-md-2 border"

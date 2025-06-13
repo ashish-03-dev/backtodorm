@@ -1,5 +1,5 @@
 import React from 'react';
-import newArrivals from '../data/newArrivals';
+import newArrivals from '../../data/newArrivals';
 
 export default function NewArrivals() {
   return (

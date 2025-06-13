@@ -8,9 +8,9 @@ const NavDropdown = ({ title, path, menu, activeDropdown, setActiveDropdown, han
     onMouseLeave={handleMouseLeave}
     onClick={() => setActiveDropdown(null)}
   >
-    <Link className="nav-link fw-medium text-dark h-100 d-flex align-items-center" to={path}>
+    <div className="nav-link fw-medium text-dark h-100 d-flex align-items-center" style={{cursor:"pointer"}}>
       {title}
-    </Link>
+    </div>
 
     {activeDropdown === dropdownKey && (
       <div className="fullwidth-dropdown p-4 bg-white shadow-sm border-top rounded-bottom show slide-down">

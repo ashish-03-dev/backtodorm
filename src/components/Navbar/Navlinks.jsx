@@ -25,7 +25,6 @@ export default function NavLinks() {
 
                 <NavDropdown
                     title="Shop"
-                    path="/categories"
                     menu={categoryMenu}
                     activeDropdown={activeDropdown}
                     setActiveDropdown={setActiveDropdown}
@@ -36,7 +35,6 @@ export default function NavLinks() {
 
                 <NavDropdown
                     title="Collections"
-                    path="/collections"
                     menu={collectionsMenu}
                     activeDropdown={activeDropdown}
                     setActiveDropdown={setActiveDropdown}
@@ -46,7 +44,6 @@ export default function NavLinks() {
                 />
                 <NavDropdown
                     title="Custom"
-                    path="/custom"
                     menu={customMenu}
                     activeDropdown={activeDropdown}
                     setActiveDropdown={setActiveDropdown}
@@ -56,7 +53,6 @@ export default function NavLinks() {
                 />
                 <NavDropdown
                     title="Products"
-                    path="/products"
                     menu={productsMenu}
                     activeDropdown={activeDropdown}
                     setActiveDropdown={setActiveDropdown}

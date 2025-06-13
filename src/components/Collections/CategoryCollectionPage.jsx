@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import allCollections from "../data/allCollections";
+import allCollections from "../../data/allCollections";
 import { Link } from "react-router-dom";
 
 export default function CategoryCollectionsPage() {
@@ -24,15 +24,31 @@ export default function CategoryCollectionsPage() {
               View All
             </Link>
           </div>
-          <div className="row">
+          <div className="d-flex overflow-auto gap-2"
+            style={{
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+              WebkitScrollbar: 'none',
+              scrollBehavior: "smooth",
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+            }}>
             {posters.slice(0, 4).map((poster) => (
-              <div key={poster.id} className="col-6 col-md-3 mb-3">
-                <div className="card h-100 border-0 shadow-sm">
+              <div
+                key={poster.id}
+                style={{
+                  flex: "0 0 auto",
+                  width: "clamp(160px, 25%, 300px)", // min 160px, ideal 25%, max 240px
+                }}
+              >
+
+
+                <div className="card h-100 border">
                   <img
                     src={poster.img}
                     alt={poster.title}
                     className="card-img-top"
-                    style={{ aspectRatio:"20/23", objectFit: "cover", borderRadius: ".375rem" }}
+                    style={{ aspectRatio: "4/5", objectFit: "cover" }}
                   />
                   <div className="card-body text-center">
                     <h6 className="fw-semibold text-truncate mb-1">{poster.title}</h6>

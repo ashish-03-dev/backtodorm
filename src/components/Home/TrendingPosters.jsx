@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import trending from '../data/trending';
+import trending from '../../data/trending';
 
 export default function Trending() {
 
@@ -89,17 +89,16 @@ export default function Trending() {
                   objectFit: "cover",
                 }}
               />
-              <div className="pt-3 d-flex flex-column text-center">
-                <h6 className="card-title mb-1 text-truncate">{item.title}</h6>
-                {/* <p className="text-muted small mb-2">{item.description}</p> */}
-                <p className="" style={{fontSize:"16px"}} >From ₹{item.price}</p>
-                <button
-                  // onClick={() => addToCart(item)}
-                  className="btn btn-dark mt-auto"
-                >
-                  Add to Cart
-                </button>
+              <div className="pt-3 px-4 d-flex flex-column text-center">
+                <h6 className="card-title mb-1 text-center" style={{ fontSize: ".92rem" }}>{item.title}</h6>
+                <p className="" style={{ fontSize: "17px" }} >From ₹{item.price}</p>
               </div>
+              <button
+                // onClick={() => addToCart(item)}
+                className="btn btn-dark mt-auto"
+              >
+                Add to Cart
+              </button>
             </div>
           </Link>
         ))}

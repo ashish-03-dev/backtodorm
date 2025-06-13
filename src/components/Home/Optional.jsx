@@ -1,5 +1,5 @@
 import React from 'react';
-import posters from '../data/posters'; // adjust based on your actual path
+import trending from '../../data/trending';
 
 export default function PosterGrid({ addToCart }) {
   return (
@@ -7,7 +7,7 @@ export default function PosterGrid({ addToCart }) {
       <div className="container">
         <h2 className="text-center fw-bold fs-2 mb-4">You may also like</h2>
         <div className="d-flex overflow-auto gap-3 pb-2" style={{ scrollSnapType: "x mandatory" }}>
-          {posters.map((poster) => (
+          {trending.map((poster) => (
             <div key={poster.id} className="flex-shrink-0"
               style={{
                 width: "80%", // mobile default
@@ -30,7 +30,7 @@ export default function PosterGrid({ addToCart }) {
                 }}
               >
                 <img
-                  src={poster.img}
+                  src={poster.image}
                   alt={poster.title}
                   style={{
                     width: '100%',

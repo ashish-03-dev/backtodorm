@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import posters from '../data/posters';
+import trending from '../../data/trending';
 
 export default function ProductDetail({ addToCart }) {
   const { id } = useParams();
@@ -10,11 +10,11 @@ export default function ProductDetail({ addToCart }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const found = posters.find(p => p.id === Number(id));
+    const found = trending.find(p => p.id === Number(id));
     console.log(found);
     setPoster(found);
     setTimeout(() => setLoading(false), 500); // simulate delay
-  }, [id, posters]);
+  }, [id, trending]);
 
   const handleSizeChange = (size) => {
     setSelectedSize(size);
@@ -37,7 +37,7 @@ export default function ProductDetail({ addToCart }) {
       <div className="row g-5">
 
         <div className="col-md-6">
-          <img src={poster.img} className="img-fluid rounded shadow-sm" alt={poster.title} />
+          <img src={poster.image} className="img-fluid rounded shadow-sm" alt={poster.title} />
         </div>
 
         <div className="col-md-6 d-flex flex-column justify-content-between">

@@ -1,55 +1,111 @@
 import React, { useState } from "react";
-import "bootstrap/dist/css/bootstrap.min.css";
+import {useNavigate} from 'react-router-dom';
+import { useFirebase } from "../context/FirebaseContext";
 
-export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function PhoneLogin() {
+  const navigate = useNavigate();
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const { setUpRecaptcha, verifyOtp, googleLogin } = useFirebase();
+
+  const handlePhoneSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Handle login logic (Firebase Auth or custom backend)
-    console.log("Logging in with:", email, password);
+    setLoading(true);
+    try {
+      await setUpRecaptcha("recaptcha-container", phone);
+      setStep(2);
+    } catch (err) {
+      alert("Failed to send OTP: " + err.message);
+    }
+    setLoading(false);
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await verifyOtp(otp);
+      navigate("/");
+    } catch (err) {
+      alert("Invalid OTP: " + err.message);
+    }
+    setLoading(false);
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      await googleLogin();
+      navigate("/");
+    } catch (err) {
+      alert("Google login failed: " + err.message);
+    }
   };
 
   return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100 bg-light">
-      <div className="card shadow p-4" style={{ maxWidth: "400px", width: "100%" }}>
-        <h3 className="mb-3 text-center">Login</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="email" className="form-label">Email address</label>
-            <input
-              type="email"
-              className="form-control"
-              id="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="mb-3">
-            <label htmlFor="password" className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-control"
-              id="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <button type="submit" className="btn btn-primary w-100">Login</button>
-        </form>
-
-        <div className="mt-3 text-center">
-          <small>
-            Don't have an account? <a href="/signup">Sign up</a>
-          </small>
+    <div className="container d-flex align-items-center justify-content-center vh-100 bg-white">
+      <div className="card shadow-lg p-4" style={{ maxWidth: "400px", width: "100%" }}>
+        <div className="text-center mb-4">
+          {/* <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Pinterest-logo.png" alt="Logo" height="32" /> */}
+          <h4 className="fw-bold mt-3">Welcome</h4>
+          <p className="text-muted">Sign in with your phone number</p>
         </div>
+
+        {step === 1 && (
+          <form onSubmit={handlePhoneSubmit}>
+            <div className="mb-3">
+              <label className="form-label">Phone Number</label>
+              <input
+                type="tel"
+                className="form-control"
+                placeholder="Enter 10-digit number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+              />
+            </div>
+            <div id="recaptcha-container" className="mb-3"></div>
+            <button type="submit" className="btn btn-danger w-100" disabled={loading}>
+              {loading ? "Sending OTP..." : "Send OTP"}
+            </button>
+          </form>
+        )}
+
+        {step === 2 && (
+          <form onSubmit={handleOtpSubmit}>
+            <div className="mb-3">
+              <label className="form-label">Enter OTP</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter OTP"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-danger w-100" disabled={loading}>
+              {loading ? "Verifying..." : "Verify OTP"}
+            </button>
+          </form>
+        )}
+
+        <div className="text-center my-3">OR</div>
+
+        <button onClick={handleGoogleLogin} className="btn border w-100 mb-2">
+          <img
+            src="https://developers.google.com/identity/images/g-logo.png"
+            alt="Google"
+            style={{ width: "20px", marginRight: "10px" }}
+          />
+          Continue with Google
+        </button>
+
+        <p className="text-center text-muted mt-3" style={{ fontSize: "0.85rem" }}>
+          By continuing, you agree to our <a href="#">Terms</a> & <a href="#">Privacy</a>.
+        </p>
       </div>
     </div>
   );

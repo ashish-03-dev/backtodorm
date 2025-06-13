@@ -33,7 +33,7 @@ const categoryCards = [
       "/images/allcollections/pop-culture/superheroes/image1.png",
       "/images/allcollections/pop-culture/TV-series/image1.png",
       "/images/categories/videogames.png",
-      "/images/trending/image10.png",
+      // "/images/trending/image10.png",
       "/images/allcollections/pop-culture/games/image1.png",
     ],
   },
@@ -44,7 +44,7 @@ const categoryCards = [
       "/images/allCollections/niche/cars/image1.png",
       "/images/allCollections/niche/bikes/image1.png",
       "/images/allCollections/niche/concept-cars/image1.png",
-      "/images/trending/image12.png",
+      // "/images/trending/image12.png",
     ],
   },
   {

@@ -135,7 +135,6 @@ const allCollections = {
         id: "p10",
         title: "John Wick Poster",
         img: "/images/allcollections/pop-culture/movies/image1.png",
-
         price: 419,
       },
       {

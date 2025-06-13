@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function AccountDropdown({ isLoggedIn }) {
+export default function AccountDropdown({ isLoggedIn, logout }) {
     const [showDropdown, setShowDropdown] = useState(false);
     const [dropdownClicked, setDropdownClicked] = useState(false);
 
@@ -43,7 +43,7 @@ export default function AccountDropdown({ isLoggedIn }) {
 
             {/* Dropdown menu */}
             <div
-                className={`fullwidth-dropdown p-4 bg-white border-top shadow-sm rounded-bottom position-absolute end-0 ${showDropdown ? "show slide-down d-block" : "d-none"}`}
+                className={`fullwidth-dropdown p-4 bg-white border-top shadow rounded-bottom position-absolute end-0 ${showDropdown ? "show slide-down d-block" : "d-none"}`}
                 style={{
                     width: "100%",
                     top: "100%",
@@ -72,10 +72,18 @@ export default function AccountDropdown({ isLoggedIn }) {
                         <a href="/wishlist" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
                             <i className="bi bi-heart me-2"></i> Wishlist
                         </a>
-                        <div className="dropdown-divider"></div>
+                        
+                        <div
+                            style={{
+                                height: "1px",
+                                backgroundColor: "#dee2e6", // Bootstrap's $gray-300
+                                margin: "0.5rem 0"
+                            }}
+                        ></div>
+
                         <button
                             className="dropdown-item py-2 text-danger d-flex align-items-center"
-                            onClick={() => alert("Logout clicked!")}
+                            onClick={logout}
                             style={{
                                 border: "none",
                                 background: "none",

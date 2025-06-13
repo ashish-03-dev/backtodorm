@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import '../styles/CategoryScroll.css';
-import categoryCards from "../data/categoryCards";
+import '../../styles/CategoryScroll.css';
+import categoryCards from "../../data/categoryCards";
 
 export default function ShopByCategory() {
   const [isHovered, setIsHovered] = useState(false);

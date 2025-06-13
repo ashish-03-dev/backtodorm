@@ -1,5 +1,6 @@
 import React from 'react';
 import '../../styles/CartSidebar.css';
+import { Link } from 'react-router-dom';
 
 export default function CartSidebar({ cartItems }) {
   return (
@@ -26,21 +27,23 @@ export default function CartSidebar({ cartItems }) {
           cartItems.map((item, index) => (
             <div key={index} className="mb-2 border-bottom pb-2">
               <img
-                  src={item.image}
-                  alt={item.title}
-                  style={{ width: "60px", height: "60px", objectFit: "cover" }}
-                  className="me-3 rounded"
-                />
+                src={item.image}
+                alt={item.title}
+                style={{ width: "60px", height: "60px", objectFit: "cover" }}
+                className="me-3 rounded"
+              />
               <h6 className="mb-1">{item.title}</h6>
               <p className="mb-0 text-muted">{item.price}</p>
             </div>
           ))
         )}
-        
+
         {/* Checkout Section */}
         <div className="border-top pt-3">
           <h6 className="fw-semibold">Total: ₹{cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0)}</h6>
-          <button className="btn btn-dark w-100 mt-3">Go to Checkout</button>
+          <Link to="/checkout" className="btn btn-dark w-100 mt-3">
+            <i className="bi bi-cart-check me-2"></i> Go to Checkout
+          </Link>
         </div>
 
       </div>
