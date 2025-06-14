@@ -8,8 +8,9 @@ import { useFirebase } from "../../context/FirebaseContext";
 
 export default function NavbarComponent({ cartItems }) {
   const { user, logout } = useFirebase(); // 👈 access user from context
-  const isLoggedIn = !!user; 
+  const isLoggedIn = !!user;
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showCart, setShowCart] = useState(false);
 
   return (
     <>
@@ -21,8 +22,7 @@ export default function NavbarComponent({ cartItems }) {
             onClick={() => setShowSidebar(true)}
             aria-label="Open Shop Categories"
           >
-            {/* <i className="bi bi-list fs-4"></i> */}
-            <i className="fas fa-bars"></i> {/* Bootstrap hamburger icon */}
+            <i className="fas fa-bars"></i>
           </button>
           <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">BackToDorm</a>
         </nav>
@@ -30,33 +30,38 @@ export default function NavbarComponent({ cartItems }) {
         <NavLinks />
 
         <div className="col-md-3 h-100 d-flex align-items-center justify-content-center position-relative">
-          <AccountDropdown isLoggedIn={isLoggedIn} logout={logout}/>
+
+          <AccountDropdown isLoggedIn={isLoggedIn} logout={logout} />
 
           <button
-            className="btn bg-light position-relative px-3 mx-1 mx-md-2 border"
+            className="btn bg-light position-relative mx-1 mx-md-2 border"
             type="button"
-            data-bs-toggle="offcanvas"
-            data-bs-target="#cartOffcanvas"
-            aria-controls="cartOffcanvas"
-            aria-label="Open Cart"
+            onClick={() => setShowCart(true)}
+            style={{ height: "35px" }}
           >
             🛒 Cart
             {cartItems.length > 0 && (
               <span
-                className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
-                style={{ fontSize: "0.65rem" }}
+                className="position-absolute top-0 start-100 translate-middle bg-primary text-white d-flex align-items-center justify-content-center"
+                style={{
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "50%",
+                  fontSize: "0.65rem",
+                }}
               >
                 {cartItems.length}
                 <span className="visually-hidden">items in cart</span>
               </span>
             )}
+
           </button>
         </div>
 
       </nav>
 
       <MobileSidebar show={showSidebar} onClose={() => setShowSidebar(false)} />
-      <CartSidebar cartItems={cartItems} />
+      <CartSidebar cartItems={cartItems} show={showCart} onClose={() => setShowCart(false)} />
     </>
   );
 }

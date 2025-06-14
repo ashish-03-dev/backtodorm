@@ -2,77 +2,54 @@ import React, { useState } from "react";
 
 export default function AccountDropdown({ isLoggedIn, logout }) {
     const [showDropdown, setShowDropdown] = useState(false);
-    const [dropdownClicked, setDropdownClicked] = useState(false);
-
-    const handleMouseEnter = () => {
-        if (!dropdownClicked) {
-            setShowDropdown(true);
-        }
-    };
-
-    const handleMouseLeave = () => {
-        if (!dropdownClicked) {
-            setShowDropdown(false);
-        }
-    };
 
     const toggleDropdown = () => {
-        if (dropdownClicked) {
-            setDropdownClicked(false);
-            setShowDropdown(false);
-        } else {
-            setDropdownClicked(true);
-            setShowDropdown(true);
-        }
+        setShowDropdown(prev => !prev);
     };
 
     return (
-        <div
-            className="h-100 d-flex align-items-center"
-            onMouseLeave={handleMouseLeave}
-        >
+        <div className=""        >
             {/* Account Icon Button */}
             <button
-                className="btn border p-0 d-flex align-items-center px-2 mx-1 mx-md-2 bg-light"
+                className="btn border py-auto d-flex align-items-center px-2 mx-1 mx-md-2 bg-light"
                 onClick={toggleDropdown}
-                onMouseEnter={handleMouseEnter}
-                style={{ cursor: "pointer", backdropFilter: "blur(10px)" }}
+                style={{ height: "35px", cursor: "pointer" }}
+
             >
                 <i className="bi bi-person fs-4"></i>
             </button>
 
-            {/* Dropdown menu */}
-            <div
-                className={`fullwidth-dropdown p-4 bg-white border-top shadow rounded-bottom position-absolute end-0 ${showDropdown ? "show slide-down d-block" : "d-none"}`}
-                style={{
-                    width: "100%",
-                    top: "100%",
-                    zIndex: 1050
-                }}
-            >
+            {showDropdown && (
+                <div
+                    className="dropdown-overlay"
+                    onClick={toggleDropdown} // Clicking outside closes the dropdown
+                ></div>
+            )}
 
-                <div className="mb-2 fw-semibold text-secondary px-1 small">
+            {/* Dropdown menu */}
+            <div className={`fullwidth-dropdown p-4 bg-white border-top shadow rounded-bottom ${showDropdown ? "show slide-down d-block" : "d-none"}`}>
+                <div className="mb-2 fw-semibold text-secondary small">
                     My Account
                 </div>
 
                 {!isLoggedIn ? (
                     <>
                         <a href="/login" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
-                            <i className="bi bi-box-arrow-in-right me-2"></i> Login / Signup
+                            <i className="bi bi-box-arrow-in-right me-2"></i> Login
                         </a>
                     </>
                 ) : (
                     <>
-                        <a href="/profile" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
-                            <i className="bi bi-person-circle me-2"></i> Profile
+                        <a href="/account" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
+                            <i className="bi bi-person-circle me-2"></i> Account
                         </a>
-                        <a href="/orders" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
+                        <a href="/account/orders" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
                             <i className="bi bi-box-seam me-2"></i> Orders
                         </a>
                         <a href="/wishlist" className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center">
                             <i className="bi bi-heart me-2"></i> Wishlist
                         </a>
-                        
+
                         <div
                             style={{
                                 height: "1px",

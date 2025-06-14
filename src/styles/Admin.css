@@ -1,0 +1,23 @@
+.admin-panel {
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  width: 240px;
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+}
+
+.admin-sidebar .nav a {
+  display: block;
+  padding: 10px;
+  color: #333;
+  text-decoration: none;
+}
+
+.admin-sidebar .nav a.active,
+.admin-sidebar .nav a:hover {
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+}

@@ -14,7 +14,7 @@ export default function HomeLayout() {
     <>
       <Navbar cartItems={cartItems} />
       <main>
-        <Outlet />
+        <Outlet addToCart={addToCart}/>
       </main>
       <Footer />
     </>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { Navigate } from 'react-router-dom';
+
 import { useFirebase } from "../../context/FirebaseContext";
 
 export default function ProfileInfo() {
-  const { user, getUserProfile, updateUserProfile, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
+  const { user, userData, loadingUserData, getUserProfile, updateUserProfile, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
   const [name, setName] = useState("");
   const [tempName, setTempName] = useState(name);
   const [editingName, setEditingName] = useState(null);
@@ -26,6 +28,10 @@ export default function ProfileInfo() {
     setEditingName(null);
   };
 
+  if (!loadingUserData && !user) {
+    return <Navigate to="/login" />;
+  }
+
   return (
     <div className="d-flex flex-column h-100">
       <h4 className="mb-4">Profile Info</h4>
@@ -48,14 +54,13 @@ export default function ProfileInfo() {
         )}
       </div>
 
-
       {/* Name */}
       <div className="mb-4">
         <label className="form-label fw-semibold mb-2">Full Name</label>
         {!editingName ? (
           <div className="input-group mt-2">
 
-            <input className="form-control text-muted" value={name} readOnly />
+            <input className="form-control text-muted" value={userData?.name || ""} readOnly />
             <span
               className="input-group-text bg-white text-primary"
               style={{ cursor: "pointer" }}

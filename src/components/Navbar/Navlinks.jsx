@@ -1,6 +1,4 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom';
-// import "../../styles/NavbarDropdown.css";
+import { useState } from 'react'
 import NavDropdown from "./NavDropdown";
 
 import categoryMenu from '../../data/categoryMenu';
@@ -18,7 +16,7 @@ export default function NavLinks() {
         <nav className="col-md-5 d-none d-lg-flex justify-content-center h-100">
             <ul className="nav h-100 justify-content-between align-items-stretch py-0 my-0" style={{ fontSize: "17px" }}>
                 <li className="nav-item">
-                    <a className="nav-link fw-medium text-dark h-100 d-flex align-items-center" href="/">
+                    <a className="nav-link text-dark h-100 d-flex align-items-center" href="/">
                         Home
                     </a>
                 </li>

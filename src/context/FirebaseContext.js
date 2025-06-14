@@ -27,6 +27,8 @@ export const FirebaseProvider = (props) => {
     const firestore = getFirestore(app);
     const database = getDatabase(app);
     const [user, setUser] = useState(null);
+    const [userData, setUserData] = useState(null);
+    const [loadingUserData, setLoadingUserData] = useState(true);
     const [confirmationResult, setConfirmationResult] = useState(null);
 
     useEffect(() => {
@@ -38,17 +40,25 @@ export const FirebaseProvider = (props) => {
                 const snapshot = await getDoc(userRef);
 
                 if (!snapshot.exists()) {
-                    await setDoc(userRef, {
+                    const userObj = {
                         uid: currentUser.uid,
                         name: currentUser.displayName || "",
                         email: currentUser.email || "",
                         phone: currentUser.phoneNumber || "",
                         photoURL: currentUser.photoURL || "",
                         createdAt: new Date().toISOString(),
-                    });
+                    }
+                    await setDoc(userRef, userObj);
+                    setUserData(userObj);
+                } else {
+                    setUserData(snapshot.data());
                 }
+
+                setLoadingUserData(false);
             } else {
                 setUser(null);
+                setUserData(null);
+                setLoadingUserData(false);
             }
         });
         return () => unsub();
@@ -160,6 +170,8 @@ export const FirebaseProvider = (props) => {
         <FirebaseContext.Provider value={{
             logout,
             user,
+            userData,
+            loadingUserData,
             firestore,
             putData,
             setUpRecaptcha,
