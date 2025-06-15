@@ -28,21 +28,3 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-.trending-cards {
-  width: 17rem;
-}
-
-.collection-cards {
-  width: 18rem;
-}
-
-@media (max-width: 576px) {
-  .trending-cards {
-    width: 12rem;
-  }
-
-  .collection-cards {
-    width: 16rem;
-  }
-}

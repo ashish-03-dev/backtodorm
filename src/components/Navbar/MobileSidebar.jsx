@@ -48,7 +48,7 @@ export default function MobileSidebar({ show, onClose }) {
               <i className={`bi ${openCategory === "shop" ? "bi-chevron-up" : "bi-chevron-down"}`}></i>
             </button>
             {openCategory === "shop" && (
-              <div className="px-5 mt-2">
+              <div className="px-5 mt-3">
                 {categoryMenu.map((section, index) => (
                   <div key={index} className="mb-3">
                     <div className="fw-bold text-dark small mb-1">{section.title}</div>
@@ -58,7 +58,7 @@ export default function MobileSidebar({ show, onClose }) {
                           <Link
                             to={item.link}
                             onClick={onClose}
-                            className="d-block py-1 text-decoration-none text-dark small"
+                            className="d-block py-1 ps-1 text-decoration-none text-dark small"
                           >
                             {item.name}
                           </Link>
@@ -81,7 +81,7 @@ export default function MobileSidebar({ show, onClose }) {
               <i className={`bi ${openCategory === "collections" ? "bi-chevron-up" : "bi-chevron-down"}`}></i>
             </button>
             {openCategory === "collections" && (
-              <div className="px-5 mt-2">
+              <div className="px-5 mt-3">
                 {collectionsMenu.map((section, index) => (
                   <div key={index} className="mb-3">
                     <div className="fw-bold text-dark small mb-1">{section.title}</div>
@@ -91,7 +91,7 @@ export default function MobileSidebar({ show, onClose }) {
                           <Link
                             to={item.link}
                             onClick={onClose}
-                            className="d-block py-1 text-decoration-none text-dark small"
+                            className="d-block py-1 ps-1 text-decoration-none text-dark small"
                           >
                             {item.name}
                           </Link>

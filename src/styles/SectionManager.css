@@ -1,0 +1,53 @@
+/* Ensure table responsiveness */
+.table-responsive {
+  overflow-x: auto;
+}
+
+/* Style badges for poster count */
+.badge {
+  font-size: 0.85rem;
+}
+
+/* Ensure modals have consistent padding */
+.modal-body {
+  padding: 1.5rem;
+}
+
+/* Align buttons in table actions */
+.table td .btn {
+  margin-right: 0.5rem;
+}
+
+/* Style list group in details modal */
+.list-group-item {
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Style form text */
+.form-text {
+  font-size: 0.85rem;
+}
+
+/* Style input group buttons (clipboard, view, remove) */
+.input-group .btn {
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Ensure add poster button is aligned */
+.btn-outline-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Style poster entry row */
+.poster-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}

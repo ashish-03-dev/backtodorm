@@ -37,7 +37,7 @@ export default function ShopByCategory() {
 
       <div
         ref={scrollRef}
-        className="d-flex overflow-auto pb-2 gap-2 gap-md-3 container-category"
+        className="d-flex overflow-auto pb-2 gap-2 gap-md-3 "
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",

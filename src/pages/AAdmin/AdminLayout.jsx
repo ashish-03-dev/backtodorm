@@ -11,6 +11,7 @@ export default function AdminLayout() {
     { path: "/admin/posters", label: "Posters" },
     { path: "/admin/customers", label: "Customers" },
     { path: "/admin/support", label: "Support" },
+    { path: "/admin/section-editor", label: "Section Editor" },
     { path: "/admin/settings", label: "Site Settings" },
     { path: "/admin/category-manager", label: "Category Manager" },
     { path: "/admin/users", label: "Admin Users" },

@@ -15,7 +15,7 @@ import {
     reauthenticateWithPopup,
 } from 'firebase/auth';
 
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc,deleteDoc } from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
 import { app } from '../firebase';
 
@@ -25,7 +25,7 @@ export const useFirebase = () => useContext(FirebaseContext);
 export const FirebaseProvider = (props) => {
     const auth = getAuth(app);
     const firestore = getFirestore(app);
-    const database = getDatabase(app);
+    const db = getDatabase(app);
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
     const [loadingUserData, setLoadingUserData] = useState(true);
@@ -64,7 +64,7 @@ export const FirebaseProvider = (props) => {
         return () => unsub();
     }, [auth, firestore]);
 
-    const putData = (key, data) => { set(ref(database, key), data) };
+    const putData = (key, data) => { set(ref(db, key), data) };
 
     const logout = () => signOut(auth);
     const setUpRecaptcha = async (containerId, phoneNumber) => {
@@ -173,6 +173,7 @@ export const FirebaseProvider = (props) => {
             userData,
             loadingUserData,
             firestore,
+            db,
             putData,
             setUpRecaptcha,
             verifyOtp,

@@ -13,14 +13,13 @@ import AdminLayout from './pages/AAdmin/AdminLayout';
 import Dashboard from "./pages/AAdmin/Dashboard";
 import Orders from "./pages/AAdmin/Orders";
 import Sellers from "./pages/AAdmin/Sellers";
-import Posters from "./pages/AAdmin/Posters";
+import Posters from "./pages/AAdmin/Posters/Posters";
 import Customers from "./pages/AAdmin/Customers";
 import Support from "./pages/AAdmin/Support";
 import Settings from "./pages/AAdmin/SiteSettings";
 import CategoryManager from "./pages/AAdmin/CategoryManager";
 import AdminUsers from "./pages/AAdmin/AdminUsers";
-// import AddPoster from './pages/admin/AddPoster';
-// import EditPoster from './pages/admin/EditPoster';
+import SectionEditor from "./pages/AAdmin/SectionEditor";
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
 import ProfileOrders from './components/Account/ProfileOrders';
@@ -60,9 +59,8 @@ function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="category-manager" element={<CategoryManager />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="section-editor" element={<SectionEditor />} />
         </Route>
-        {/* <Route path="/admin/add" element={<AddPoster />} /> */}
-        {/* <Route path="/admin/edit/:id" element={<EditPoster />} /> */}
       </Routes>
     </Router>
   );

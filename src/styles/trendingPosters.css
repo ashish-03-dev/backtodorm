@@ -1,0 +1,60 @@
+
+/* Card Widths */
+.trending-cards {
+  width: 17rem;
+}
+
+.collection-cards {
+  width: 18rem;
+}
+
+@media (max-width: 576px) {
+  .trending-cards {
+    width: 12rem;
+  }
+
+  .collection-cards {
+    width: 16rem;
+  }
+}
+
+/* Skeleton Loading Animation */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Ensure cards maintain consistent size */
+.card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Truncate title to 2 lines with ellipsis */
+.text-truncate-2-lines {
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 2.5rem;
+}
+
+/* Ensure content area below image has fixed height */
+.card > .d-flex {
+  flex: 1;
+  min-height: 100px;
+}
+
+/* Hide scrollbar but keep functionality */
+.overflow-auto::-webkit-scrollbar {
+  display: none;
+}

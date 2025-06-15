@@ -1,5 +1,6 @@
   .account-sidebar {
     width: 300px;
+      flex-shrink: 0; /* prevent shrink */
   }
 
   /* Sidebar behavior on mobile */

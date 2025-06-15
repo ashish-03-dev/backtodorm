@@ -52,11 +52,13 @@ export default function AccountLayout() {
       {showSidebar && <div className="account-overlay d-md-none" onClick={() => setShowSidebar(false)}></div>}
 
       <div className="bg-light p-3">
-        <div className="container d-flex flex-row gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
+        <div className="container d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
 
           {/* Sidebar */}
           {!showContentOnMobile && (
-            <div className={`account-sidebar bg-light d-flex flex-column gap-3 ${showSidebar ? "show" : ""}`}>
+            <div className={`account-sidebar bg-light d-flex flex-column gap-3 ${showSidebar ? "show" : ""}`}
+              style={{ width: "300px", flexShrink: 0 }}
+            >
               <div className="text-center p-4 bg-white shadow-sm">
                 <h5 className="mb-0">My Account</h5>
               </div>
@@ -83,19 +85,19 @@ export default function AccountLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/security") ? "fw-bold text-primary bg-light border" : "text-dark"} sidebar-item`}
-                      onClick={() => handleSectionClick("/account/security")}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/orders") ? "fw-bold text-primary bg-light border" : "text-dark"} sidebar-item`}
+                      onClick={() => handleSectionClick("/account/orders")}
                     >
-                      Security
+                      Orders
                       <i className="bi bi-chevron-right d-md-none"></i>
                     </div>
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/orders") ? "fw-bold text-primary bg-light border" : "text-dark"} sidebar-item`}
-                      onClick={() => handleSectionClick("/account/orders")}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/security") ? "fw-bold text-primary bg-light border" : "text-dark"} sidebar-item`}
+                      onClick={() => handleSectionClick("/account/security")}
                     >
-                      Orders
+                      Security
                       <i className="bi bi-chevron-right d-md-none"></i>
                     </div>
                   </li>
@@ -109,7 +111,9 @@ export default function AccountLayout() {
           )}
 
           {/* Main Content */}
-          <div className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${showContentOnMobile ? 'd-block d-md-block' : 'd-none d-md-block'}`}>
+          <div className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${showContentOnMobile ? 'd-block d-md-block' : 'd-none d-md-block'}`}
+            style={{ maxWidth: "100%", overflow: "auto" }}
+          >
             <Outlet />
           </div>
         </div>
