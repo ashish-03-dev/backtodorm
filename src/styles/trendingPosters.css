@@ -1,4 +1,3 @@
-
 /* Card Widths */
 .trending-cards {
   width: 17rem;
@@ -15,6 +14,11 @@
 
   .collection-cards {
     width: 16rem;
+  }
+
+  /* Reduce price text size on mobile */
+  .price-text {
+    font-size: 0.875rem; /* Equivalent to 14px, adjust as needed */
   }
 }
 
@@ -35,6 +39,7 @@
 .card {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Truncate title to 2 lines with ellipsis */
@@ -45,13 +50,17 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 2.5rem;
+  white-space: normal;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  max-height: 2.208rem;
 }
 
-/* Ensure content area below image has fixed height */
+/* Ensure content area below image has fixed height and hides overflow */
 .card > .d-flex {
   flex: 1;
   min-height: 100px;
+  overflow: hidden;
 }
 
 /* Hide scrollbar but keep functionality */

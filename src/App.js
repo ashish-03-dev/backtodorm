@@ -17,7 +17,7 @@ import Posters from "./pages/AAdmin/Posters/Posters";
 import Customers from "./pages/AAdmin/Customers";
 import Support from "./pages/AAdmin/Support";
 import Settings from "./pages/AAdmin/SiteSettings";
-import CategoryManager from "./pages/AAdmin/CategoryManager";
+import CategoryManager from "./pages/AAdmin/ContentManager";
 import AdminUsers from "./pages/AAdmin/AdminUsers";
 import SectionEditor from "./pages/AAdmin/SectionEditor";
 import AccountLayout from './components/Account/AccountLayout';
@@ -54,12 +54,12 @@ function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="sellers" element={<Sellers />} />
           <Route path="posters" element={<Posters />} />
+          <Route path="section-editor" element={<SectionEditor />} />
           <Route path="customers" element={<Customers />} />
           <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />
           <Route path="category-manager" element={<CategoryManager />} />
           <Route path="users" element={<AdminUsers />} />
-          <Route path="section-editor" element={<SectionEditor />} />
         </Route>
       </Routes>
     </Router>

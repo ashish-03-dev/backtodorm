@@ -170,6 +170,7 @@ export const FirebaseProvider = (props) => {
         <FirebaseContext.Provider value={{
             logout,
             user,
+            auth,
             userData,
             loadingUserData,
             firestore,
