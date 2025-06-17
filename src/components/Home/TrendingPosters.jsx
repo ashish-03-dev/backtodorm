@@ -55,15 +55,31 @@ export default function Trending() {
         const unsubscribePosters = onSnapshot(
           postersQuery,
           (postersSnap) => {
-            const fetchedPosters = postersSnap.docs.map((doc) => ({
-              id: doc.id,
-              title: doc.data().title || "Untitled",
-              image: doc.data().imageUrl || "",
-              price: doc.data().finalPrice || 0,
-              sizes: doc.data().sizes || [],
-              originalPrice: doc.data().price || 0,
-              discount: doc.data().discount || 0,
-            }));
+            const fetchedPosters = postersSnap.docs.map((doc) => {
+              const data = doc.data();
+              const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+              const badges = Array.isArray(data.badges) ? data.badges : [];
+              // Find the size with the minimum finalPrice
+              const minPriceSize = sizes.length > 0 
+                ? sizes.reduce((min, size) => 
+                    size.finalPrice < min.finalPrice ? size : min, 
+                    sizes[0]
+                  )
+                : { price: 0, finalPrice: 0 };
+
+              return {
+                id: doc.id,
+                title: data.title || "Untitled",
+                image: data.imageUrl || "",
+                price: minPriceSize.finalPrice || 0,
+                originalPrice: minPriceSize.price || 0,
+                discount: sizes.length > 0 && minPriceSize.finalPrice < minPriceSize.price 
+                  ? Math.round((1 - minPriceSize.finalPrice / minPriceSize.price) * 100) 
+                  : 0,
+                sizes: sizes,
+                badges: badges,
+              };
+            });
 
             setPosters(fetchedPosters);
             setIsLoading(false);
@@ -224,37 +240,53 @@ export default function Trending() {
                 className="card border-0 rounded-0 position-relative"
                 style={{ width: "100%", minHeight: "350px" }}
               >
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-100"
-                  loading="lazy"
-                  style={{
-                    aspectRatio: '4/5',
-                    objectFit: "cover",
-                    minHeight: "200px",
-                  }}
-                />
+                <div className="position-relative">
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="w-100"
+                    loading="lazy"
+                    style={{
+                      aspectRatio: '4/5',
+                      objectFit: "cover",
+                      minHeight: "200px",
+                    }}
+                  />
+                  {item.badges.length > 0 && (
+                    <div
+                      className="position-absolute top-0 start-0 p-2 d-none d-md-flex gap-1"
+                      style={{ zIndex: 5 }}
+                    >
+                      {item.badges.map((badge, index) => (
+                        <span
+                          key={index}
+                          className="badge bg-primary text-white"
+                          style={{
+                            fontSize: '0.75rem',
+                            opacity: 0.9,
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="py-3 d-flex flex-column text-center">
                   <h6
                     className="card-title mb-1 px-2 text-center text-truncate-2-lines"
-                    style={{ fontSize: ".92rem", minHeight:"2.2rem" }}
+                    style={{ fontSize: ".92rem", minHeight: "2.2rem" }}
                     title={item.title}
                   >
                     {item.title}
                   </h6>
-                  {/* Multi-Part Badge */}
-                  {item.sizes.length > 1 && (
-                    <span
-                      className="badge bg-light border text-muted small fw-normal mb-2"
-                      title="This poster has multiple parts"
-                    >
-                      Multi-Part
-                    </span>
-                  )}
-                  <p className="price-text mb-2" style={{ fontSize: window.innerWidth <= 576 ? "15px" : "17px",
-                    minHeight: "1.5rem", 
-                   }}>
+                  <p
+                    className="price-text mb-2"
+                    style={{
+                      fontSize: window.innerWidth <= 576 ? "15px" : "17px",
+                      minHeight: "1.5rem",
+                    }}
+                  >
                     {item.discount > 0 ? (
                       <>
                         <span className="text-muted text-decoration-line-through me-2">
@@ -266,9 +298,7 @@ export default function Trending() {
                       <span>From ₹{item.price}</span>
                     )}
                   </p>
-                  <button className="btn btn-dark">
-                    Add to Cart
-                  </button>
+                  <button className="btn btn-dark">Add to Cart</button>
                 </div>
               </div>
             </Link>

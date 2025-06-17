@@ -57,15 +57,29 @@ export default function PopularPicks() {
         const unsubscribePosters = onSnapshot(
           postersQuery,
           (postersSnap) => {
-            const fetchedPosters = postersSnap.docs.map((doc) => ({
-              id: doc.id,
-              title: doc.data().title || "Untitled",
-              image: doc.data().imageUrl || "",
-              price: doc.data().finalPrice || 0,
-              sizes: doc.data().sizes || [],
-              originalPrice: doc.data().price || 0,
-              discount: doc.data().discount || 0,
-            }));
+            const fetchedPosters = postersSnap.docs.map((doc) => {
+              const data = doc.data();
+              const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+              // Find the size with the minimum finalPrice
+              const minPriceSize = sizes.length > 0 
+                ? sizes.reduce((min, size) => 
+                    size.finalPrice < min.finalPrice ? size : min, 
+                    sizes[0]
+                  )
+                : { price: 0, finalPrice: 0 };
+
+              return {
+                id: doc.id,
+                title: data.title || "Untitled",
+                image: data.imageUrl || "",
+                price: minPriceSize.finalPrice || 0,
+                originalPrice: minPriceSize.price || 0,
+                discount: sizes.length > 0 && minPriceSize.finalPrice < minPriceSize.price 
+                  ? Math.round((1 - minPriceSize.finalPrice / minPriceSize.price) * 100) 
+                  : 0,
+                sizes: sizes,
+              };
+            });
             setPosters(fetchedPosters);
             setIsLoading(false);
           },
@@ -260,7 +274,7 @@ export default function PopularPicks() {
                     className="price-text mb-2"
                     style={{
                       fontSize: window.innerWidth <= 576 ? "15px" : "17px",
-                      minHeight: "1.5rem", // Ensure consistent price height
+                      minHeight: "1.5rem",
                     }}
                   >
                     {item.discount > 0 ? (
