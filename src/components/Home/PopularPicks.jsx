@@ -19,7 +19,6 @@ export default function PopularPicks() {
       return;
     }
 
-    // Listen to popular section document
     const sectionRef = doc(firestore, "homeSections", "popular");
     const unsubscribeSection = onSnapshot(
       sectionRef,
@@ -46,7 +45,6 @@ export default function PopularPicks() {
           return;
         }
 
-        // Fetch posters with real-time updates
         const postersQuery = query(
           collection(firestore, "posters"),
           where("__name__", "in", posterIds),
@@ -60,12 +58,13 @@ export default function PopularPicks() {
             const fetchedPosters = postersSnap.docs.map((doc) => {
               const data = doc.data();
               const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+              const badges = Array.isArray(data.badges) ? data.badges : [];
               // Find the size with the minimum finalPrice
-              const minPriceSize = sizes.length > 0 
-                ? sizes.reduce((min, size) => 
-                    size.finalPrice < min.finalPrice ? size : min, 
-                    sizes[0]
-                  )
+              const minPriceSize = sizes.length > 0
+                ? sizes.reduce((min, size) =>
+                  size.finalPrice < min.finalPrice ? size : min,
+                  sizes[0]
+                )
                 : { price: 0, finalPrice: 0 };
 
               return {
@@ -74,10 +73,11 @@ export default function PopularPicks() {
                 image: data.imageUrl || "",
                 price: minPriceSize.finalPrice || 0,
                 originalPrice: minPriceSize.price || 0,
-                discount: sizes.length > 0 && minPriceSize.finalPrice < minPriceSize.price 
-                  ? Math.round((1 - minPriceSize.finalPrice / minPriceSize.price) * 100) 
+                discount: sizes.length > 0 && minPriceSize.finalPrice < minPriceSize.price
+                  ? Math.round((1 - minPriceSize.finalPrice / minPriceSize.price) * 100)
                   : 0,
                 sizes: sizes,
+                badges: badges,
               };
             });
             setPosters(fetchedPosters);
@@ -243,17 +243,39 @@ export default function PopularPicks() {
                 className="card border-0 rounded-0 position-relative"
                 style={{ width: "100%", minHeight: "350px" }}
               >
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="w-100"
-                  loading="lazy"
-                  style={{
-                    aspectRatio: '4/5',
-                    objectFit: "cover",
-                    minHeight: "200px",
-                  }}
-                />
+                <div className="position-relative">
+
+                  <img
+                    src={item.image}
+                    alt={item.title}
+                    className="w-100"
+                    loading="lazy"
+                    style={{
+                      aspectRatio: '4/5',
+                      objectFit: "cover",
+                      minHeight: "200px",
+                    }}
+                  />
+                  {item.badges.length > 0 && (
+                    <div
+                      className="position-absolute top-0 start-0 p-2 d-none d-md-flex gap-1"
+                      style={{ zIndex: 5 }}
+                    >
+                      {item.badges.map((badge, index) => (
+                        <span
+                          key={index}
+                          className="badge bg-primary text-white"
+                          style={{
+                            fontSize: '0.75rem',
+                            opacity: 0.9,
+                          }}
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="py-3 d-flex flex-column text-center">
                   <h6
                     className="card-title mb-1 px-2 text-center text-truncate-2-lines"
@@ -262,14 +284,6 @@ export default function PopularPicks() {
                   >
                     {item.title}
                   </h6>
-                  {item.sizes.length > 1 && (
-                    <span
-                      className="badge bg-light border text-muted small fw-normal mb-2"
-                      title="This poster has multiple parts"
-                    >
-                      Multi-Part
-                    </span>
-                  )}
                   <p
                     className="price-text mb-2"
                     style={{

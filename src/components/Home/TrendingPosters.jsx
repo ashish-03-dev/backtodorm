@@ -80,7 +80,6 @@ export default function Trending() {
                 badges: badges,
               };
             });
-
             setPosters(fetchedPosters);
             setIsLoading(false);
           },
