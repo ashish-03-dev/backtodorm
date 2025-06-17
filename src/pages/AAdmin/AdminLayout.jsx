@@ -7,13 +7,13 @@ export default function AdminLayout() {
   const navItems = [
     { path: "/admin", label: "Dashboard" },
     { path: "/admin/orders", label: "Orders" },
-    { path: "/admin/sellers", label: "Sellers" },
+    { path: "/admin/home-content", label: "Home Content" },
+    { path: "/admin/category-manager", label: "Category Manager" },
     { path: "/admin/posters", label: "Posters" },
-    { path: "/admin/section-editor", label: "Content Management" },
+    { path: "/admin/sellers", label: "Sellers" },
     { path: "/admin/customers", label: "Customers" },
     { path: "/admin/support", label: "Support" },
     { path: "/admin/settings", label: "Site Settings" },
-    { path: "/admin/category-manager", label: "Category Manager" },
     { path: "/admin/users", label: "Admin Users" },
   ];
 

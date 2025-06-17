@@ -4,7 +4,7 @@ import PosterTable from "./PosterTable";
 import PosterFilter from "./PosterFilter";
 import PosterForm from "./PosterForm";
 import PosterView from "./PosterView";
-import CollectionsView from "./CollectionsView";
+import CollectionsManager from "./CollectionsManager";
 import { addPosterToFirebase, updatePosterInFirebase, approvePosterInFirebase, rejectPosterInFirebase, deletePosterInFirebase, submitPosterInFirebase } from "../firebaseUtils";
 import { useFirebase } from "../../../context/FirebaseContext";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -147,17 +147,6 @@ const Posters = () => {
     posters.filter((p) => p.approved === "rejected"),
     tabFilters.rejected.search
   );
-  const collectionsMap = posters.reduce((map, p) => {
-    p.collections.forEach((col) => {
-      if (!map[col]) map[col] = [];
-      map[col].push(p);
-    });
-    return map;
-  }, {});
-  const filteredCollectionsMap = Object.keys(collectionsMap).reduce((map, col) => {
-    map[col] = applySearchFilter(collectionsMap[col], tabFilters.collections.search);
-    return map;
-  }, {});
 
   return (
     <div className="container mt-4">
@@ -272,15 +261,8 @@ const Posters = () => {
               onSubmit={submitPoster}
             />
           </Tab>
-          <Tab eventKey="collections" title="📦 By Collection">
-            <PosterFilter
-              filter={tabFilters.collections}
-              onFilterChange={(f) => handleTabFilterChange("collections", f)}
-              onAdd={() => openEdit(null)}
-              hideApprovedFilter
-            />
-            <CollectionsView
-              collectionsMap={filteredCollectionsMap}
+          <Tab eventKey="collections" title="📦 Collections">
+            <CollectionsManager
               onEdit={openEdit}
               onView={openView}
               onDelete={deletePoster}

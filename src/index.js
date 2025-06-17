@@ -8,13 +8,16 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { FirebaseProvider } from './context/FirebaseContext';
 import { AddressProvider } from './context/AddressContext';
+import { SearchProvider } from './context/SearchContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <FirebaseProvider>
       <AddressProvider>
-        <App />
+        <SearchProvider>
+          <App />
+        </SearchProvider>
       </AddressProvider>
     </FirebaseProvider>
   </React.StrictMode>

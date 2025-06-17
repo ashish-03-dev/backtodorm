@@ -5,17 +5,22 @@ import CartSidebar from "./CartSidebar";
 import MobileSidebar from './MobileSidebar';
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useFirebase } from "../../context/FirebaseContext";
+import { useNavigate } from "react-router-dom";
 
 export default function NavbarComponent({ cartItems }) {
-  const { user, logout } = useFirebase(); // 👈 access user from context
+  const { user, logout } = useFirebase();
   const isLoggedIn = !!user;
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <>
-      <nav className="d-flex sticky-top w-100 px-3 px-md-5 justify-content-between align-items-center bg-white shadow-sm" role="banner" style={{ height: "65px" }}>
-
+      <nav
+        className="d-flex sticky-top w-100 px-3 px-md-5 justify-content-between align-items-center bg-white shadow-sm"
+        role="banner"
+        style={{ height: "65px" }}
+      >
         <nav className="col-md-3 d-flex align-items-center">
           <button
             className="btn btn-outline-dark d-lg-none me-3"
@@ -24,12 +29,23 @@ export default function NavbarComponent({ cartItems }) {
           >
             <i className="fas fa-bars"></i>
           </button>
-          <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">BackToDorm</a>
+          <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">
+            BackToDorm
+          </a>
         </nav>
 
         <NavLinks />
 
-        <div className="col-md-3 h-100 d-flex align-items-center justify-content-center position-relative">
+        <div className="col-md-3 h-100 d-flex align-items-center justify-content-end position-relative">
+          <button
+            className="btn bg-light mx-1 mx-md-2 border"
+            type="button"
+            onClick={() => navigate("/search")}
+            style={{ height: "35px", padding: "0 10px" }}
+            aria-label="Search Posters"
+          >
+            <i className="bi bi-search fs-5"></i>
+          </button>
 
           <AccountDropdown isLoggedIn={isLoggedIn} logout={logout} />
 
@@ -54,10 +70,8 @@ export default function NavbarComponent({ cartItems }) {
                 <span className="visually-hidden">items in cart</span>
               </span>
             )}
-
           </button>
         </div>
-
       </nav>
 
       <MobileSidebar show={showSidebar} onClose={() => setShowSidebar(false)} />

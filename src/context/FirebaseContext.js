@@ -14,8 +14,7 @@ import {
     reauthenticateWithCredential,
     reauthenticateWithPopup,
 } from 'firebase/auth';
-
-import { getFirestore, doc, getDoc, setDoc,deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
 import { app } from '../firebase';
 
@@ -35,7 +34,6 @@ export const FirebaseProvider = (props) => {
         const unsub = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-
                 const userRef = doc(firestore, 'users', currentUser.uid);
                 const snapshot = await getDoc(userRef);
 
@@ -47,13 +45,13 @@ export const FirebaseProvider = (props) => {
                         phone: currentUser.phoneNumber || "",
                         photoURL: currentUser.photoURL || "",
                         createdAt: new Date().toISOString(),
-                    }
+                        isSeller: false,
+                    };
                     await setDoc(userRef, userObj);
                     setUserData(userObj);
                 } else {
                     setUserData(snapshot.data());
                 }
-
                 setLoadingUserData(false);
             } else {
                 setUser(null);
@@ -64,15 +62,44 @@ export const FirebaseProvider = (props) => {
         return () => unsub();
     }, [auth, firestore]);
 
+    const checkUsernameAvailability = async (username) => {
+        if (!username.startsWith('@') || username.length < 2) {
+            return { available: false, message: "Username must start with @ and contain at least one character" };
+        }
+        const usersRef = collection(firestore, 'users');
+        const q = query(usersRef, where('sellerUsername', '==', username));
+        const querySnapshot = await getDocs(q);
+        return {
+            available: querySnapshot.empty,
+            message: querySnapshot.empty ? "Username is available" : "Username is already taken",
+        };
+    };
+
+    const becomeSeller = async (sellerData) => {
+        if (!user) throw new Error("User not signed in");
+        const userRef = doc(firestore, 'users', user.uid);
+        const { available } = await checkUsernameAvailability(sellerData.sellerUsername);
+        if (!available) throw new Error("Username is already taken");
+
+        const updatedData = {
+            isSeller: true,
+            sellerUsername: sellerData.sellerUsername,
+            sellerCreatedAt: new Date().toISOString(),
+        };
+        await setDoc(userRef, updatedData, { merge: true });
+        setUserData((prev) => ({ ...prev, ...updatedData }));
+        return updatedData;
+    };
+
     const putData = (key, data) => { set(ref(db, key), data) };
 
     const logout = () => signOut(auth);
+
     const setUpRecaptcha = async (containerId, phoneNumber) => {
         try {
             if (window.location.hostname === "localhost") {
                 auth.settings.appVerificationDisabledForTesting = true;
             }
-
             if (!window.recaptchaVerifier) {
                 window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
                     size: "invisible",
@@ -82,7 +109,6 @@ export const FirebaseProvider = (props) => {
                 });
                 await window.recaptchaVerifier.render();
             }
-
             const appVerifier = window.recaptchaVerifier;
             const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, appVerifier);
             setConfirmationResult(result);
@@ -108,18 +134,19 @@ export const FirebaseProvider = (props) => {
         const userRef = doc(firestore, 'users', uid);
         const usersnap = await getDoc(userRef);
         return usersnap.exists() ? usersnap.data() : null;
-    }
+    };
 
     const updateUserProfile = async (uid, data) => {
         if (!uid) throw new Error("No UID provided");
         const userRef = doc(firestore, "users", uid);
         return await setDoc(userRef, data, { merge: true });
-    }
+    };
+
     const linkPhoneNumber = async (verificationId, otp) => {
         if (!auth.currentUser) throw new Error("User not signed in");
         const credential = PhoneAuthProvider.credential(verificationId, otp);
         return await linkWithCredential(auth.currentUser, credential);
-    }
+    };
 
     const linkGoogleAccount = async () => {
         const provider = new GoogleAuthProvider();
@@ -184,8 +211,10 @@ export const FirebaseProvider = (props) => {
             linkPhoneNumber,
             linkGoogleAccount,
             deleteUserAccount,
+            becomeSeller,
+            checkUsernameAvailability, // Add new function
         }}>
             {props.children}
         </FirebaseContext.Provider>
-    )
-}
+    );
+};

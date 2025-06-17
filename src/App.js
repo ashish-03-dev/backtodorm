@@ -19,13 +19,16 @@ import Support from "./pages/AAdmin/Support";
 import Settings from "./pages/AAdmin/SiteSettings";
 import CategoryManager from "./pages/AAdmin/ContentManager";
 import AdminUsers from "./pages/AAdmin/AdminUsers";
-import SectionEditor from "./pages/AAdmin/SectionEditor";
+import HomeContentManager from "./pages/AAdmin/HomeContentManager";
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
 import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import Wishlist from './components/Wishlist';
+import BecomeSeller from './components/Account/BecomeSeller';
+import SellerDashboard from './components/SellerDashboard';
+import SearchPage from './components/SearchPage';
 
 function App() {
 
@@ -45,7 +48,10 @@ function App() {
             <Route path="orders" element={<ProfileOrders />} />
             <Route path="addresses" element={<ProfileAddresses />} />
             <Route path="security" element={<SecuritySettings />} />
+            <Route path="become-seller" element={<BecomeSeller />} />
           </Route>
+          <Route path="/seller-dashboard" element={<SellerDashboard />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/wishlist" element={<Wishlist />} />
         </Route>
         <Route path="/login" element={<Login />} />
@@ -54,7 +60,7 @@ function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="sellers" element={<Sellers />} />
           <Route path="posters" element={<Posters />} />
-          <Route path="section-editor" element={<SectionEditor />} />
+          <Route path="home-content" element={<HomeContentManager />} />
           <Route path="customers" element={<Customers />} />
           <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />
