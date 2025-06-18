@@ -9,18 +9,12 @@ const PosterForm = ({ poster, onSave }) => {
   const [uploading, setUploading] = useState(false);
   const [idError, setIdError] = useState(null);
   const [collectionError, setCollectionError] = useState(null);
-  const [categoryError, setCategoryError] = useState(null);
   const [idChecked, setIdChecked] = useState(!!poster);
   const [availableCollections, setAvailableCollections] = useState([]);
-  const [availableCategories, setAvailableCategories] = useState([]);
   const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
-  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
-  const [newCategoryName, setNewCategoryName] = useState("");
   const [newCollectionError, setNewCollectionError] = useState(null);
-  const [newCategoryError, setNewCategoryError] = useState(null);
   const [selectedCollections, setSelectedCollections] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [sellerName, setSellerName] = useState("");
   const [keywords, setKeywords] = useState(poster?.keywords?.join(", ") || "");
   const [showAllKeywords, setShowAllKeywords] = useState(false);
@@ -54,26 +48,6 @@ const PosterForm = ({ poster, onSave }) => {
       }
     };
 
-    const fetchCategories = async () => {
-      try {
-        const categoriesRef = collection(firestore, "categories");
-        const snapshot = await getDocs(categoriesRef);
-        const categories = snapshot.docs.map((doc) => ({
-          value: doc.id,
-          label: doc.data().name,
-        }));
-        setAvailableCategories(categories);
-
-        if (poster?.category) {
-          const selected = categories.find((cat) => cat.label === poster.category);
-          if (selected) setSelectedCategory(selected);
-        }
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-        setCategoryError("Failed to load categories.");
-      }
-    };
-
     const fetchSellerName = async () => {
       if (poster?.seller) {
         try {
@@ -89,7 +63,6 @@ const PosterForm = ({ poster, onSave }) => {
 
     if (firestore) {
       fetchCollections();
-      fetchCategories();
       fetchSellerName();
     }
   }, [firestore, poster]);
@@ -213,36 +186,6 @@ const PosterForm = ({ poster, onSave }) => {
     }
   };
 
-  const handleNewCategorySubmit = async (e) => {
-    e.preventDefault();
-    const name = newCategoryName.trim();
-    if (!name) {
-      setNewCategoryError("Category name is required.");
-      return;
-    }
-    if (availableCategories.some((c) => c.value.toLowerCase() === name.toLowerCase())) {
-      setNewCategoryError("Category already exists.");
-      return;
-    }
-
-    try {
-      const categoryId = name.toLowerCase().replace(/\s+/g, "-");
-      await setDoc(doc(firestore, "categories", categoryId), {
-        name,
-        createdAt: new Date(),
-      });
-      const newCategory = { value: categoryId, label: name };
-      setAvailableCategories((prev) => [...prev, newCategory]);
-      setSelectedCategory(newCategory);
-      setNewCategoryName("");
-      setNewCategoryError(null);
-      setShowNewCategoryModal(false);
-    } catch (err) {
-      setNewCategoryError("Failed to save category: " + err.message);
-      console.error("Error saving category:", err);
-    }
-  };
-
   const handleSizeChange = (index, field, value) => {
     const updatedSizes = [...sizes];
     updatedSizes[index] = { ...updatedSizes[index], [field]: value };
@@ -269,15 +212,10 @@ const PosterForm = ({ poster, onSave }) => {
     const posterId = (poster?.id || form.posterId.value.trim()).toLowerCase();
     const discount = parseFloat(form.discount.value) || 0;
     let imageUrl = poster?.imageUrl || form.imageUrl.value;
-    const category = selectedCategory?.label || "";
     const collections = selectedCollections.map((col) => col.label);
 
     if (!poster && (!posterId || !idChecked || idError)) {
       alert("Please provide a unique Poster ID and check its availability.");
-      return;
-    }
-    if (!category) {
-      alert("Category is required.");
       return;
     }
     if (sizes.some((s) => !s.size || !s.price || isNaN(s.price) || parseFloat(s.price) <= 0)) {
@@ -317,7 +255,6 @@ const PosterForm = ({ poster, onSave }) => {
       tags: form.tags.value.split(",").map((t) => t.trim()).filter(Boolean),
       keywords: keywords.split(",").map(k => k.trim()).filter(Boolean),
       collections,
-      category,
       imageUrl,
       discount,
       sizes: sizes.map((s) => ({
@@ -453,28 +390,6 @@ const PosterForm = ({ poster, onSave }) => {
           )}
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Label>Category</Form.Label>
-          <div className="d-flex align-items-center gap-2">
-            <Select
-              options={availableCategories}
-              value={selectedCategory}
-              onChange={setSelectedCategory}
-              className="flex-grow-1"
-              placeholder="Select category..."
-            />
-            <Button
-              variant="outline-primary"
-              onClick={() => setShowNewCategoryModal(true)}
-              title="Suggest new category"
-            >
-              + Suggest New
-            </Button>
-          </div>
-          {categoryError && (
-            <Form.Text className="text-danger">{categoryError}</Form.Text>
-          )}
-        </Form.Group>
-        <Form.Group className="mb-3">
           <Form.Label>Sizes and Prices</Form.Label>
           {sizes.map((sizeObj, index) => (
             <div key={index} className="d-flex align-items-center gap-2 mb-2">
@@ -591,30 +506,6 @@ const PosterForm = ({ poster, onSave }) => {
             </Form.Group>
             <Button type="submit" variant="success">
               Add Collection
-            </Button>
-          </Form>
-        </Modal.Body>
-      </Modal>
-
-      <Modal show={showNewCategoryModal} onHide={() => setShowNewCategoryModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Suggest New Category</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleNewCategorySubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Category Name</Form.Label>
-              <Form.Control
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="e.g., Motivational"
-                isInvalid={!!newCategoryError}
-              />
-              <Form.Control.Feedback type="invalid">{newCategoryError}</Form.Control.Feedback>
-            </Form.Group>
-            <Button type="submit" variant="success">
-              Add Category
             </Button>
           </Form>
         </Modal.Body>

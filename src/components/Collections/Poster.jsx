@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from "firebase/firestore";
 import { useFirebase } from '../../context/FirebaseContext';
+import { useOutletContext } from 'react-router-dom';
 
-export default function ProductDetail({ addToCart }) {
+export default function ProductDetail() {
   const { id } = useParams();
   const { firestore } = useFirebase();
+  const { addToCart, buyNow } = useOutletContext();
+  const navigate = useNavigate();
   const [poster, setPoster] = useState(null);
   const [selectedSize, setSelectedSize] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +39,6 @@ export default function ProductDetail({ addToCart }) {
           return;
         }
 
-        // Ensure sizes is an array of objects with size, price, and finalPrice
         const sizes = Array.isArray(posterData.sizes) ? posterData.sizes : [];
         const defaultSize = sizes.length > 0 ? sizes[0].size : null;
 
@@ -45,8 +47,9 @@ export default function ProductDetail({ addToCart }) {
           title: posterData.title || "Untitled",
           image: posterData.imageUrl || "",
           description: posterData.description || "No description available.",
-          discount: posterData.discount || 0, // Include discount field
-          sizes: sizes, // Array of { size, price, finalPrice }
+          discount: posterData.discount || 0,
+          sizes: sizes,
+          seller: posterData.seller || null,
         });
         setSelectedSize(defaultSize);
         setLoading(false);
@@ -64,11 +67,16 @@ export default function ProductDetail({ addToCart }) {
     setSelectedSize(size);
   };
 
-  // Find the selected size object to get price and finalPrice
   const selectedSizeObj = poster?.sizes.find(s => s.size === selectedSize) || {};
   const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
   const originalPrice = selectedSizeObj.price || 0;
   const isDiscounted = poster?.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
+
+  const handleBuyNow = () => {
+    const item = { id: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller };
+    buyNow(item);
+    navigate('/checkout');
+  };
 
   if (loading) {
     return (
@@ -94,7 +102,6 @@ export default function ProductDetail({ addToCart }) {
             <h3>{poster.title}</h3>
             <p className="mb-4">{poster.description}</p>
 
-            {/* Size Options */}
             <div className="mb-4">
               <h6 className="fw-semibold mb-2">Select Size</h6>
               <div className="d-flex gap-2">
@@ -110,7 +117,6 @@ export default function ProductDetail({ addToCart }) {
               </div>
             </div>
 
-            {/* Price Display */}
             <div className="mb-4">
               {isDiscounted ? (
                 <div>
@@ -134,11 +140,13 @@ export default function ProductDetail({ addToCart }) {
             <div className="d-flex flex-column gap-2 mb-4">
               <button
                 className="btn btn-dark btn-lg"
-                onClick={() => addToCart({ ...poster, selectedSize, price: displayPrice })}
+                onClick={() => addToCart({ id: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller })}
               >
                 🛒 Add to Cart
               </button>
-              <button className="btn btn-outline-dark btn-lg">Buy Now</button>
+              <button className="btn btn-outline-dark btn-lg" onClick={handleBuyNow}>
+                Buy Now
+              </button>
             </div>
           </div>
         </div>

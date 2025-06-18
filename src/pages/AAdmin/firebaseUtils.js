@@ -85,37 +85,18 @@ export const addPosterToFirebase = async (firestore, posterData, posterId = null
       throw new Error("Poster ID already exists");
     }
 
-    // Run a transaction to update posters, categories, and collections
-    const categoryRef = doc(firestore, "categories", data.category);
+    // Run a transaction to update posters and collections
     const collectionRefs = (data.collections || []).map((col) =>
       doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
     );
 
     await runTransaction(firestore, async (transaction) => {
-      const categoryDoc = await transaction.get(categoryRef);
       const collectionDocs = await Promise.all(
         collectionRefs.map(ref => transaction.get(ref))
       );
 
       // Set poster
       transaction.set(posterRef, poster);
-
-      // Update category
-      if (!categoryDoc.exists()) {
-        transaction.set(categoryRef, {
-          name: data.category,
-          description: "",
-          posterIds: [posterRef.id],
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        const posterIds = categoryDoc.data().posterIds || [];
-        if (!posterIds.includes(posterRef.id)) {
-          transaction.update(categoryRef, {
-            posterIds: [...posterIds, posterRef.id],
-          });
-        }
-      }
 
       // Update collections
       data.collections.forEach((col, index) => {
@@ -171,8 +152,7 @@ export const updatePosterInFirebase = async (firestore, posterData, posterId) =>
 
     const posterRef = doc(firestore, "posters", posterId);
 
-    // Run a transaction to update posters, categories, and collections
-    const categoryRef = doc(firestore, "categories", data.category);
+    // Run a transaction to update posters and collections
     const collectionRefs = (data.collections || []).map((col) =>
       doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
     );
@@ -183,11 +163,7 @@ export const updatePosterInFirebase = async (firestore, posterData, posterId) =>
       if (!existingPoster.exists()) {
         throw new Error("Poster not found");
       }
-      const oldCategory = existingPoster.data().category;
       const oldCollections = existingPoster.data().collections || [];
-
-      const oldCategoryDoc = oldCategory ? await transaction.get(doc(firestore, "categories", oldCategory)) : null;
-      const categoryDoc = await transaction.get(categoryRef);
 
       const collectionsToRemove = oldCollections.filter(col => !data.collections.includes(col));
       const collectionsToAdd = data.collections.filter(col => !oldCollections.includes(col));
@@ -201,31 +177,6 @@ export const updatePosterInFirebase = async (firestore, posterData, posterId) =>
       // Perform all writes
       // Update poster
       transaction.update(posterRef, poster);
-
-      // Update old category (remove poster ID)
-      if (oldCategory && oldCategory !== data.category && oldCategoryDoc?.exists()) {
-        const oldPosterIds = oldCategoryDoc.data().posterIds || [];
-        transaction.update(doc(firestore, "categories", oldCategory), {
-          posterIds: oldPosterIds.filter(pid => pid !== posterRef.id),
-        });
-      }
-
-      // Update new category
-      if (!categoryDoc.exists()) {
-        transaction.set(categoryRef, {
-          name: data.category,
-          description: "",
-          posterIds: [posterRef.id],
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        const posterIds = categoryDoc.data().posterIds || [];
-        if (!posterIds.includes(posterRef.id)) {
-          transaction.update(categoryRef, {
-            posterIds: [...posterIds, posterRef.id],
-          });
-        }
-      }
 
       // Update collections
       collectionsToAdd.forEach((col, index) => {
@@ -307,22 +258,14 @@ export const deletePosterInFirebase = async (firestore, posterId) => {
       if (!posterDoc.exists()) {
         throw new Error("Poster not found");
       }
-      const { category, collections } = posterDoc.data();
+      const { collections } = posterDoc.data();
 
-      // Read category and collections
-      const categoryDoc = await transaction.get(doc(firestore, "categories", category));
+      // Read collections
       const collectionDocs = await Promise.all(
         (collections || []).map(col => transaction.get(doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-")))
       ));
 
       // Write updates
-      if (categoryDoc.exists()) {
-        const posterIds = categoryDoc.data().posterIds || [];
-        transaction.update(doc(firestore, "categories", category), {
-          posterIds: posterIds.filter(pid => pid !== posterId),
-        });
-      }
-
       collectionDocs.forEach((colDoc, index) => {
         if (colDoc.exists() && colDoc.data().posterIds) {
           const posterIds = colDoc.data().posterIds || [];

@@ -1,53 +1,124 @@
-import React, { useState } from "react";
-import { Table, Button, Form, Modal, Badge } from "react-bootstrap";
-
-const dummySellers = [
-  {
-    id: "S001",
-    name: "Rahul Sharma",
-    email: "rahul@example.com",
-    phone: "9876543210",
-    totalPosters: 10,
-    approvedPosters: 8,
-    rejectedPosters: 2,
-    sold: 42,
-    isActive: true,
-  },
-  {
-    id: "S002",
-    name: "Ayesha Khan",
-    email: "ayesha@example.com",
-    phone: "9876543222",
-    totalPosters: 5,
-    approvedPosters: 5,
-    rejectedPosters: 0,
-    sold: 19,
-    isActive: false,
-  },
-];
+import React, { useState, useEffect, useRef } from "react";
+import { Table, Button, Form, Modal, Badge, Spinner, Alert } from "react-bootstrap";
+import { useFirebase } from "../../context/FirebaseContext";
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
+import '../../styles/SellerComponents.css';
 
 const Sellers = () => {
-  const [sellers, setSellers] = useState(dummySellers);
+  const { firestore, user, userData, loadingUserData, error: firebaseError } = useFirebase();
+  const navigate = useNavigate();
+  const [sellers, setSellers] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const hasRedirected = useRef(false);
+
+  // Check user authentication and admin status
+  useEffect(() => {
+    if (loadingUserData || !userData) {
+      return;
+    }
+    if (!user?.uid || userData.isAdmin !== true) {
+      if (!hasRedirected.current) {
+        hasRedirected.current = true;
+        setTimeout(() => navigate("/login", { replace: true }), 100);
+      }
+    } else {
+      hasRedirected.current = false;
+    }
+  }, [user, userData, loadingUserData, navigate]);
+
+  // Fetch sellers and their metrics
+  useEffect(() => {
+    if (!firestore || !userData?.isAdmin || loadingUserData) return;
+
+    const sellersQuery = query(
+      collection(firestore, "users"),
+      where("isSeller", "==", true)
+    );
+
+    const unsubscribe = onSnapshot(
+      sellersQuery,
+      async (snapshot) => {
+        const sellerList = [];
+        for (const sellerDoc of snapshot.docs) {
+          const sellerData = { id: sellerDoc.id, ...sellerDoc.data() };
+
+          // Fetch poster metrics
+          const postersQuery = query(
+            collection(firestore, "posters"),
+            where("seller", "==", sellerDoc.id)
+          );
+          const postersSnapshot = await new Promise((resolve) => {
+            onSnapshot(postersQuery, resolve, (err) => {
+              setError(`Failed to fetch posters: ${err.message}`);
+              resolve();
+            });
+          });
+          const posters = postersSnapshot?.docs.map((doc) => doc.data()) || [];
+          const totalPosters = posters.length;
+          const approvedPosters = posters.filter((p) => p.approved === true).length;
+          const rejectedPosters = posters.filter((p) => p.approved === false).length;
+
+          // Fetch sales metrics
+          const ordersQuery = query(
+            collection(firestore, "orders"),
+            where("sellerId", "==", sellerDoc.id)
+          );
+          const ordersSnapshot = await new Promise((resolve) => {
+            onSnapshot(ordersQuery, resolve, (err) => {
+              setError(`Failed to fetch orders: ${err.message}`);
+              resolve();
+            });
+          });
+          const orders = ordersSnapshot?.docs.map((doc) => doc.data()) || [];
+          const sold = orders.reduce((sum, order) => sum + (order.quantity || 1), 0);
+
+          sellerList.push({
+            ...sellerData,
+            totalPosters,
+            approvedPosters,
+            rejectedPosters,
+            sold,
+          });
+        }
+        setSellers(sellerList);
+        setLoading(false);
+      },
+      (err) => {
+        setError(`Failed to fetch sellers: ${err.message}`);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [firestore, userData, loadingUserData]);
 
   const filteredSellers = sellers.filter((s) => {
     const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase());
+      s.name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.email?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "active" && s.isActive) ||
-      (statusFilter === "inactive" && !s.isActive);
+      (statusFilter === "active" && s.isSeller) ||
+      (statusFilter === "inactive" && !s.isSeller);
     return matchesSearch && matchesStatus;
   });
 
-  const handleToggleStatus = (id) => {
-    setSellers((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isActive: !s.isActive } : s))
-    );
+  const handleToggleStatus = async (sellerId) => {
+    try {
+      const seller = sellers.find((s) => s.id === sellerId);
+      await updateDoc(doc(firestore, "users", sellerId), {
+        isSeller: !seller.isSeller,
+      });
+    } catch (err) {
+      setError(`Failed to update status: ${err.message}`);
+    }
   };
 
   const handleEdit = (seller = null) => {
@@ -55,37 +126,60 @@ const Sellers = () => {
     setShowModal(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
+    setError("");
     const form = e.target;
     const newSeller = {
-      id: selectedSeller?.id || "S" + (sellers.length + 1).toString().padStart(3, "0"),
       name: form.name.value,
       email: form.email.value,
-      phone: form.phone.value,
-      totalPosters: selectedSeller?.totalPosters || 0,
-      approvedPosters: selectedSeller?.approvedPosters || 0,
-      rejectedPosters: selectedSeller?.rejectedPosters || 0,
-      sold: selectedSeller?.sold || 0,
-      isActive: selectedSeller?.isActive ?? true,
+      phone: form.phone.value || null,
+      isSeller: selectedSeller?.isSeller ?? true,
+      isAdmin: false,
     };
 
-    if (selectedSeller) {
-      setSellers((prev) =>
-        prev.map((s) => (s.id === selectedSeller.id ? newSeller : s))
-      );
-    } else {
-      setSellers((prev) => [...prev, newSeller]);
+    try {
+      if (selectedSeller) {
+        await updateDoc(doc(firestore, "users", selectedSeller.id), newSeller);
+      } else {
+        const newId = doc(collection(firestore, "users")).id;
+        await setDoc(doc(firestore, "users", newId), {
+          ...newSeller,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      setShowModal(false);
+    } catch (err) {
+      setError(`Failed to save seller: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
-
-    setShowModal(false);
   };
+
+  if (loadingUserData || !userData) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+        <Spinner animation="border" className="text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
+
+  if (firebaseError) {
+    return (
+      <div className="container mt-4">
+        <Alert variant="danger">Firebase Error: {firebaseError}</Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mt-4">
       <h2 className="mb-3">🧑‍💼 Sellers Management</h2>
+      {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
 
-      {/* Search and Filter */}
       <div className="row mb-3">
         <div className="col-md-4">
           <Form.Control
@@ -105,11 +199,12 @@ const Sellers = () => {
           </Form.Select>
         </div>
         <div className="col-md-4 text-end">
-          <Button onClick={() => handleEdit(null)}>+ Add Seller</Button>
+          <Button onClick={() => handleEdit(null)} variant="primary">
+            + Add Seller
+          </Button>
         </div>
       </div>
 
-      {/* Table */}
       <div className="table-responsive">
         <Table bordered hover>
           <thead className="table-light">
@@ -128,22 +223,22 @@ const Sellers = () => {
           <tbody>
             {filteredSellers.map((seller) => (
               <tr key={seller.id}>
-                <td>{seller.name}</td>
-                <td>{seller.email}</td>
-                <td>{seller.phone}</td>
-                <td>{seller.totalPosters}</td>
+                <td>{seller.name || "N/A"}</td>
+                <td>{seller.email || "N/A"}</td>
+                <td>{seller.phone || "N/A"}</td>
+                <td>{seller.totalPosters || 0}</td>
                 <td>
-                  <Badge bg="success">{seller.approvedPosters}</Badge>
+                  <Badge bg="success">{seller.approvedPosters || 0}</Badge>
                 </td>
                 <td>
-                  <Badge bg="danger">{seller.rejectedPosters}</Badge>
+                  <Badge bg="danger">{seller.rejectedPosters || 0}</Badge>
                 </td>
                 <td>
-                  <Badge bg="info">{seller.sold}</Badge>
+                  <Badge bg="info">{seller.sold || 0}</Badge>
                 </td>
                 <td>
-                  <Badge bg={seller.isActive ? "success" : "secondary"}>
-                    {seller.isActive ? "Active" : "Suspended"}
+                  <Badge bg={seller.isSeller ? "success" : "secondary"}>
+                    {seller.isSeller ? "Active" : "Suspended"}
                   </Badge>
                 </td>
                 <td>
@@ -157,10 +252,10 @@ const Sellers = () => {
                   </Button>
                   <Button
                     size="sm"
-                    variant={seller.isActive ? "danger" : "success"}
+                    variant={seller.isSeller ? "danger" : "success"}
                     onClick={() => handleToggleStatus(seller.id)}
                   >
-                    {seller.isActive ? "Suspend" : "Activate"}
+                    {seller.isSeller ? "Suspend" : "Activate"}
                   </Button>
                 </td>
               </tr>
@@ -176,7 +271,6 @@ const Sellers = () => {
         </Table>
       </div>
 
-      {/* Add/Edit Modal */}
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>
@@ -209,8 +303,8 @@ const Sellers = () => {
                 defaultValue={selectedSeller?.phone || ""}
               />
             </Form.Group>
-            <Button type="submit" variant="success">
-              {selectedSeller ? "Update" : "Add"} Seller
+            <Button type="submit" variant="success" disabled={submitting}>
+              {submitting ? "Saving..." : selectedSeller ? "Update" : "Add"} Seller
             </Button>
           </Form>
         </Modal.Body>

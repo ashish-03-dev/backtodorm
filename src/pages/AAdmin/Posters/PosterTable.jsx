@@ -8,7 +8,6 @@ const PosterTable = ({ posters, onEdit, onView, onDelete, onApprove, onReject, o
         <tr>
           <th>Preview</th>
           <th>Title</th>
-          <th>Category</th>
           <th>Pricing</th>
           <th>Active</th>
           <th>Approved</th>
@@ -25,7 +24,6 @@ const PosterTable = ({ posters, onEdit, onView, onDelete, onApprove, onReject, o
                 </Button>
               </td>
               <td>{p.title || "No title"}</td>
-              <td>{p.category || "No category"}</td>
               <td>
                 {Array.isArray(p.sizes) && p.sizes.length > 0 ? (
                   p.sizes.map((size, index) => (
@@ -91,7 +89,7 @@ const PosterTable = ({ posters, onEdit, onView, onDelete, onApprove, onReject, o
           ))
         ) : (
           <tr>
-            <td colSpan="7" className="text-center text-muted">
+            <td colSpan="6" className="text-center text-muted">
               No posters found.
             </td>
           </tr>

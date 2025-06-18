@@ -1,78 +1,138 @@
-import { useState } from "react";
+import React, { useState } from 'react';
+import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useFirebase } from '../context/FirebaseContext';
+import { collection, addDoc, doc, deleteDoc } from 'firebase/firestore';
+import { Form, Button, Alert, ListGroup, Card } from 'react-bootstrap';
 
-export default function Checkout({ cartItems = [] }) {
-  const [user, setUser] = useState({
-    name: "",
-    email: "",
-    address: "",
+export default function Checkout() {
+  const { user, firestore, userData } = useFirebase();
+  const { cartItems, buyNowItem, setCartItems, setBuyNowItem } = useOutletContext();
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    name: userData?.name || '',
+    address: userData?.address || '',
   });
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.price, 0);
+  const items = buyNowItem ? [buyNowItem] : cartItems;
+  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setUser({ ...user, [name]: value });
-  };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      setError('You must be logged in to place an order.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
 
-  const handlePlaceOrder = () => {
-    alert("Order Placed!");
-    // TODO: integrate with Razorpay/Firebase
+    try {
+      for (const item of items) {
+        await addDoc(collection(firestore, 'orders'), {
+          customerId: user.uid,
+          sellerId: item.seller,
+          posterId: item.posterId,
+          status: 'Pending',
+          totalPrice: item.price * item.quantity,
+          orderDate: new Date().toISOString(),
+          quantity: item.quantity,
+          sentToSupplier: false,
+          supplierInfo: null,
+          size: item.selectedSize,
+        });
+      }
+      // Clear cart
+      if (buyNowItem) {
+        setBuyNowItem(null);
+      } else {
+        setCartItems([]);
+        localStorage.removeItem('cartItems');
+        if (user && firestore) {
+          // Delete all cart items in Firestore
+          for (const item of cartItems) {
+            const cartItemId = `${item.posterId}-${item.selectedSize}`;
+            await deleteDoc(doc(firestore, `users/${user.uid}/cart`, cartItemId));
+          }
+        }
+      }
+      navigate('/account/orders', { state: { orderSuccess: true } });
+    } catch (err) {
+      setError(`Failed to place order: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="container py-5">
-      <h2 className="fw-bold mb-4">Checkout</h2>
+    <div className="container my-5" style={{minHeight:"calc(100svh - 65px)"}}>
+      <h2 className="mb-4">Checkout</h2>
+      {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
 
-      <div className="row">
-        {/* Cart Summary */}
-        <div className="col-md-6 mb-4">
-          <h5 className="fw-semibold mb-3">Your Posters</h5>
-          {cartItems.length === 0 ? (
-            <p className="text-muted">Your cart is empty.</p>
-          ) : (
-            <ul className="list-group">
-              {cartItems.map((item) => (
-                <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center">
-                  <span>{item.title}</span>
-                  <span>₹{item.price}</span>
-                </li>
-              ))}
-              <li className="list-group-item d-flex justify-content-between">
-                <strong>Total</strong>
-                <strong>₹{totalAmount}</strong>
-              </li>
-            </ul>
-          )}
+      <div className="row g-4">
+        <div className="col-md-6">
+          <Card>
+            <Card.Body>
+              <h4 className="mb-3">Order Summary</h4>
+              <ListGroup variant="flush">
+                {items.map((item, index) => (
+                  <ListGroup.Item key={`${item.posterId}-${item.selectedSize}-${index}`}>
+                    <div className="d-flex justify-content-between">
+                      <div>
+                        <h6>{item.title} ({item.selectedSize})</h6>
+                        <p className="mb-0">Quantity: {item.quantity}</p>
+                      </div>
+                      <p>₹{item.price * item.quantity}</p>
+                    </div>
+                  </ListGroup.Item>
+                ))}
+              </ListGroup>
+              <hr />
+              <div className="d-flex justify-content-between">
+                <h5>Total</h5>
+                <h5>₹{totalPrice}</h5>
+              </div>
+            </Card.Body>
+          </Card>
         </div>
 
-        {/* Shipping Info */}
         <div className="col-md-6">
-          <h5 className="fw-semibold mb-3">Shipping Info</h5>
-          <form>
-            <div className="mb-3">
-              <label className="form-label">Full Name</label>
-              <input type="text" name="name" className="form-control" onChange={handleInputChange} required />
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label">Email</label>
-              <input type="email" name="email" className="form-control" onChange={handleInputChange} required />
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label">Shipping Address</label>
-              <textarea name="address" className="form-control" rows="3" onChange={handleInputChange} required />
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-dark w-100 mt-3"
-              onClick={handlePlaceOrder}
-              disabled={!user.name || !user.email || !user.address || cartItems.length === 0}
-            >
-              Place Order
-            </button>
-          </form>
+          <Card>
+            <Card.Body>
+              <h4 className="mb-3">Shipping Details</h4>
+              <Form onSubmit={handleSubmit}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Full Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    disabled={submitting}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Address</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    required
+                    disabled={submitting}
+                  />
+                </Form.Group>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-100"
+                  disabled={submitting || items.length === 0}
+                >
+                  {submitting ? 'Placing Order...' : 'Place Order'}
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import Orders from "./pages/AAdmin/Orders";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import HomeLayout from './pages/HomeLayout';
@@ -11,7 +12,7 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import AdminLayout from './pages/AAdmin/AdminLayout';
 import Dashboard from "./pages/AAdmin/Dashboard";
-import Orders from "./pages/AAdmin/Orders";
+import SectionManager from './pages/AAdmin/HomeContentManager/SectionManager';
 import Sellers from "./pages/AAdmin/Sellers";
 import Posters from "./pages/AAdmin/Posters/Posters";
 import Customers from "./pages/AAdmin/Customers";
@@ -19,7 +20,6 @@ import Support from "./pages/AAdmin/Support";
 import Settings from "./pages/AAdmin/SiteSettings";
 import CategoryManager from "./pages/AAdmin/ContentManager";
 import AdminUsers from "./pages/AAdmin/AdminUsers";
-import HomeContentManager from "./pages/AAdmin/HomeContentManager";
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
 import ProfileOrders from './components/Account/ProfileOrders';
@@ -27,7 +27,12 @@ import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import Wishlist from './components/Wishlist';
 import BecomeSeller from './components/Account/BecomeSeller';
-import SellerDashboard from './components/SellerDashboard';
+import SellerLayout from './components/Seller/SellerLayout';
+import SellerDashboard from './components/Seller/SellerDashboard';
+import MyProducts from './components/Seller/MyProducts';
+import SalesHistory from './components/Seller/SalesHistory';
+import Payouts from "./components/Seller/Payouts";
+import SellerSettings from "./components/Seller/SellerSettings";
 import SearchPage from './components/SearchPage';
 
 function App() {
@@ -50,7 +55,14 @@ function App() {
             <Route path="security" element={<SecuritySettings />} />
             <Route path="become-seller" element={<BecomeSeller />} />
           </Route>
-          <Route path="/seller-dashboard" element={<SellerDashboard />} />
+          <Route path="seller" element={<SellerLayout />}>
+            <Route index element={<SellerDashboard />} />
+            <Route path="dashboard" element={<SellerDashboard />} />
+            <Route path="products" element={<MyProducts />} />
+            <Route path="sales" element={<SalesHistory />} />
+            <Route path="payouts" element={<Payouts />} />
+            <Route path="settings" element={<SellerSettings />} />
+          </Route>
           <Route path="/search" element={<SearchPage />} />
           <Route path="/wishlist" element={<Wishlist />} />
         </Route>
@@ -60,7 +72,7 @@ function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="sellers" element={<Sellers />} />
           <Route path="posters" element={<Posters />} />
-          <Route path="home-content" element={<HomeContentManager />} />
+          <Route path="home-content" element={<SectionManager />} />
           <Route path="customers" element={<Customers />} />
           <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />

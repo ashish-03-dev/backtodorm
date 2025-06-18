@@ -1,42 +1,17 @@
-import React, { useState } from "react";
-import { Modal, Button, Form, Badge } from "react-bootstrap";
-
-const dummyOrders = [
-  {
-    id: "ORD001",
-    customer: "Ashish Kumar",
-    date: "2025-06-12",
-    status: "Pending",
-    total: 749,
-    sentToSupplier: true,
-    supplierInfo: {
-      supplierName: "PosterPrints Ltd.",
-      contact: "posterprints@example.com",
-      notes: "Deliver by Friday",
-      trackingId: "TRK123456",
-    },
-    items: [
-      { name: "Naruto Poster", qty: 1, price: 249 },
-      { name: "Iron Man Poster", qty: 2, price: 250 },
-    ],
-  },
-  {
-    id: "ORD002",
-    customer: "Riya Singh",
-    date: "2025-06-11",
-    status: "Delivered",
-    total: 299,
-    sentToSupplier: false,
-    items: [{ name: "Attack on Titan Poster", qty: 1, price: 299 }],
-  },
-];
+import React, { useState, useEffect, useRef } from "react";
+import { Modal, Button, Form, Badge, Table, Spinner, Alert } from "react-bootstrap";
+import { useFirebase } from "../../context/FirebaseContext";
+import { useNavigate } from "react-router-dom";
+import { collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
+import '../../styles/SellerComponents.css';
 
 const Orders = () => {
-  const [orders, setOrders] = useState(dummyOrders);
+  const { firestore, user, userData, loadingUserData, error: firebaseError } = useFirebase();
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState({ status: "", search: "" });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [supplierData, setSupplierData] = useState({
     supplierName: "",
@@ -45,107 +20,182 @@ const Orders = () => {
     trackingId: "",
     sentOrderId: null,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const hasRedirected = useRef(false);
 
-  const handleStatusChange = (orderId, newStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+  // Redirect non-admins
+  useEffect(() => {
+    if (loadingUserData || !userData) {
+      return;
+    }
+    // console.log("Orders redirect check: user =", user?.uid, "isAdmin =", userData?.isAdmin, "type =", typeof userData?.isAdmin);
+    if (!user?.uid || userData.isAdmin !== true) {
+      if (!hasRedirected.current) {
+        hasRedirected.current = true;
+        setTimeout(() => navigate("/login", { replace: true }), 100);
+      }
+    } else {
+      hasRedirected.current = false;
+    }
+  }, [user, userData, loadingUserData, navigate]);
+
+  // Fetch orders
+  useEffect(() => {
+    if (!firestore || !userData?.isAdmin || loadingUserData) return;
+
+    const ordersQuery = query(collection(firestore, "orders"));
+
+    const unsubscribe = onSnapshot(
+      ordersQuery,
+      async (snapshot) => {
+        const orderList = [];
+        for (const orderDoc of snapshot.docs) {
+          const orderData = { id: orderDoc.id, ...orderDoc.data() };
+
+          // Fetch customer name
+          const customerDoc = await getDoc(doc(firestore, "users", orderData.customerId));
+          const customerName = customerDoc.exists() ? customerDoc.data().name : "Unknown";
+
+          // Fetch poster details
+          const posterDoc = await getDoc(doc(firestore, "posters", orderData.posterId));
+          const posterTitle = posterDoc.exists() ? posterDoc.data().title : "Unknown Poster";
+
+          // Fetch seller name
+          const sellerDoc = await getDoc(doc(firestore, "users", orderData.sellerId));
+          const sellerName = sellerDoc.exists() ? sellerDoc.data().name : "Unknown";
+
+          orderList.push({
+            ...orderData,
+            customerName,
+            posterTitle,
+            sellerName,
+          });
+        }
+        setOrders(orderList);
+        setLoading(false);
+      },
+      (err) => {
+        setError(`Failed to fetch orders: ${err.message}`);
+        setLoading(false);
+      }
     );
+
+    return () => unsubscribe();
+  }, [firestore, userData, loadingUserData]);
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    setSubmitting(true);
+    setError("");
+    try {
+      await updateDoc(doc(firestore, "orders", orderId), { status: newStatus });
+    } catch (err) {
+      setError(`Failed to update status: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const filteredOrders = orders.filter((order) => {
     return (
       (filter.status === "" || order.status === filter.status) &&
       (filter.search === "" ||
-        order.customer.toLowerCase().includes(filter.search.toLowerCase()) ||
-        order.id.toLowerCase().includes(filter.search.toLowerCase()))
+        order.customerName.toLowerCase().includes(filter.search.toLowerCase()) ||
+        order.id.toLowerCase().includes(filter.search.toLowerCase()) ||
+        order.posterTitle.toLowerCase().includes(filter.search.toLowerCase()))
     );
   });
 
-  const isFiltering =
-    filter.status !== "" || filter.search.trim().length > 1;
-
+  const isFiltering = filter.status !== "" || filter.search.trim().length > 1;
 
   const handleShowDetail = (order) => {
     setSelectedOrder(order);
     setShowDetailModal(true);
   };
 
-  const handleShowEdit = (order = null) => {
-    setSelectedOrder(order);
-    setShowEditModal(true);
-  };
-
-  const handleEditSubmit = (e) => {
+  const handleSendToSupplier = async (e) => {
     e.preventDefault();
-    const form = e.target;
-    const newOrder = {
-      id: selectedOrder?.id || "ORD" + (orders.length + 1).toString().padStart(3, "0"),
-      customer: form.customer.value,
-      date: form.date.value,
-      status: form.status.value,
-      total: parseInt(form.total.value),
-      items: [],
-    };
-
-    if (selectedOrder) {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === selectedOrder.id ? newOrder : o))
-      );
-    } else {
-      setOrders((prev) => [...prev, newOrder]);
+    setSubmitting(true);
+    setError("");
+    try {
+      await updateDoc(doc(firestore, "orders", supplierData.sentOrderId), {
+        sentToSupplier: true,
+        supplierInfo: {
+          supplierName: supplierData.supplierName,
+          contact: supplierData.contact,
+          notes: supplierData.notes,
+          trackingId: supplierData.trackingId,
+        },
+      });
+      setShowSupplierModal(false);
+    } catch (err) {
+      setError(`Failed to send to supplier: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
-
-    setShowEditModal(false);
   };
+
+  if (loadingUserData || !userData) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+        <Spinner animation="border" className="text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
+
+  if (firebaseError) {
+    return (
+      <div className="container mt-4">
+        <Alert variant="danger">Firebase Error: {firebaseError}</Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mt-4">
       <h2 className="mb-3">📦 Orders Management</h2>
+      {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
 
-      {/* FILTERS */}
-      <div className="row g-3 mb-3">
+      <div className="row g-3 mb-4">
         <div className="col-md-3">
           <Form.Select
             value={filter.status}
-            onChange={(e) =>
-              setFilter((prev) => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => setFilter((prev) => ({ ...prev, status: e.target.value }))}
+            disabled={submitting}
           >
             <option value="">Filter by Status</option>
-            <option>Pending</option>
-            <option>Shipped</option>
-            <option>Delivered</option>
-            <option>Cancelled</option>
+            <option value="Pending">Pending</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
           </Form.Select>
         </div>
         <div className="col-md-5">
           <Form.Control
-            type="text"
-            placeholder="Search by Customer or Order ID"
+            type="search"
+            placeholder="Search by Customer, Order ID, or Poster"
             value={filter.search}
-            onChange={(e) =>
-              setFilter((prev) => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value }))}
+            disabled={submitting}
           />
         </div>
-        <div className="col-md-4 text-end">
-          <Button variant="primary" onClick={() => handleShowEdit(null)}>
-            + Create Order
-          </Button>
-        </div>
       </div>
-      {!isFiltering && orders.some((o) => !o.sentToSupplier) && (
+
+      {!isFiltering && orders.some((order) => !order.sentToSupplier) && (
         <div className="mb-4 p-3 border rounded bg-light">
           <h5 className="mb-3">🚨 Unforwarded Customer Orders</h5>
           {orders
-            .filter((o) => !o.sentToSupplier)
+            .filter((order) => !order.sentToSupplier)
             .map((order) => (
               <div
                 key={order.id}
                 className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded bg-white"
               >
                 <div>
-                  <strong>{order.id}</strong> - {order.customer} ({order.date}) - ₹{order.total}
+                  <strong>{order.id}</strong> - {order.customerName} ({order.orderDate}) - ₹{order.totalPrice}
                 </div>
                 <Button
                   variant="outline-success"
@@ -160,6 +210,7 @@ const Orders = () => {
                     });
                     setShowSupplierModal(true);
                   }}
+                  disabled={submitting}
                 >
                   Forward to Supplier
                 </Button>
@@ -168,13 +219,14 @@ const Orders = () => {
         </div>
       )}
 
-      {/* TABLE */}
       <div className="table-responsive">
-        <table className="table table-hover align-middle">
+        <Table striped bordered hover>
           <thead className="table-light">
             <tr>
               <th>Order ID</th>
               <th>Customer</th>
+              <th>Seller</th>
+              <th>Poster</th>
               <th>Date</th>
               <th>Status</th>
               <th>Total (₹)</th>
@@ -187,46 +239,36 @@ const Orders = () => {
               <tr key={order.id}>
                 <td>
                   {order.id}
-                  {order.sentToSupplier && (
-                    <Badge bg="success" className="ms-2">Sent</Badge>
-                  )}
+                  {order.sentToSupplier && <Badge bg="success" className="ms-2">Sent</Badge>}
                 </td>
-                <td>{order.customer}</td>
-                <td>{order.date}</td>
+                <td>{order.customerName}</td>
+                <td>{order.sellerName}</td>
+                <td>{order.posterTitle}</td>
+                <td>{order.orderDate}</td>
                 <td>
                   <Form.Select
                     size="sm"
                     value={order.status}
-                    onChange={(e) =>
-                      handleStatusChange(order.id, e.target.value)
-                    }
+                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                    disabled={submitting}
                   >
-                    <option>Pending</option>
-                    <option>Shipped</option>
-                    <option>Delivered</option>
-                    <option>Cancelled</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
                   </Form.Select>
                 </td>
-                <td>{order.total}</td>
-                <td>
-                  {order.sentToSupplier ? "✅ Done" : "❌ Not Sent"}
-                </td>
+                <td>{order.totalPrice}</td>
+                <td>{order.sentToSupplier ? "✅ Done" : "❌ Not Sent"}</td>
                 <td>
                   <Button
                     variant="outline-info"
                     size="sm"
                     className="me-2"
                     onClick={() => handleShowDetail(order)}
+                    disabled={submitting}
                   >
                     View
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    className="me-2"
-                    onClick={() => handleShowEdit(order)}
-                  >
-                    Edit
                   </Button>
                   {order.sentToSupplier ? (
                     <Button variant="success" size="sm" disabled>
@@ -246,6 +288,7 @@ const Orders = () => {
                         });
                         setShowSupplierModal(true);
                       }}
+                      disabled={submitting}
                     >
                       Send to Supplier
                     </Button>
@@ -255,16 +298,15 @@ const Orders = () => {
             ))}
             {filteredOrders.length === 0 && (
               <tr>
-                <td colSpan="7" className="text-center text-muted">
+                <td colSpan="9" className="text-center text-muted">
                   No orders found.
                 </td>
               </tr>
             )}
           </tbody>
-        </table>
+        </Table>
       </div>
 
-      {/* ORDER DETAILS MODAL */}
       <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Order Details</Modal.Title>
@@ -273,19 +315,13 @@ const Orders = () => {
           {selectedOrder && (
             <>
               <p><strong>Order ID:</strong> {selectedOrder.id}</p>
-              <p><strong>Customer:</strong> {selectedOrder.customer}</p>
-              <p><strong>Date:</strong> {selectedOrder.date}</p>
+              <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
+              <p><strong>Seller:</strong> {selectedOrder.sellerName}</p>
+              <p><strong>Poster:</strong> {selectedOrder.posterTitle}</p>
+              <p><strong>Quantity:</strong> {selectedOrder.quantity}</p>
+              <p><strong>Date:</strong> {selectedOrder.orderDate}</p>
               <p><strong>Status:</strong> {selectedOrder.status}</p>
-              <p><strong>Total:</strong> ₹{selectedOrder.total}</p>
-              <hr />
-              <h6>Items:</h6>
-              <ul className="list-group">
-                {selectedOrder.items.map((item, i) => (
-                  <li key={i} className="list-group-item d-flex justify-content-between">
-                    {item.name} (x{item.qty}) <span>₹{item.price}</span>
-                  </li>
-                ))}
-              </ul>
+              <p><strong>Total:</strong> ₹{selectedOrder.totalPrice}</p>
               {selectedOrder.sentToSupplier && selectedOrder.supplierInfo && (
                 <>
                   <hr />
@@ -301,109 +337,33 @@ const Orders = () => {
         </Modal.Body>
       </Modal>
 
-      {/* EDIT/CREATE MODAL */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>{selectedOrder ? "Edit" : "Create"} Order</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleEditSubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Customer Name</Form.Label>
-              <Form.Control
-                name="customer"
-                defaultValue={selectedOrder?.customer || ""}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Date</Form.Label>
-              <Form.Control
-                name="date"
-                type="date"
-                defaultValue={selectedOrder?.date || ""}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Status</Form.Label>
-              <Form.Select name="status" defaultValue={selectedOrder?.status || "Pending"}>
-                <option>Pending</option>
-                <option>Shipped</option>
-                <option>Delivered</option>
-                <option>Cancelled</option>
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Total Amount (₹)</Form.Label>
-              <Form.Control
-                type="number"
-                name="total"
-                defaultValue={selectedOrder?.total || 0}
-                required
-              />
-            </Form.Group>
-
-            <Button type="submit" variant="success">
-              {selectedOrder ? "Update Order" : "Create Order"}
-            </Button>
-          </Form>
-        </Modal.Body>
-      </Modal>
-
-      {/* SUPPLIER MODAL */}
       <Modal show={showSupplierModal} onHide={() => setShowSupplierModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Send Order to Supplier</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const updated = orders.map((o) =>
-                o.id === supplierData.sentOrderId
-                  ? {
-                    ...o,
-                    sentToSupplier: true,
-                    supplierInfo: { ...supplierData },
-                  }
-                  : o
-              );
-              setOrders(updated);
-              setShowSupplierModal(false);
-              alert(`Order ${supplierData.sentOrderId} marked as sent to supplier.`);
-            }}
-          >
+          <Form onSubmit={handleSendToSupplier}>
             <Form.Group className="mb-3">
               <Form.Label>Supplier Name</Form.Label>
               <Form.Control
                 value={supplierData.supplierName}
                 onChange={(e) =>
-                  setSupplierData((prev) => ({
-                    ...prev,
-                    supplierName: e.target.value,
-                  }))
+                  setSupplierData((prev) => ({ ...prev, supplierName: e.target.value }))
                 }
                 required
+                disabled={submitting}
               />
             </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label>Supplier Contact</Form.Label>
               <Form.Control
                 value={supplierData.contact}
                 onChange={(e) =>
-                  setSupplierData((prev) => ({
-                    ...prev,
-                    contact: e.target.value,
-                  }))
+                  setSupplierData((prev) => ({ ...prev, contact: e.target.value }))
                 }
+                disabled={submitting}
               />
             </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label>Notes / Instructions</Form.Label>
               <Form.Control
@@ -411,29 +371,23 @@ const Orders = () => {
                 rows={3}
                 value={supplierData.notes}
                 onChange={(e) =>
-                  setSupplierData((prev) => ({
-                    ...prev,
-                    notes: e.target.value,
-                  }))
+                  setSupplierData((prev) => ({ ...prev, notes: e.target.value }))
                 }
+                disabled={submitting}
               />
             </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label>Tracking ID</Form.Label>
               <Form.Control
                 value={supplierData.trackingId}
                 onChange={(e) =>
-                  setSupplierData((prev) => ({
-                    ...prev,
-                    trackingId: e.target.value,
-                  }))
+                  setSupplierData((prev) => ({ ...prev, trackingId: e.target.value }))
                 }
+                disabled={submitting}
               />
             </Form.Group>
-
-            <Button type="submit" variant="success">
-              Mark as Sent
+            <Button type="submit" variant="success" disabled={submitting}>
+              {submitting ? "Sending..." : "Mark as Sent"}
             </Button>
           </Form>
         </Modal.Body>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import HeroBanner from '../components/Home/HeroBanner';
 import CategoryScroll from '../components/Home/CategoryScroll';
 import TrendingPosters from '../components/Home/TrendingPosters';
@@ -12,23 +13,21 @@ import AboutSection from '../components/Home/AboutSection';
 import '../styles/MainLanding.css';
 
 export default function MainLanding() {
-     const [cartItems, setCartItems] = useState([]);
-    
-      const addToCart = (poster) => {
-        setCartItems([...cartItems, poster]);
-      };
-    return (
-        <>
-            <HeroBanner />
-            <CategoryScroll title="Shop by Category"/>
-            <TrendingPosters />
-            <PopularPicks />
-            <CollectionScroll title="Collections"/>
-            <NewArrivals />
-            <Optional addToCart={addToCart} />
-            <CustomerReviews />
-            <WhyChooseUs />
-            <AboutSection />
-        </>
-    );
+  const { addToCart, buyNow } = useOutletContext();
+  const [cartItems, setCartItems] = useState([]);
+
+  return (
+    <>
+      <HeroBanner />
+      <CategoryScroll title="Shop by Category" />
+      <TrendingPosters />
+      <PopularPicks />
+      <CollectionScroll title="Collections" />
+      <NewArrivals />
+      <Optional addToCart={addToCart} buyNow={buyNow} />
+      <CustomerReviews />
+      <WhyChooseUs />
+      <AboutSection />
+    </>
+  );
 }

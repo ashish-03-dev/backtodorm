@@ -1,0 +1,30 @@
+.account-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767.98px) {
+  .account-sidebar {
+    width: 100%;
+  }
+  .account-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+}
+
+.sidebar-item {
+  border: 1px solid transparent;
+}
+
+.sidebar-item:hover {
+  background-color: #f1f1f1;
+  cursor: pointer;
+}
+
+/* need to check if these css already in another account layout css */

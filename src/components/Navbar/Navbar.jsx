@@ -7,7 +7,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { useFirebase } from "../../context/FirebaseContext";
 import { useNavigate } from "react-router-dom";
 
-export default function NavbarComponent({ cartItems }) {
+export default function NavbarComponent({ cartItems = [], removeFromCart, updateQuantity }) {
   const { user, logout } = useFirebase();
   const isLoggedIn = !!user;
   const [showSidebar, setShowSidebar] = useState(false);
@@ -75,7 +75,13 @@ export default function NavbarComponent({ cartItems }) {
       </nav>
 
       <MobileSidebar show={showSidebar} onClose={() => setShowSidebar(false)} />
-      <CartSidebar cartItems={cartItems} show={showCart} onClose={() => setShowCart(false)} />
+      <CartSidebar
+        cartItems={cartItems}
+        show={showCart}
+        onClose={() => setShowCart(false)}
+        removeFromCart={removeFromCart}
+        updateQuantity={updateQuantity}
+      />
     </>
   );
 }

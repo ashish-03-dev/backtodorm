@@ -142,10 +142,10 @@ export default function SearchPage() {
 
   // Skeleton component for loading state using Bootstrap
   const PosterSkeleton = () => (
-    <div className="col-md-4 mb-4">
+    <div className="col-6 col-md-3 mb-4">
       <div className="card h-100 shadow-sm">
         <div className="placeholder-glow">
-          <div className="placeholder" style={{ height: "200px" }}></div>
+          <div className="placeholder" style={{ height: "300px" }}></div>
         </div>
         <div className="card-body d-flex flex-column">
           <div className="placeholder-glow mb-2">
@@ -166,7 +166,7 @@ export default function SearchPage() {
   );
 
   return (
-    <div className="container py-4">
+    <div className="container py-4"  style={{minHeight:"calc(100svh - 65px)"}}>
       <h2>Search Posters</h2>
       <form onSubmit={handleSearch} className="mb-4">
         <div className="input-group mb-3">
@@ -211,13 +211,13 @@ export default function SearchPage() {
       ) : (
         <div className="row">
           {results.map((poster) => (
-            <div key={poster.id} className="col-md-4 mb-4">
+            <div key={poster.id} className="col-6 col-md-3 mb-4">
               <div className="card h-100 shadow-sm">
                 <img
                   src={poster.imageUrl}
                   className="card-img-top"
                   alt={poster.title}
-                  style={{ height: "200px", objectFit: "cover" }}
+                  style={{ height: "300px", objectFit: "cover" }}
                 />
                 <div className="card-body d-flex flex-column">
                   <h6 className="card-title">{poster.title}</h6>

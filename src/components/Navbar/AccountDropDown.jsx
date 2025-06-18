@@ -72,7 +72,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
             {userData?.isSeller ? (
               <div
                 className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
-                onClick={() => handleNavigation("/seller-dashboard")}
+                onClick={() => handleNavigation("/seller")}
                 style={{ cursor: "pointer" }}
               >
                 <i className="bi bi-shop me-2"></i> Seller Dashboard

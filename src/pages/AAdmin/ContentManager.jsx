@@ -1,159 +1,207 @@
-import React, { useState } from "react";
-import { Button, Form, Table, Modal, Row, Col } from "react-bootstrap";
+import React, { useState, useEffect } from "react";
+import { Button, Form, Table, Modal, Spinner, Alert } from "react-bootstrap";
+import { useFirebase } from "../../context/FirebaseContext";
+import { useNavigate } from "react-router-dom";
+import { collection, query, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import '../../styles/SellerComponents.css';
 
-const CategoryTagManager = () => {
-  const [categories, setCategories] = useState(["Anime", "Gaming", "Movies"]);
-  const [tags, setTags] = useState(["Trending", "Minimalist", "Vintage"]);
-  const [newCategory, setNewCategory] = useState("");
+const TagManager = () => {
+  const { firestore, user, userData, loadingUserData } = useFirebase();
+  const navigate = useNavigate();
+  const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState("");
-  const [editItem, setEditItem] = useState({ type: "", index: -1, value: "" });
+  const [editItem, setEditItem] = useState({ id: "", value: "" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleAdd = (type) => {
-    if (type === "category" && newCategory.trim()) {
-      setCategories([...categories, newCategory.trim()]);
-      setNewCategory("");
-    } else if (type === "tag" && newTag.trim()) {
-      setTags([...tags, newTag.trim()]);
+  // Redirect non-admins or show loading spinner
+  useEffect(() => {
+    if (loadingUserData) return;
+    if (!user || !userData?.isAdmin) {
+      // navigate("/login", { replace: true });
+    }
+  }, [user, userData, loadingUserData, navigate]);
+
+  // Fetch tags
+  useEffect(() => {
+    if (!firestore || !userData?.isAdmin || loadingUserData) return;
+
+    const tagsQuery = query(collection(firestore, "tags"));
+
+    const unsubscribe = onSnapshot(
+      tagsQuery,
+      (snapshot) => {
+        setTags(snapshot.docs.map((doc) => ({ id: doc.id, name: doc.data().name })));
+        setLoading(false);
+      },
+      (err) => {
+        setError(`Failed to fetch tags: ${err.message}`);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [firestore, userData, loadingUserData]);
+
+  const handleAdd = async () => {
+    if (!newTag.trim()) return;
+
+    setSubmitting(true);
+    setError("");
+    try {
+      if (tags.some((tag) => tag.name.toLowerCase() === newTag.trim().toLowerCase())) {
+        setError(`Tag "${newTag}" already exists.`);
+        setSubmitting(false);
+        return;
+      }
+
+      const newId = doc(collection(firestore, "tags")).id;
+      await setDoc(doc(firestore, "tags", newId), { name: newTag.trim() });
       setNewTag("");
+    } catch (err) {
+      setError(`Failed to add tag: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = (type, index) => {
-    if (type === "category") {
-      setCategories(categories.filter((_, i) => i !== index));
-    } else {
-      setTags(tags.filter((_, i) => i !== index));
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this tag?")) return;
+
+    setSubmitting(true);
+    setError("");
+    try {
+      await deleteDoc(doc(firestore, "tags", id));
+    } catch (err) {
+      setError(`Failed to delete tag: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleEdit = (type, index, value) => {
-    setEditItem({ type, index, value });
+  const handleEdit = (id, value) => {
+    setEditItem({ id, value });
   };
 
-  const handleEditSave = () => {
-    if (editItem.type === "category") {
-      const updated = [...categories];
-      updated[editItem.index] = editItem.value;
-      setCategories(updated);
-    } else {
-      const updated = [...tags];
-      updated[editItem.index] = editItem.value;
-      setTags(updated);
+  const handleEditSave = async () => {
+    if (!editItem.value.trim()) return;
+
+    setSubmitting(true);
+    setError("");
+    try {
+      if (
+        tags.some(
+          (tag) =>
+            tag.name.toLowerCase() === editItem.value.trim().toLowerCase() &&
+            tag.id !== editItem.id
+        )
+      ) {
+        setError(`Tag "${editItem.value}" already exists.`);
+        setSubmitting(false);
+        return;
+      }
+
+      await updateDoc(doc(firestore, "tags", editItem.id), {
+        name: editItem.value.trim(),
+      });
+      setEditItem({ id: "", value: "" });
+    } catch (err) {
+      setError(`Failed to update tag: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
-    setEditItem({ type: "", index: -1, value: "" });
   };
+
+  // if (loadingUserData || loading) {
+  //   return (
+  //     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+  //       <Spinner animation="border" className="text-primary" role="status">
+  //         <span className="visually-hidden">Loading...</span>
+  //       </Spinner>
+  //     </div>
+  //   );
+  // }
+
+  // if (!user || !userData?.isAdmin) return null;
 
   return (
-    <div className="container mt-4">
-      <h2 className="mb-4">📚 Category & Tag Manager</h2>
+    <div className="container mx-auto mt-4">
+      <h2 className="mb-4">🏷️ Tag Manager</h2>
+      {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
 
-      <Row>
-        {/* Categories Section */}
-        <Col md={6}>
-          <h5>📁 Categories</h5>
-          <Form className="d-flex mb-3">
-            <Form.Control
-              placeholder="New category"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-            />
-            <Button className="ms-2" onClick={() => handleAdd("category")}>
-              Add
-            </Button>
-          </Form>
-          <Table bordered hover>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Category Name</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((cat, i) => (
-                <tr key={i}>
-                  <td>{i + 1}</td>
-                  <td>{cat}</td>
-                  <td>
-                    <Button
-                      size="sm"
-                      variant="outline-primary"
-                      onClick={() => handleEdit("category", i, cat)}
-                      className="me-2"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline-danger"
-                      onClick={() => handleDelete("category", i)}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Col>
+      {/* Tag Form */}
+      <Form className="d-flex mb-4">
+        <Form.Control
+          placeholder="Add new tag (e.g., Minimalist)"
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          disabled={submitting}
+        />
+        <Button
+          className="ms-2"
+          variant="primary"
+          onClick={handleAdd}
+          disabled={submitting || !newTag.trim()}
+        >
+          + Add Tag
+        </Button>
+      </Form>
 
-        {/* Tags Section */}
-        <Col md={6}>
-          <h5>🏷️ Tags</h5>
-          <Form className="d-flex mb-3">
-            <Form.Control
-              placeholder="New tag"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-            />
-            <Button className="ms-2" onClick={() => handleAdd("tag")}>
-              Add
-            </Button>
-          </Form>
-          <Table bordered hover>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Tag Name</th>
-                <th>Actions</th>
+      {/* Tag Table */}
+      <div className="table-responsive">
+        <Table striped bordered hover>
+          <thead className="table-light">
+            <tr>
+              <th>#</th>
+              <th>Tag Name</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tags.map((tag, i) => (
+              <tr key={tag.id}>
+                <td>{i + 1}</td>
+                <td>{tag.name}</td>
+                <td>
+                  <Button
+                    size="sm"
+                    variant="outline-primary"
+                    onClick={() => handleEdit(tag.id, tag.name)}
+                    className="me-2"
+                    disabled={submitting}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => handleDelete(tag.id)}
+                    disabled={submitting}
+                  >
+                    Delete
+                  </Button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {tags.map((tag, i) => (
-                <tr key={i}>
-                  <td>{i + 1}</td>
-                  <td>{tag}</td>
-                  <td>
-                    <Button
-                      size="sm"
-                      variant="outline-primary"
-                      onClick={() => handleEdit("tag", i, tag)}
-                      className="me-2"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline-danger"
-                      onClick={() => handleDelete("tag", i)}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Col>
-      </Row>
+            ))}
+            {tags.length === 0 && (
+              <tr>
+                <td colSpan="3" className="text-center text-muted">
+                  No tags found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </Table>
+      </div>
 
       {/* Edit Modal */}
       <Modal
-        show={editItem.index !== -1}
-        onHide={() => setEditItem({ type: "", index: -1, value: "" })}
+        show={editItem.id !== ""}
+        onHide={() => setEditItem({ id: "", value: "" })}
       >
         <Modal.Header closeButton>
-          <Modal.Title>Edit {editItem.type === "category" ? "Category" : "Tag"}</Modal.Title>
+          <Modal.Title>Edit Tag</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Control
@@ -161,13 +209,23 @@ const CategoryTagManager = () => {
             onChange={(e) =>
               setEditItem((prev) => ({ ...prev, value: e.target.value }))
             }
+            disabled={submitting}
+            placeholder="Enter new tag name"
           />
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setEditItem({ type: "", index: -1, value: "" })}>
+          <Button
+            variant="secondary"
+            onClick={() => setEditItem({ id: "", value: "" })}
+            disabled={submitting}
+          >
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleEditSave}>
+          <Button
+            variant="primary"
+            onClick={handleEditSave}
+            disabled={submitting || !editItem.value.trim()}
+          >
             Save Changes
           </Button>
         </Modal.Footer>
@@ -176,4 +234,4 @@ const CategoryTagManager = () => {
   );
 };
 
-export default CategoryTagManager;
+export default TagManager;
