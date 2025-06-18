@@ -34,12 +34,9 @@ export const FirebaseProvider = (props) => {
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       try {
         if (currentUser) {
-          console.log("onAuthStateChanged: currentUser =", currentUser.uid);
           setUser(currentUser);
           const userRef = doc(firestore, 'users', currentUser.uid);
           const snapshot = await getDoc(userRef);
-          console.log("Firestore snapshot exists:", snapshot.exists());
-          console.log("Firestore snapshot data:", snapshot.data());
 
           if (!snapshot.exists()) {
             const userObj = {
@@ -52,12 +49,10 @@ export const FirebaseProvider = (props) => {
               isSeller: false,
               isAdmin: currentUser.uid === 'xhJlJHvOxgSysxjQl8AJfvdhGPg1' ? true : false,
             };
-            console.log("Creating new user document:", userObj);
             try {
               await setDoc(userRef, userObj);
               setUserData(userObj);
             } catch (setError) {
-              console.error("Failed to create user document:", setError);
               setError("Failed to initialize user data");
               setUserData(userObj);
             }
@@ -67,22 +62,18 @@ export const FirebaseProvider = (props) => {
               ...data,
               isAdmin: data.isAdmin ?? false,
             };
-            console.log("Setting userData:", userDataWithFallback);
             setUserData(userDataWithFallback);
           }
         } else {
-          console.log("No current user, resetting userData");
           setUser(null);
           setUserData(null);
         }
       } catch (err) {
-        console.error("Error in onAuthStateChanged:", err);
         setError("Authentication error: " + err.message);
         setUser(null);
         setUserData(null);
       } finally {
         setLoadingUserData(false);
-        console.log("loadingUserData set to false, userData =", userData);
       }
     });
     return () => unsub();
@@ -130,7 +121,6 @@ export const FirebaseProvider = (props) => {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
           size: "invisible",
           callback: () => {
-            console.log("reCAPTCHA solved");
           },
         });
         await window.recaptchaVerifier.render();
@@ -140,7 +130,6 @@ export const FirebaseProvider = (props) => {
       setConfirmationResult(result);
       return result;
     } catch (error) {
-      console.error("Error in setUpRecaptcha:", error);
       throw error;
     }
   };

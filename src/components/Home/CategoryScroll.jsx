@@ -50,7 +50,7 @@ export default function ShopByCollection() {
                   resolve({
                     id: collectionDoc.id,
                     title: capitalizeTitle(data.name || collectionDoc.id),
-                    link: data.link || `/collection/${collectionDoc.id}`,
+                    link: data.link || `/collections/${collectionDoc.id}`,
                     images: imageUrls,
                   });
                 }, (err) => {

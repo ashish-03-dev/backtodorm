@@ -30,8 +30,8 @@ const SectionManager = () => {
         if (!homeSectionsSnapshot.docs.find((d) => d.id === "menus")) {
           await setDoc(doc(homeSectionsRef, "menus"), {
             menuList: [
-              { id: "shopMenu", sections: [] },
-              { id: "collectionsMenu", sections: [] },
+              { id: "shopMenu", sections: [], images: [] },
+              { id: "collectionsMenu", sections: [], images: [] },
             ],
           });
         }
@@ -141,25 +141,26 @@ const SectionManager = () => {
             return null;
           });
           if (itemErrors.some((err) => err)) secErrors.items = itemErrors;
-          const imageErrors = await Promise.all(
-            (sec.images || []).map(async (img, imgIndex) => {
-              if (!img.src?.trim()) return null;
-              if (!img.src.match(/^[a-zA-Z0-9_-]+$/)) return "Invalid image ID format.";
-              try {
-                const q = query(collection(firestore, "posters"), where("__name__", "==", img.src));
-                const querySnap = await getDocs(q);
-                if (querySnap.empty) return "Image ID does not exist.";
-                return null;
-              } catch (err) {
-                return `Failed to validate ID: ${err.message}`;
-              }
-            })
-          );
-          if (imageErrors.some((err) => err)) secErrors.images = imageErrors;
           return Object.keys(secErrors).length ? { index: secIndex, errors: secErrors } : null;
         })
       );
       if (sectionErrors.some((err) => err)) errors.sections = sectionErrors.filter((err) => err);
+
+      const imageErrors = await Promise.all(
+        (formData.images || []).map(async (img, imgIndex) => {
+          if (!img.src?.trim()) return null;
+          if (!img.src.match(/^[a-zA-Z0-9_-]+$/)) return "Invalid image ID format.";
+          try {
+            const q = query(collection(firestore, "posters"), where("__name__", "==", img.src));
+            const querySnap = await getDocs(q);
+            if (querySnap.empty) return "Image ID does not exist.";
+            return null;
+          } catch (err) {
+            return `Failed to validate ID: ${err.message}`;
+          }
+        })
+      );
+      if (imageErrors.some((err) => err)) errors.images = imageErrors;
     }
     return errors;
   };
@@ -197,16 +198,16 @@ const SectionManager = () => {
           items: sec.items
             .filter((item) => item.name.trim() && item.link.trim())
             .map((item) => ({ name: item.name.trim(), link: item.link.trim() })),
-          images: sec.images
-            .filter((img) => img.src.trim())
-            .map((img) => ({
-              src: img.src.trim(),
-              alt: img.alt.trim(),
-              label: img.label.trim(),
-              link: img.link.trim(),
-            })),
         }));
-        const newMenu = { id, sections };
+        const images = formData.images
+          .filter((img) => img.src.trim())
+          .map((img) => ({
+            src: img.src.trim(),
+            alt: img.alt.trim(),
+            label: img.label.trim(),
+            link: img.link.trim(),
+          }));
+        const newMenu = { id, sections, images };
         const menusDocRef = doc(firestore, "homeSections", "menus");
         const menusDoc = await getDocs(query(collection(firestore, "homeSections")));
         const menuList = menusDoc.docs.find((d) => d.id === "menus")?.data().menuList || [];
@@ -220,7 +221,7 @@ const SectionManager = () => {
       const newIds = [
         ...(formData.posterIds || []),
         ...(formData.imageIds || []),
-        ...(formData.sections?.flatMap((sec) => sec.images?.map((img) => img.src) || []) || []),
+        ...(formData.images?.map((img) => img.src) || []),
       ].filter((id) => id.trim() && !posterImages[id]);
       if (newIds.length) {
         const imageResults = await fetchImages(newIds, firestore);

@@ -27,7 +27,7 @@ export default function NavbarComponent({ cartItems = [], removeFromCart, update
             onClick={() => setShowSidebar(true)}
             aria-label="Open Shop Categories"
           >
-            <i className="fas fa-bars"></i>
+            <i className="fas fa-bars fs-6"></i>
           </button>
           <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">
             BackToDorm
@@ -36,35 +36,40 @@ export default function NavbarComponent({ cartItems = [], removeFromCart, update
 
         <NavLinks />
 
-        <div className="col-md-3 h-100 d-flex align-items-center justify-content-end position-relative">
+        <div className="col-md-3 h-100 d-flex align-items-center flex-grow-1 justify-content-end position-relative" style={{maxWidth:"50%"}}>
           <button
-            className="btn bg-light mx-1 mx-md-2 border"
+            className="btn px-3 mx-1 mx-md-2 align-items-center"
             type="button"
             onClick={() => navigate("/search")}
-            style={{ height: "35px", padding: "0 10px" }}
+            style={{ height: "35px", padding: "0 8px", lineHeight: '1' }}
             aria-label="Search Posters"
           >
-            <i className="bi bi-search fs-5"></i>
+            <i className="bi bi-search fs-6"></i>
           </button>
 
           <AccountDropdown isLoggedIn={isLoggedIn} logout={logout} />
 
           <button
-            className="btn bg-light position-relative mx-1 mx-md-2 border"
+            className="btn position-relative mx-1 mx-md-2 px-3 d-flex align-items-center justify-content-center"
             type="button"
             onClick={() => setShowCart(true)}
             style={{ height: "35px" }}
           >
-            🛒 Cart
+            <i className="bi bi-cart fs-5"></i>
             {cartItems.length > 0 && (
               <span
-                className="position-absolute top-0 start-100 translate-middle bg-primary text-white d-flex align-items-center justify-content-center"
+                className="position-absolute bg-primary text-white d-flex align-items-center justify-content-center"
                 style={{
-                  width: "18px",
-                  height: "18px",
-                  borderRadius: "50%",
-                  fontSize: "0.65rem",
+                  top: '5px',
+                  right: '0px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  fontSize: '0.6rem',
+                  transform: 'translate(50%, -50%)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                 }}
+                title={`${cartItems.length} items in cart`}
               >
                 {cartItems.length}
                 <span className="visually-hidden">items in cart</span>

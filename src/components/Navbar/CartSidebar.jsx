@@ -3,7 +3,7 @@ import { Offcanvas, Button, ListGroup, Image } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/CartSidebar.css';
 
-export default function CartSidebar({ cartItems, show, onClose, removeFromCart, updateQuantity }) {
+export default function CartSidebar({ cartItems = [], show, onClose, removeFromCart, updateQuantity }) {
   const navigate = useNavigate();
 
   const handleGoToCheckout = () => {
@@ -11,22 +11,20 @@ export default function CartSidebar({ cartItems, show, onClose, removeFromCart, 
     navigate('/checkout');
   };
 
-  const totalPrice = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const totalPrice = cartItems.reduce((acc, item) => acc + (item.price || 0) * (item.quantity || 0), 0).toFixed(2);
 
   const handleUpdateQuantity = (posterId, selectedSize, newQuantity) => {
-    if (typeof updateQuantity !== 'function') {
-      console.error('updateQuantity is not a function');
-      return;
-    }
-    updateQuantity(posterId, selectedSize, newQuantity);
+    if (newQuantity < 1) return;
+    updateQuantity(posterId, selectedSize || '', newQuantity);
   };
 
   const handleRemoveFromCart = (posterId, selectedSize) => {
-    if (typeof removeFromCart !== 'function') {
-      console.error('removeFromCart is not a function');
+    console.log('Removing item:', { posterId, selectedSize: selectedSize || 'none' });
+    if (!posterId) {
+      console.error('Invalid posterId:', posterId);
       return;
     }
-    removeFromCart(posterId, selectedSize);
+    removeFromCart(posterId, selectedSize || '');
   };
 
   return (
@@ -50,37 +48,52 @@ export default function CartSidebar({ cartItems, show, onClose, removeFromCart, 
             <ListGroup variant="flush">
               {cartItems.map((item) => (
                 <ListGroup.Item
-                  key={`${item.posterId}-${item.selectedSize}`}
-                  className="d-flex align-items-center mb-3 border-bottom pb-2"
+                  key={`${item.posterId}-${item.selectedSize || 'none'}`}
+                  className="d-flex align-items-start mb-3 border-bottom pb-2"
                 >
-                  {item.image && (
-                    <Image
-                      src={item.image || 'https://via.placeholder.com/60'}
-                      alt={item.title}
-                      style={{ width: '60px', aspectRatio: '4/5', objectFit: 'cover' }}
-                      className="me-3 rounded"
-                    />
-                  )}
-                  <div className="flex-grow-1">
-                    <h6 className="mb-1">{item.title}</h6>
-                    <p className="mb-1 text-muted">Size: {item.selectedSize}</p>
-                    <p className="mb-1">₹{item.price} x {item.quantity}</p>
-                    <div className="d-flex align-items-center">
+                  <Image
+                    src={item.image || 'https://via.placeholder.com/60'}
+                    alt={item.title || 'Cart item'}
+                    style={{ width: '60px', aspectRatio: '4/5', objectFit: 'cover' }}
+                    className="me-3 rounded flex-shrink-0"
+                    title={item.title || 'Untitled'}
+                  />
+                  <div
+                    className="flex-grow-1"
+                    style={{ maxWidth: 'calc(100% - 100px)' }} // Image (60px) + Delete button (30px) + margins (10px)
+                  >
+                    <h6
+                      className="mb-1 text-truncate"
+                      title={item.title || 'Untitled'}
+                      style={{ maxWidth: '100%', overflow: 'hidden' }}
+                    >
+                      {item.title || 'Untitled'}
+                    </h6>
+                    <p className="mb-1 text-muted">Size: {item.selectedSize || 'N/A'}</p>
+                    {item.seller && <p className="mb-1 text-muted small">By: {item.seller}</p>}
+                    <p className="mb-2">₹{(item.price || 0).toLocaleString('en-IN')} x {item.quantity || 0}</p>
+                    <div className="d-flex align-items-center gap-2">
                       <Button
                         variant="outline-secondary"
                         size="sm"
                         onClick={() => handleUpdateQuantity(item.posterId, item.selectedSize, item.quantity - 1)}
                         disabled={item.quantity <= 1}
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ width: '30px', height: '30px', lineHeight: '1' }}
+                        aria-label={`Decrease quantity of ${item.title || 'item'}`}
                       >
-                        -
+                        <i className="bi bi-dash fs-6"></i>
                       </Button>
-                      <span className="mx-2">{item.quantity}</span>
+                      <span className="mx-2">{item.quantity || 0}</span>
                       <Button
                         variant="outline-secondary"
                         size="sm"
                         onClick={() => handleUpdateQuantity(item.posterId, item.selectedSize, item.quantity + 1)}
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ width: '30px', height: '30px', lineHeight: '1' }}
+                        aria-label={`Increase quantity of ${item.title || 'item'}`}
                       >
-                        +
+                        <i className="bi bi-plus fs-6"></i>
                       </Button>
                     </div>
                   </div>
@@ -88,9 +101,12 @@ export default function CartSidebar({ cartItems, show, onClose, removeFromCart, 
                     variant="outline-danger"
                     size="sm"
                     onClick={() => handleRemoveFromCart(item.posterId, item.selectedSize)}
-                    className="ms-3"
+                    className="ms-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{ width: '30px', height: '30px', lineHeight: '1' }}
+                    aria-label={`Remove ${item.title || 'item'} from cart`}
+                    title="Remove item"
                   >
-                    Remove
+                    <i className="bi bi-trash fs-6"></i>
                   </Button>
                 </ListGroup.Item>
               ))}
@@ -98,13 +114,15 @@ export default function CartSidebar({ cartItems, show, onClose, removeFromCart, 
           )}
         </Offcanvas.Body>
         <div className="p-3 border-top">
-          <h6 className="fw-semibold">Total: ₹{totalPrice}</h6>
+          <h6 className="fw-semibold mb-3">Total: ₹{totalPrice.toLocaleString('en-IN')}</h6>
           <Button
             onClick={handleGoToCheckout}
-            className="btn btn-dark w-100 mt-3"
+            variant="dark"
+            className="w-100 d-flex align-items-center justify-content-center"
             disabled={cartItems.length === 0}
+            style={{ height: '40px', lineHeight: '1' }}
           >
-            <i className="bi bi-cart-check me-2"></i> Go to Checkout
+            <i className="bi bi-cart-check me-2 fs-6"></i> Go to Checkout
           </Button>
         </div>
       </Offcanvas>

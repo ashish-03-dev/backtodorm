@@ -73,7 +73,7 @@ export default function ProductDetail() {
   const isDiscounted = poster?.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
 
   const handleBuyNow = () => {
-    const item = { id: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller };
+    const item = { posterId: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller };
     buyNow(item);
     navigate('/checkout');
   };
@@ -140,7 +140,7 @@ export default function ProductDetail() {
             <div className="d-flex flex-column gap-2 mb-4">
               <button
                 className="btn btn-dark btn-lg"
-                onClick={() => addToCart({ id: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller })}
+                onClick={() => addToCart({ posterId: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller })}
               >
                 🛒 Add to Cart
               </button>

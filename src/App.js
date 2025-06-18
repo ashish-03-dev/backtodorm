@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomeLayout from './pages/HomeLayout';
 import MainLanding from './pages/MainLanding';
 import CollectionDetail from './components/Collections/CollectionsDetail';
-import CategoryCollectionsPage from './components/Collections/CategoryCollectionPage';
 import SingleCollection from './components/Collections/SingleCollection';
 import Poster from './components/Collections/Poster';
 import Checkout from './pages/Checkout';
@@ -18,7 +17,7 @@ import Posters from "./pages/AAdmin/Posters/Posters";
 import Customers from "./pages/AAdmin/Customers";
 import Support from "./pages/AAdmin/Support";
 import Settings from "./pages/AAdmin/SiteSettings";
-import CategoryManager from "./pages/AAdmin/ContentManager";
+import TagManager from "./pages/AAdmin/TagManager";
 import AdminUsers from "./pages/AAdmin/AdminUsers";
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
@@ -42,9 +41,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomeLayout />}>
           <Route index element={<MainLanding />} />
-          <Route path="collections/:categoryType/:collectionId" element={<CollectionDetail />} />
-          <Route path="collections/:categoryType" element={<CategoryCollectionsPage />} />
-          <Route path="collection/:collectionId" element={<SingleCollection />} />
+          <Route path="collections/:collectionId" element={<CollectionDetail />} />
           <Route path="poster/:id" element={<Poster />} />
           <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="account" element={<AccountLayout />}>
@@ -76,7 +73,7 @@ function App() {
           <Route path="customers" element={<Customers />} />
           <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="category-manager" element={<CategoryManager />} />
+          <Route path="tag-manager" element={<TagManager />} />
           <Route path="users" element={<AdminUsers />} />
         </Route>
       </Routes>
