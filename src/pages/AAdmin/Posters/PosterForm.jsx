@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Form, Button, Modal } from "react-bootstrap";
-import { doc, getDoc, collection, getDocs, setDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, setDoc, query, where } from "firebase/firestore";
 import Select from "react-select";
 import { useFirebase } from "../../../context/FirebaseContext";
 
@@ -11,19 +11,42 @@ const PosterForm = ({ poster, onSave }) => {
   const [collectionError, setCollectionError] = useState(null);
   const [idChecked, setIdChecked] = useState(!!poster);
   const [availableCollections, setAvailableCollections] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
   const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionError, setNewCollectionError] = useState(null);
   const [selectedCollections, setSelectedCollections] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [sellerUsername, setSellerUsername] = useState(poster?.sellerUsername || "@");
   const [sellerName, setSellerName] = useState("");
+  const [sellerId, setSellerId] = useState(poster?.seller || "");
+  const [isSellerValid, setIsSellerValid] = useState(!!poster);
   const [keywords, setKeywords] = useState(poster?.keywords?.join(", ") || "");
   const [showAllKeywords, setShowAllKeywords] = useState(false);
   const [sizes, setSizes] = useState(
-    Array.isArray(poster?.sizes) && poster.sizes.length > 0 
-      ? poster.sizes 
+    Array.isArray(poster?.sizes) && poster.sizes.length > 0
+      ? poster.sizes
       : [{ size: "", price: "" }]
   );
   const formRef = useRef(null);
+
+  // Normalize text for keywords and collections
+  const normalizeText = (text) => {
+    if (!text) return [];
+    const lower = text.toLowerCase().trim();
+    const title = lower
+      .split(/\s+|-/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+    const hyphenated = lower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    return [...new Set([lower, title, hyphenated])].filter(Boolean);
+  };
+
+  // Normalize to hyphenated lowercase
+  const normalizeCollection = (text) => {
+    if (!text) return "";
+    return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  };
 
   useEffect(() => {
     const fetchCollections = async () => {
@@ -31,14 +54,13 @@ const PosterForm = ({ poster, onSave }) => {
         const collectionsRef = collection(firestore, "collections");
         const snapshot = await getDocs(collectionsRef);
         const collections = snapshot.docs.map((doc) => ({
-          value: doc.id,
-          label: doc.data().name,
+          value: doc.id, // e.g., "k-pop"
+          label: doc.data().name, // e.g., "k-pop"
         }));
         setAvailableCollections(collections);
-
         if (poster?.collections) {
           const selected = collections.filter((col) =>
-            poster.collections.includes(col.label)
+            poster.collections.includes(col.value)
           );
           setSelectedCollections(selected);
         }
@@ -48,22 +70,55 @@ const PosterForm = ({ poster, onSave }) => {
       }
     };
 
-    const fetchSellerName = async () => {
-      if (poster?.seller) {
+    const fetchTags = async () => {
+      try {
+        const tagsRef = collection(firestore, "tags");
+        const snapshot = await getDocs(tagsRef);
+        const tags = snapshot.docs.map((doc) => ({
+          value: doc.id,
+          label: doc.data().name, // e.g., "k-pop"
+        }));
+        setAvailableTags(tags);
+        if (poster?.tags) {
+          const selected = poster.tags.map((tag) => {
+            const existingTag = tags.find((t) => t.value === tag || t.label === tag);
+            return existingTag || { value: tag, label: tag };
+          });
+          setSelectedTags(selected);
+        }
+      } catch (error) {
+        console.error("Error fetching tags:", error);
+      }
+    };
+
+    const fetchSellerInfo = async () => {
+      if (poster?.seller && poster?.sellerUsername) {
         try {
-          const userDoc = await getDoc(doc(firestore, "users", poster.seller));
-          if (userDoc.exists()) {
-            setSellerName(userDoc.data().name || "Unknown User");
+          const userQuery = query(
+            collection(firestore, "users"),
+            where("sellerUsername", "==", poster.sellerUsername)
+          );
+          const querySnapshot = await getDocs(userQuery);
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const data = userDoc.data();
+            setSellerName(data.name || "Unknown User");
+            setIsSellerValid(!!data.isSeller);
+            setSellerId(userDoc.id);
+          } else {
+            setIsSellerValid(false);
           }
         } catch (error) {
-          console.error("Error fetching seller name:", error);
+          console.error("Error fetching seller info:", error);
+          setIsSellerValid(false);
         }
       }
     };
 
     if (firestore) {
       fetchCollections();
-      fetchSellerName();
+      fetchTags();
+      fetchSellerInfo();
     }
   }, [firestore, poster]);
 
@@ -115,6 +170,48 @@ const PosterForm = ({ poster, onSave }) => {
     checkIdUniqueness(generatedId);
   };
 
+  const checkSellerUsername = async (username) => {
+    if (!username || username.length <= 1) {
+      setIsSellerValid(false);
+      setSellerName("");
+      setSellerId("");
+      return false;
+    }
+    if (!username.startsWith("@")) {
+      setIsSellerValid(false);
+      setSellerName("");
+      setSellerId("");
+      return false;
+    }
+    try {
+      const userQuery = query(
+        collection(firestore, "users"),
+        where("sellerUsername", "==", username)
+      );
+      const querySnapshot = await getDocs(userQuery);
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const data = userDoc.data();
+        if (data.isSeller) {
+          setSellerName(data.name || "Unknown User");
+          setIsSellerValid(true);
+          setSellerId(userDoc.id);
+          return true;
+        }
+      }
+      setIsSellerValid(false);
+      setSellerName("");
+      setSellerId("");
+      return false;
+    } catch (error) {
+      console.error("Error checking seller username:", error);
+      setIsSellerValid(false);
+      setSellerName("");
+      setSellerId("");
+      return false;
+    }
+  };
+
   const insertUserId = async () => {
     if (!auth) {
       alert("Authentication is not initialized. Please check Firebase setup.");
@@ -122,36 +219,79 @@ const PosterForm = ({ poster, onSave }) => {
     }
     const user = auth.currentUser;
     if (user) {
-      formRef.current.seller.value = user.uid;
       try {
         const userDoc = await getDoc(doc(firestore, "users", user.uid));
         if (userDoc.exists()) {
-          setSellerName(userDoc.data().name || "Unknown User");
+          const data = userDoc.data();
+          if (data.isSeller && data.sellerUsername) {
+            setSellerUsername(data.sellerUsername);
+            formRef.current.seller.value = data.sellerUsername;
+            setSellerName(data.name || "Unknown User");
+            setIsSellerValid(true);
+            setSellerId(user.uid);
+          } else {
+            alert("You are not registered as a seller. Please become a seller first.");
+          }
+        } else {
+          alert("User data not found.");
         }
       } catch (error) {
-        console.error("Error fetching seller name:", error);
+        console.error("Error fetching user data:", error);
+        alert("Failed to fetch user data: " + error.message);
       }
     } else {
       alert("No user is currently signed in.");
     }
   };
 
-  const generateKeywords = () => {
+  const handleSellerUsernameChange = (e) => {
+    let value = e.target.value;
+    if (!value.startsWith("@")) {
+      value = "@" + value.replace(/^@+/, "");
+    }
+    setSellerUsername(value);
+    setIsSellerValid(false);
+    setSellerName("");
+    setSellerId("");
+  };
+
+  const handleTagChange = async (selectedOptions) => {
+    setSelectedTags(selectedOptions || []);
+    for (const option of selectedOptions || []) {
+      if (!availableTags.some((tag) => tag.value === option.value)) {
+        try {
+          const newTagName = normalizeCollection(option.label.trim());
+          if (!newTagName || availableTags.some((tag) => tag.label === newTagName)) {
+            continue;
+          }
+          const newTagId = doc(collection(firestore, "tags")).id;
+          await setDoc(doc(firestore, "tags", newTagId), { name: newTagName });
+          setAvailableTags((prev) => [
+            ...prev,
+            { value: newTagId, label: newTagName },
+          ]);
+        } catch (error) {
+          console.error("Error adding new tag:", error);
+        }
+      }
+    }
+  };
+
+  const generateKeywordsLocal = () => {
     const form = formRef.current;
     const title = form?.title?.value?.trim() || "";
     const description = form?.description?.value?.trim() || "";
-    const tags = form?.tags?.value?.split(",").map(t => t.trim()).filter(Boolean) || [];
-    const collections = selectedCollections.map(col => col.label);
-    
+    const tags = selectedTags.map((t) => t.label);
+    const collections = selectedCollections.map((col) => col.label);
     const stopWords = new Set(["a", "an", "the", "and", "or", "but", "in", "on", "at", "to"]);
     const words = [
       ...title.toLowerCase().split(/\s+/),
       ...description.toLowerCase().split(/\s+/),
-      ...tags,
-      ...collections
+      ...tags.flatMap(normalizeText),
+      ...collections.flatMap(normalizeText),
     ];
     const newKeywords = [...new Set(words)]
-      .filter(word => !stopWords.has(word) && word.length > 2)
+      .filter((word) => !stopWords.has(word) && word.length > 2)
       .slice(0, 50);
     setKeywords(newKeywords.join(", "));
   };
@@ -163,18 +303,23 @@ const PosterForm = ({ poster, onSave }) => {
       setNewCollectionError("Collection name is required.");
       return;
     }
-    if (availableCollections.some((c) => c.value.toLowerCase() === name.toLowerCase())) {
+    const normalizedName = normalizeCollection(name);
+    if (!normalizedName) {
+      setNewCollectionError("Invalid collection name.");
+      return;
+    }
+    if (availableCollections.some((c) => c.label === normalizedName)) {
       setNewCollectionError("Collection already exists.");
       return;
     }
-
     try {
-      const collectionId = name.toLowerCase().replace(/\s+/g, "-");
+      const collectionId = normalizedName;
       await setDoc(doc(firestore, "collections", collectionId), {
-        name,
+        name: normalizedName, // e.g., "k-pop"
         createdAt: new Date(),
+        posterIds: [],
       });
-      const newCollection = { value: collectionId, label: name };
+      const newCollection = { value: collectionId, label: normalizedName };
       setAvailableCollections((prev) => [...prev, newCollection]);
       setSelectedCollections((prev) => [...prev, newCollection]);
       setNewCollectionName("");
@@ -193,7 +338,7 @@ const PosterForm = ({ poster, onSave }) => {
   };
 
   const addSize = () => {
-    if (sizes.length === 0 || sizes.every(s => s.size && s.price)) {
+    if (sizes.length === 0 || sizes.every((s) => s.size && s.price)) {
       setSizes([...sizes, { size: "", price: "" }]);
     } else {
       alert("Please fill in the current size and price before adding a new one.");
@@ -212,10 +357,15 @@ const PosterForm = ({ poster, onSave }) => {
     const posterId = (poster?.id || form.posterId.value.trim()).toLowerCase();
     const discount = parseFloat(form.discount.value) || 0;
     let imageUrl = poster?.imageUrl || form.imageUrl.value;
-    const collections = selectedCollections.map((col) => col.label);
+    const collections = selectedCollections.map((col) => normalizeCollection(col.label)); // e.g., "k-pop"
+    const tags = selectedTags.map((tag) => normalizeCollection(tag.label)); // e.g., "k-pop"
 
     if (!poster && (!posterId || !idChecked || idError)) {
       alert("Please provide a unique Poster ID and check its availability.");
+      return;
+    }
+    if (!isSellerValid) {
+      alert("Please provide a valid seller username and check its availability.");
       return;
     }
     if (sizes.some((s) => !s.size || !s.price || isNaN(s.price) || parseFloat(s.price) <= 0)) {
@@ -252,8 +402,8 @@ const PosterForm = ({ poster, onSave }) => {
     const data = {
       title: form.title.value,
       description: form.description.value,
-      tags: form.tags.value.split(",").map((t) => t.trim()).filter(Boolean),
-      keywords: keywords.split(",").map(k => k.trim()).filter(Boolean),
+      tags,
+      keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
       collections,
       imageUrl,
       discount,
@@ -264,17 +414,16 @@ const PosterForm = ({ poster, onSave }) => {
       })),
       approved: poster?.approved || "draft",
       isActive: form.isActive.checked,
-      seller: form.seller.value,
+      seller: sellerId,
+      sellerUsername,
       createdAt: poster?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     onSave(data, posterId);
   };
 
-  const truncatedKeywords = showAllKeywords ? keywords : keywords.slice(0, 50);
-
   return (
-    <div>
+    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
       <Form onSubmit={handleSubmit} ref={formRef}>
         {!poster ? (
           <Form.Group className="mb-3">
@@ -292,19 +441,22 @@ const PosterForm = ({ poster, onSave }) => {
               <Button
                 variant="outline-secondary"
                 onClick={() => checkIdUniqueness(formRef.current.posterId.value.trim().toLowerCase())}
+                aria-label="Check Poster ID"
+                className="me-1"
               >
                 Check
               </Button>
               <Button
                 variant="outline-secondary"
                 onClick={suggestId}
+                aria-label="Suggest Poster ID"
               >
-                Suggest ID
+                Suggest
               </Button>
+              <Form.Control.Feedback type="invalid" id="posterIdFeedback">
+                {idError}
+              </Form.Control.Feedback>
             </div>
-            <Form.Control.Feedback type="invalid" id="posterIdFeedback">
-              {idError}
-            </Form.Control.Feedback>
           </Form.Group>
         ) : (
           <Form.Group className="mb-3">
@@ -323,6 +475,7 @@ const PosterForm = ({ poster, onSave }) => {
             name="title"
             defaultValue={poster?.title || ""}
             required
+            placeholder="Enter poster title"
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -332,13 +485,20 @@ const PosterForm = ({ poster, onSave }) => {
             rows={2}
             name="description"
             defaultValue={poster?.description || ""}
+            placeholder="Enter poster description"
           />
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Label>Tags (comma-separated)</Form.Label>
-          <Form.Control
-            name="tags"
-            defaultValue={poster?.tags?.join(", ") || ""}
+          <Form.Label>Tags</Form.Label>
+          <Select
+            isMulti
+            options={availableTags}
+            value={selectedTags}
+            onChange={handleTagChange}
+            className="flex-grow-1"
+            placeholder="Select or create tags (e.g., k-pop, minimalist)..."
+            isCreatable
+            formatCreateLabel={(inputValue) => `Create tag "${inputValue}"`}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -346,13 +506,16 @@ const PosterForm = ({ poster, onSave }) => {
           <div className="input-group">
             <Form.Control
               name="keywords"
-              value={truncatedKeywords}
+              value={keywords.slice(0, showAllKeywords ? undefined : 50)}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="Enter keywords..."
             />
             <Button
               variant="outline-secondary"
-              onClick={generateKeywords}
+              onClick={generateKeywordsLocal}
+              aria-label="Generate keywords"
+              className="me-1"
+              disabled={uploading}
             >
               Generate
             </Button>
@@ -360,6 +523,7 @@ const PosterForm = ({ poster, onSave }) => {
               <Button
                 variant="outline-secondary"
                 onClick={() => setShowAllKeywords(!showAllKeywords)}
+                aria-label={showAllKeywords ? "Truncate keywords" : "Expand keywords"}
               >
                 {showAllKeywords ? "Truncate" : "Expand"}
               </Button>
@@ -381,13 +545,12 @@ const PosterForm = ({ poster, onSave }) => {
               variant="outline-primary"
               onClick={() => setShowNewCollectionModal(true)}
               title="Suggest new collection"
+              aria-label="Suggest new collection"
             >
-              + Suggest New
+              + New
             </Button>
           </div>
-          {collectionError && (
-            <Form.Text className="text-danger">{collectionError}</Form.Text>
-          )}
+          {collectionError && <Form.Text className="text-danger">{collectionError}</Form.Text>}
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Sizes and Prices</Form.Label>
@@ -412,6 +575,8 @@ const PosterForm = ({ poster, onSave }) => {
                 <Button
                   variant="outline-danger"
                   onClick={() => removeSize(index)}
+                  title="Remove size"
+                  aria-label="Remove size"
                 >
                   Remove
                 </Button>
@@ -420,8 +585,10 @@ const PosterForm = ({ poster, onSave }) => {
           ))}
           <Button
             variant="outline-primary"
+            size="sm"
             onClick={addSize}
             className="mt-2"
+            aria-label="Add size"
           >
             + Add Size
           </Button>
@@ -430,7 +597,7 @@ const PosterForm = ({ poster, onSave }) => {
           <Form.Label>Image Upload</Form.Label>
           <Form.Control type="file" name="imageFile" accept="image/*" />
           {poster?.imageUrl && (
-            <Form.Text>
+            <Form.Text className="mt-2">
               Current: <a href={poster.imageUrl} target="_blank" rel="noopener noreferrer">View Image</a>
             </Form.Text>
           )}
@@ -441,6 +608,7 @@ const PosterForm = ({ poster, onSave }) => {
             type="url"
             name="imageUrl"
             defaultValue={poster?.imageUrl || ""}
+            placeholder="Enter image URL"
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -449,25 +617,50 @@ const PosterForm = ({ poster, onSave }) => {
             type="number"
             name="discount"
             defaultValue={poster?.discount || 0}
+            placeholder="Enter discount percentage"
           />
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Label>Seller</Form.Label>
-          <div className="input-group">
-            <Form.Control
-              name="seller"
-              defaultValue={poster?.seller || ""}
-              required
-            />
+          <Form.Label>Seller Username</Form.Label>
+          <div className="input-group" style={{ flexWrap: "nowrap" }}>
+            <div className="position-relative me-2" style={{ minWidth: "150px", flexGrow: 1 }}>
+              <Form.Control
+                name="seller"
+                value={sellerUsername}
+                onChange={handleSellerUsernameChange}
+                required
+                placeholder="@username"
+                isValid={isSellerValid}
+                aria-describedby="sellerFeedback"
+              />
+              {isSellerValid && (
+                <span
+                  className="position-absolute top-50 end-0 translate-middle-y me-2 text-success"
+                  style={{ fontSize: "1rem" }}
+                >
+                  ✓
+                </span>
+              )}
+            </div>
             <Form.Control
               type="text"
               value={sellerName}
               readOnly
               placeholder="Seller Name"
+              style={{ width: "35%" }}
             />
             <Button
               variant="outline-secondary"
+              onClick={() => checkSellerUsername(sellerUsername)}
+              aria-label="Check seller username"
+              className="me-1"
+            >
+              Check
+            </Button>
+            <Button
+              variant="outline-secondary"
               onClick={insertUserId}
+              aria-label="Insert current user"
             >
               Me
             </Button>
@@ -482,7 +675,7 @@ const PosterForm = ({ poster, onSave }) => {
             disabled={poster?.approved !== "approved"}
           />
         </Form.Group>
-        <Button type="submit" variant="success" disabled={uploading}>
+        <Button type="submit" variant="success" disabled={uploading} className="w-100">
           {uploading ? "Uploading..." : poster ? "Update Poster" : "Save Draft"}
         </Button>
       </Form>
@@ -499,7 +692,7 @@ const PosterForm = ({ poster, onSave }) => {
                 type="text"
                 value={newCollectionName}
                 onChange={(e) => setNewCollectionName(e.target.value)}
-                placeholder="e.g., Vintage Cars"
+                placeholder="e.g., K Pop"
                 isInvalid={!!newCollectionError}
               />
               <Form.Control.Feedback type="invalid">{newCollectionError}</Form.Control.Feedback>

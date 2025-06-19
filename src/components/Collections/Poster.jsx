@@ -67,13 +67,46 @@ export default function ProductDetail() {
     setSelectedSize(size);
   };
 
+  const handleAddToCart = () => {
+    if (!selectedSize) {
+      alert("Please select a size.");
+      return;
+    }
+
+    const selectedSizeObj = poster.sizes.find(s => s.size === selectedSize) || {};
+    const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
+
+    const cartItem = {
+      posterId: poster.id,
+      title: poster.title,
+      selectedSize,
+      price: displayPrice,
+      seller: poster.seller,
+      image: poster.image,
+    };
+
+    addToCart(cartItem);
+  };
+
   const selectedSizeObj = poster?.sizes.find(s => s.size === selectedSize) || {};
   const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
   const originalPrice = selectedSizeObj.price || 0;
   const isDiscounted = poster?.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
 
   const handleBuyNow = () => {
-    const item = { posterId: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller };
+    if (!selectedSize) {
+      alert("Please select a size.");
+      return;
+    }
+
+    const item = { 
+      posterId: poster.id, 
+      title: poster.title, 
+      selectedSize, 
+      price: displayPrice, 
+      seller: poster.seller,
+      image: poster.image,
+    };
     buyNow(item);
     navigate('/checkout');
   };
@@ -140,7 +173,7 @@ export default function ProductDetail() {
             <div className="d-flex flex-column gap-2 mb-4">
               <button
                 className="btn btn-dark btn-lg"
-                onClick={() => addToCart({ posterId: poster.id, title: poster.title, selectedSize, price: displayPrice, seller: poster.seller })}
+                onClick={handleAddToCart}
               >
                 🛒 Add to Cart
               </button>

@@ -42,6 +42,7 @@ function App() {
         <Route path="/" element={<HomeLayout />}>
           <Route index element={<MainLanding />} />
           <Route path="collections/:collectionId" element={<CollectionDetail />} />
+          <Route path="collection/:collectionId" element={<SingleCollection />} />
           <Route path="poster/:id" element={<Poster />} />
           <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
           <Route path="account" element={<AccountLayout />}>

@@ -3,7 +3,7 @@ import { Button, Form, Table, Modal, Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
 import { useNavigate } from "react-router-dom";
 import { collection, query, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import '../../styles/SellerComponents.css';
+import "../../styles/SellerComponents.css";
 
 const TagManager = () => {
   const { firestore, user, userData, loadingUserData } = useFirebase();
@@ -15,20 +15,17 @@ const TagManager = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Redirect non-admins or show loading spinner
   useEffect(() => {
     if (loadingUserData) return;
     if (!user || !userData?.isAdmin) {
-      // navigate("/login", { replace: true });
+      navigate("/login", { replace: true });
     }
   }, [user, userData, loadingUserData, navigate]);
 
-  // Fetch tags
   useEffect(() => {
     if (!firestore || !userData?.isAdmin || loadingUserData) return;
 
     const tagsQuery = query(collection(firestore, "tags"));
-
     const unsubscribe = onSnapshot(
       tagsQuery,
       (snapshot) => {
@@ -40,24 +37,22 @@ const TagManager = () => {
         setLoading(false);
       }
     );
-
     return () => unsubscribe();
   }, [firestore, userData, loadingUserData]);
 
   const handleAdd = async () => {
     if (!newTag.trim()) return;
-
     setSubmitting(true);
     setError("");
     try {
-      if (tags.some((tag) => tag.name.toLowerCase() === newTag.trim().toLowerCase())) {
+      const normalizedTag = newTag.trim().toLowerCase();
+      if (tags.some((tag) => tag.name.toLowerCase() === normalizedTag)) {
         setError(`Tag "${newTag}" already exists.`);
         setSubmitting(false);
         return;
       }
-
       const newId = doc(collection(firestore, "tags")).id;
-      await setDoc(doc(firestore, "tags", newId), { name: newTag.trim() });
+      await setDoc(doc(firestore, "tags", newId), { name: normalizedTag });
       setNewTag("");
     } catch (err) {
       setError(`Failed to add tag: ${err.message}`);
@@ -68,7 +63,6 @@ const TagManager = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this tag?")) return;
-
     setSubmitting(true);
     setError("");
     try {
@@ -86,24 +80,21 @@ const TagManager = () => {
 
   const handleEditSave = async () => {
     if (!editItem.value.trim()) return;
-
     setSubmitting(true);
     setError("");
     try {
+      const normalizedTag = editItem.value.trim().toLowerCase();
       if (
         tags.some(
-          (tag) =>
-            tag.name.toLowerCase() === editItem.value.trim().toLowerCase() &&
-            tag.id !== editItem.id
+          (tag) => tag.name.toLowerCase() === normalizedTag && tag.id !== editItem.id
         )
       ) {
         setError(`Tag "${editItem.value}" already exists.`);
         setSubmitting(false);
         return;
       }
-
       await updateDoc(doc(firestore, "tags", editItem.id), {
-        name: editItem.value.trim(),
+        name: normalizedTag,
       });
       setEditItem({ id: "", value: "" });
     } catch (err) {
@@ -113,27 +104,25 @@ const TagManager = () => {
     }
   };
 
-  // if (loadingUserData || loading) {
-  //   return (
-  //     <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
-  //       <Spinner animation="border" className="text-primary" role="status">
-  //         <span className="visually-hidden">Loading...</span>
-  //       </Spinner>
-  //     </div>
-  //   );
-  // }
+  if (loadingUserData || loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+        <Spinner animation="border" className="text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
 
-  // if (!user || !userData?.isAdmin) return null;
+  if (!user || !userData?.isAdmin) return null;
 
   return (
     <div className="container mx-auto mt-4">
       <h2 className="mb-4">🏷️ Tag Manager</h2>
       {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
-
-      {/* Tag Form */}
       <Form className="d-flex mb-4">
         <Form.Control
-          placeholder="Add new tag (e.g., Minimalist)"
+          placeholder="Add new tag (e.g., minimalist, k-pop)"
           value={newTag}
           onChange={(e) => setNewTag(e.target.value)}
           disabled={submitting}
@@ -147,8 +136,6 @@ const TagManager = () => {
           + Add Tag
         </Button>
       </Form>
-
-      {/* Tag Table */}
       <div className="table-responsive">
         <Table striped bordered hover>
           <thead className="table-light">
@@ -194,21 +181,14 @@ const TagManager = () => {
           </tbody>
         </Table>
       </div>
-
-      {/* Edit Modal */}
-      <Modal
-        show={editItem.id !== ""}
-        onHide={() => setEditItem({ id: "", value: "" })}
-      >
+      <Modal show={editItem.id !== ""} onHide={() => setEditItem({ id: "", value: "" })}>
         <Modal.Header closeButton>
           <Modal.Title>Edit Tag</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Control
             value={editItem.value}
-            onChange={(e) =>
-              setEditItem((prev) => ({ ...prev, value: e.target.value }))
-            }
+            onChange={(e) => setEditItem((prev) => ({ ...prev, value: e.target.value }))}
             disabled={submitting}
             placeholder="Enter new tag name"
           />

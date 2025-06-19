@@ -1,72 +1,175 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { useAddress } from '../../context/AddressContext';
+import { useFirebase } from '../../context/FirebaseContext';
+import { onAuthStateChanged } from 'firebase/auth';
+import { Alert, Spinner, Button, Card } from 'react-bootstrap';
 import AddressForm from './AddressForm';
 
 export default function AddressBook() {
   const { getAddressList, addAddress, deleteAddress, updateAddress } = useAddress();
-  const [showForm, setShowForm] = useState(false);
+  const { auth } = useFirebase();
   const [addresses, setAddresses] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetchAddresses();
-  }, []);
+    if (!auth) {
+      setError('Firebase authentication is not available.');
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (!currentUser) {
+        setError('Please log in to view your addresses.');
+        setAddresses([]);
+        setLoading(false);
+      } else {
+        setError('');
+        fetchAddresses();
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, [auth]);
 
   const fetchAddresses = async () => {
-    const list = await getAddressList();
-    setAddresses(list);
-  }
+    try {
+      setLoading(true);
+      const list = await getAddressList();
+      setAddresses(list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      setLoading(false);
+    } catch (err) {
+      setError(`Failed to load addresses: ${err.message}`);
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async (id) => {
     try {
       await deleteAddress(id);
-      const updated = await getAddressList();
-      setAddresses(updated); // Assuming you're managing `addresses` via useState
-    } catch (error) {
-      console.error("Delete failed:", error);
+      await fetchAddresses();
+    } catch (err) {
+      setError(`Failed to delete address: ${err.message}`);
+      console.error('Delete failed:', err);
     }
   };
+
+  const handleEdit = (id) => {
+    setEditingAddressId(id);
+    setShowAddForm(false);
+  };
+
+  const handleUpdate = async (id, updatedAddress) => {
+    try {
+      await updateAddress(id, updatedAddress);
+      await fetchAddresses();
+      setEditingAddressId(null);
+    } catch (err) {
+      setError(`Failed to update address: ${err.message}`);
+      console.error('Update failed:', err);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAddressId(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center my-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2">Loading your addresses...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="danger" dismissible onClose={() => setError('')}>
+        {error}
+      </Alert>
+    );
+  }
 
   return (
     <div>
       <h4 className="mb-3">Saved Addresses</h4>
 
-      {!showForm && (
-        <button className="btn btn-outline-primary mb-3" onClick={() => setShowForm(true)}>
+      {!showAddForm && !editingAddressId && (
+        <Button
+          variant="outline-primary"
+          className="mb-3"
+          onClick={() => setShowAddForm(true)}
+        >
           Add New Address
-        </button>
+        </Button>
       )}
 
-      {showForm && <AddressForm setShowForm={setShowForm} fetchAddresses={fetchAddresses} addAddress={addAddress} />}
+      {showAddForm && (
+        <AddressForm
+          fetchAddresses={fetchAddresses}
+          addAddress={addAddress}
+          setShowForm={setShowAddForm}
+          onCancel={() => setShowAddForm(false)}
+        />
+      )}
+
+      {addresses.length === 0 && !showAddForm && !editingAddressId && (
+        <p className="text-muted">You have no saved addresses yet.</p>
+      )}
 
       {addresses.map((addr) => (
-        <div key={addr.id} className="card p-3 mb-3">
-          <div className="d-flex justify-content-between align-items-start">
-            <div>
-              <p className="mb-1">
-                <span>{addr.name}</span>
-                <span className="ms-2">{addr.phone}</span>
-              </p>
-              <small className="text-muted">
-                {addr.address}, {addr.locality}, {addr.city},
-                {addr.landmark && `, Landmark: ${addr.landmark}`}
-              </small>
-              <br />
-              <small className="text-muted">
-                {addr.state} - {addr.pincode}
-              </small>
+        <Card key={addr.id} className="p-3 mb-3">
+          {editingAddressId === addr.id ? (
+            <AddressForm
+              fetchAddresses={fetchAddresses}
+              initialData={addr}
+              onSubmit={(updatedAddress) => handleUpdate(addr.id, updatedAddress)}
+              setShowForm={handleCancelEdit}
+              isEditMode={true}
+              onCancel={handleCancelEdit}
+            />
+          ) : (
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <p className="mb-1">
+                  <strong>{addr.name}</strong>
+                  <span className="ms-2">+91 {addr.phone}</span>
+                </p>
+                <small className="text-muted">
+                  {addr.address}, {addr.locality}, {addr.district}
+                  {addr.landmark && `, Landmark: ${addr.landmark}`}
+                </small>
+                <br />
+                <small className="text-muted">
+                  {addr.state} - {addr.pincode}
+                </small>
+              </div>
+              <div className="d-flex gap-2">
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={() => handleEdit(addr.id)}
+                >
+                  <i className="bi bi-pencil"></i>
+                </Button>
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  onClick={() => handleDelete(addr.id)}
+                >
+                  <i className="bi bi-trash"></i>
+                </Button>
+              </div>
             </div>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDelete(addr.id)}
-            >
-              <i className="bi bi-trash"></i>
-            </button>
-          </div>
-        </div>
+          )}
+        </Card>
       ))}
-
-
-
     </div>
   );
 }

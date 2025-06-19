@@ -1,56 +1,106 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { useFirebase } from "../../context/FirebaseContext"; // Adjust path as needed
 
 export default function HorizontalCollectionScroll({ title }) {
-
-  const collections = [
-    {
-      id: "nature-landscapes",
-      title: "Nature Landscapes",
-      image: "/images/collections/cars.png",
-      description: "Serene and beautiful views of nature to bring peace to your space.",
-    },
-    {
-      id: "inspirational-quotes-pack",
-      title: "Inspirational Quotes Pack",
-      image: "/images/collections/motivate.png",
-      description: "Motivational and thoughtful quotes for daily positivity.",
-    },
-    {
-      id: "anime-classics-collection",
-      title: "Anime Classics Collection",
-      image: "/images/collections/anime-classics.jpg",
-      description: "Iconic scenes from legendary anime like Naruto, DBZ, and One Piece.",
-    },
-    {
-      id: "poster-packs",
-      title: "50 Poster Mega Pack",
-      image: "/images/collections/poster-pack.jpg",
-      description: "A giant pack of 50 assorted posters at a value price.",
-    },
-    {
-      id: "ultimate-anime-pack",
-      title: "Ultimate Anime Pack",
-      image: "/images/collections/ultimate-anime.jpg",
-      description: "Top trending anime posters in one exclusive bundle.",
-    },
-    {
-      id: "aesthetic-wall-collection",
-      title: "Aesthetic Wall Collection",
-      image: "/images/collections/aesthetic.jpg",
-      description: "Pastel tones and soft visuals for a clean aesthetic vibe.",
-    },
-  ];
-
-
+  const { firestore } = useFirebase();
+  const [collections, setCollections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
 
+  // Helper to ensure string or empty string
+  const ensureString = (value) => (typeof value === "string" ? value : "");
+
+  useEffect(() => {
+    const fetchCollections = async () => {
+      if (!firestore) {
+        setError("Invalid Firestore instance");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch standaloneCollections
+        const collectionsRef = collection(firestore, "standaloneCollections");
+        const snapshot = await getDocs(collectionsRef);
+        const fetchedCollections = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          title: ensureString(doc.data().title),
+          description: ensureString(doc.data().description),
+          image: ensureString(doc.data().image), // posterId or legacy URL
+          discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 20,
+          posters: Array.isArray(doc.data().posters) ? doc.data().posters : [],
+        }));
+
+        // Collect unique posterIds from image fields
+        const posterIds = [...new Set(fetchedCollections.map((col) => col.image).filter((id) => id && /^[a-zA-Z0-9_-]+$/.test(id)))];
+        const posterImages = {};
+
+        // Fetch poster image URLs
+        if (posterIds.length) {
+          await Promise.all(
+            posterIds.map(async (posterId) => {
+              try {
+                const posterRef = doc(firestore, "posters", posterId);
+                const posterSnap = await getDoc(posterRef);
+                if (posterSnap.exists() && posterSnap.data().imageUrl) {
+                  posterImages[posterId] = ensureString(posterSnap.data().imageUrl);
+                } else {
+                  posterImages[posterId] = "https://via.placeholder.com/150"; // Placeholder
+                }
+              } catch (err) {
+                console.warn(`Failed to fetch poster ${posterId}: ${err.message}`);
+                posterImages[posterId] = "https://via.placeholder.com/150"; // Placeholder
+              }
+            })
+          );
+        }
+
+        // Map collections with image URLs
+        const collectionsWithImages = fetchedCollections.map((col) => {
+          let imageUrl = "https://via.placeholder.com/150"; // Default placeholder
+          if (col.image) {
+            if (/^[a-zA-Z0-9_-]+$/.test(col.image)) {
+              // posterId
+              imageUrl = posterImages[col.image] || imageUrl;
+            } else if (col.image.startsWith("http")) {
+              // Legacy URL
+              imageUrl = col.image;
+            }
+          }
+          return { ...col, imageUrl };
+        });
+
+        setCollections(collectionsWithImages);
+        setLoading(false);
+      } catch (err) {
+        setError("Failed to load collections: " + err.message);
+        setLoading(false);
+      }
+    };
+
+    fetchCollections();
+  }, [firestore]);
+
   const scroll = (direction) => {
     const container = scrollRef.current;
-    const scrollAmount = 320; // You can tweak this for better snapping
-    container.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
+    const scrollAmount = 320;
+    container.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
   };
+
+  if (loading) {
+    return <div>Loading collections...</div>;
+  }
+
+  if (error) {
+    return <div className="text-danger">{error}</div>;
+  }
 
   return (
     <section
@@ -60,7 +110,6 @@ export default function HorizontalCollectionScroll({ title }) {
     >
       <h2 className="fs-2 fw-bold mb-4">{title}</h2>
 
-      {/* Scroll Buttons */}
       {isHovered && (
         <>
           <button
@@ -71,7 +120,6 @@ export default function HorizontalCollectionScroll({ title }) {
           >
             <i className="bi bi-chevron-left fs-5"></i>
           </button>
-
           <button
             onClick={() => scroll("right")}
             className="btn btn-light rounded-circle position-absolute top-50 end-0 translate-middle-y d-none d-md-flex align-items-center justify-content-center shadow"
@@ -83,7 +131,6 @@ export default function HorizontalCollectionScroll({ title }) {
         </>
       )}
 
-      {/* Scrollable Collections */}
       <div
         ref={scrollRef}
         className="d-flex overflow-auto gap-4 pb-2"
@@ -94,16 +141,16 @@ export default function HorizontalCollectionScroll({ title }) {
           msOverflowStyle: "none",
         }}
       >
-        {collections.map((col, index) => (
+        {collections.map((col) => (
           <Link
             to={`/collection/${col.id}`}
-            key={index}
+            key={col.id}
             className="text-decoration-none text-dark flex-shrink-0 collection-cards"
             style={{ scrollSnapAlign: "start" }}
           >
             <div className="card border h-100">
               <img
-                src={col.image}
+                src={col.imageUrl}
                 alt={col.title}
                 className="w-100"
                 style={{
@@ -111,6 +158,9 @@ export default function HorizontalCollectionScroll({ title }) {
                   objectFit: "cover",
                   borderTopLeftRadius: "0.5rem",
                   borderTopRightRadius: "0.5rem",
+                }}
+                onError={(e) => {
+                  e.target.src = "https://via.placeholder.com/150"; // Fallback on load error
                 }}
               />
               <div className="card-body d-flex flex-column justify-content-between">

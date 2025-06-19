@@ -149,7 +149,7 @@ const Posters = () => {
   );
 
   return (
-    <div className="container mt-4">
+    <div className="container mt-4" style={{ maxWidth: "1400px" }}>
       <h2>🖼️ Posters Management</h2>
       {loading && <Spinner animation="border" className="d-block mx-auto my-3" />}
       {error && <Alert variant="danger">{error}</Alert>}
@@ -274,14 +274,14 @@ const Posters = () => {
         </Tabs>
       )}
 
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)}>
+      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Poster Details</Modal.Title>
         </Modal.Header>
         <Modal.Body>{viewing && <PosterView poster={viewing} />}</Modal.Body>
       </Modal>
 
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>{editing ? "Edit Poster" : "Add Poster"}</Modal.Title>
         </Modal.Header>

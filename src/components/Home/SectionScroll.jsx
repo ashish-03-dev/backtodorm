@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { doc, onSnapshot, query, collection, where } from 'firebase/firestore';
 import '../../styles/trendingPosters.css';
 
 export default function SectionScroll({ sectionId, title, firestore }) {
+  const { addToCart } = useOutletContext();
   const [posters, setPosters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -62,10 +63,10 @@ export default function SectionScroll({ sectionId, title, firestore }) {
               const badges = Array.isArray(data.badges) ? data.badges : [];
               const minPriceSize = sizes.length
                 ? sizes.reduce(
-                    (min, size) => (size.finalPrice < min.finalPrice ? size : min),
-                    sizes[0]
-                  )
-                : { price: 0, finalPrice: 0 };
+                  (min, size) => (size.finalPrice < min.finalPrice ? size : min),
+                  sizes[0]
+                )
+                : { price: 0, finalPrice: 0, size: '' };
 
               return {
                 id: doc.id,
@@ -79,6 +80,8 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                     : 0,
                 sizes,
                 badges,
+                defaultSize: minPriceSize.size,
+                seller: data.seller || null,
               };
             });
             setPosters(fetchedPosters);
@@ -106,6 +109,26 @@ export default function SectionScroll({ sectionId, title, firestore }) {
     if (container) {
       container.scrollBy({ left: direction === 'left' ? -300 : 300, behavior: 'smooth' });
     }
+  };
+
+  const handleAddToCart = (poster, e) => {
+    e.preventDefault();
+    e.stopPropagation(); // Prevent the Link's navigation
+    if (!poster.defaultSize) {
+      alert('No size available for this poster.');
+      return;
+    }
+
+    const cartItem = {
+      posterId: poster.id,
+      title: poster.title,
+      selectedSize: poster.defaultSize,
+      price: poster.price,
+      seller: poster.seller,
+      image: poster.image,
+    };
+
+    addToCart(cartItem);
   };
 
   const SkeletonCard = () => (
@@ -228,78 +251,88 @@ export default function SectionScroll({ sectionId, title, firestore }) {
             </div>
           )}
           {posters.map((item) => (
-            <Link
-              to={`/poster/${item.id}`}
+            <div
               key={item.id}
-              className="text-decoration-none text-dark flex-shrink-0 trending-cards"
+              className="flex-shrink-0 trending-cards"
               style={{ scrollSnapAlign: 'start' }}
             >
               <div
                 className="card border-0 rounded-0 position-relative"
                 style={{ width: '100%', minHeight: '350px' }}
               >
-                <div className="position-relative">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className="w-100"
-                    loading="lazy"
-                    style={{
-                      aspectRatio: '4/5',
-                      objectFit: 'cover',
-                      minHeight: '200px',
-                    }}
-                  />
-                  {item.badges.length > 0 && (
-                    <div
-                      className="position-absolute top-0 start-0 p-2 d-none d-md-flex gap-1"
-                      style={{ zIndex: 5 }}
-                    >
-                      {item.badges.map((badge, index) => (
-                        <span
-                          key={index}
-                          className="badge bg-primary text-white"
-                          style={{
-                            fontSize: '0.75rem',
-                            opacity: 0.9,
-                          }}
-                        >
-                          {badge}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="py-3 d-flex flex-column text-center">
-                  <h6
-                    className="card-title mb-1 px-2 text-center text-truncate-2-lines"
-                    style={{ fontSize: '.92rem', minHeight: '2.2rem' }}
-                    title={item.title}
-                  >
-                    {item.title}
-                  </h6>
-                  <p
-                    className="price-text mb-2"
-                    style={{
-                      fontSize: window.innerWidth <= 576 ? '15px' : '17px',
-                      minHeight: '1.5rem',
-                    }}
-                  >
-                    {item.discount > 0 ? (
-                      <>
-                        <span className="text-muted text-decoration-line-through me-2">
-                          ₹{item.originalPrice}
-                        </span>
-                        <span>From ₹{item.price}</span>
-                      </>
-                    ) : (
-                      <span>From ₹{item.price}</span>
+                <Link to={`/poster/${item.id}`} className="text-decoration-none text-dark">
+                  <div className="position-relative">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="w-100"
+                      loading="lazy"
+                      style={{
+                        aspectRatio: '4/5',
+                        objectFit: 'cover',
+                        minHeight: '200px',
+                      }}
+                    />
+                    {item.badges.length > 0 && (
+                      <div
+                        className="position-absolute top-0 start-0 p-2 d-none d-md-flex gap-1"
+                        style={{ zIndex: 5 }}
+                      >
+                        {item.badges.map((badge, index) => (
+                          <span
+                            key={index}
+                            className="badge bg-primary text-white"
+                            style={{
+                              fontSize: '0.75rem',
+                              opacity: 0.9,
+                            }}
+                          >
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
                     )}
-                  </p>
-                  <button className="btn btn-dark">Add to Cart</button>
-                </div>
+                  </div>
+                  <div className="py-3 d-flex flex-column text-center">
+                    <h6
+                      className="card-title mb-1 px-2 text-center text-truncate-2-lines"
+                      style={{ fontSize: '.92rem', minHeight: '2.2rem' }}
+                      title={item.title}
+                    >
+                      {item.title}
+                    </h6>
+                    <p
+                      className="price-text mb-2"
+                      style={{
+                        fontSize: window.innerWidth <= 576 ? '15px' : '17px',
+                        minHeight: '1.5rem',
+                      }}
+                    >
+                      {item.discount > 0 ? (
+                        <>
+                          <span className="text-muted text-decoration-line-through me-2">
+                            ₹{item.originalPrice}
+                          </span>
+                          <span>From ₹{item.price}</span>
+                        </>
+                      ) : (
+                        <span>From ₹{item.price}</span>
+                      )}
+                    </p>
+                  </div>
+                </Link>
+                <button
+                  className="btn btn-dark mx-3 mb-3"
+                  onClick={(e) => {
+                    console.log("button added");
+                    handleAddToCart(item, e)
+                  }
+                  }
+                >
+                  Add to Cart
+                </button>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

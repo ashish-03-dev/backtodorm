@@ -10,19 +10,16 @@ export default function HomeLayout() {
   const [cartItems, setCartItems] = useState(() => {
     const savedCart = localStorage.getItem('cartItems');
     const parsedCart = savedCart ? JSON.parse(savedCart) : [];
-    // Clean invalid items on load
     return parsedCart.filter(item => item.posterId && item.selectedSize && item.title);
   });
   const [buyNowItem, setBuyNowItem] = useState(null);
 
-  // Sync local storage for guests
   useEffect(() => {
     if (!user) {
       localStorage.setItem('cartItems', JSON.stringify(cartItems));
     }
   }, [cartItems, user]);
 
-  // Sync Firestore for logged-in users
   useEffect(() => {
     if (!user || !firestore) return;
 
@@ -31,8 +28,7 @@ export default function HomeLayout() {
       const firestoreCart = snapshot.docs.map((doc) => ({
         ...doc.data(),
         id: doc.id,
-      })).filter(item => item.posterId && item.selectedSize && item.title); // Clean invalid items
-      console.log('Fetched Firestore cart:', firestoreCart);
+      })).filter(item => item.posterId && item.selectedSize && item.title);
       setCartItems(firestoreCart);
     }, (error) => {
       console.error('Error fetching Firestore cart:', error);
@@ -41,44 +37,71 @@ export default function HomeLayout() {
     return () => unsubscribe();
   }, [user, firestore]);
 
-  const addToCart = async (poster) => {
-    if (!poster?.posterId || !poster?.selectedSize || !poster?.title) {
-      console.error('Invalid poster data:', "osterId:", poster.posterId, "Selected Size:", poster.selectedSize, "Poster Tite:", poster.title);
+  const addToCart = async (posters, collectionId = null, collectionDiscount = 0) => {
+    if (!Array.isArray(posters)) {
+      posters = [posters]; // Ensure single poster is treated as an array
+    }
+
+    const invalidPoster = posters.find(p => !p?.posterId || !p?.selectedSize || !p?.title);
+    if (invalidPoster) {
+      console.error('Invalid poster data:', invalidPoster);
       return;
     }
-    console.log('Adding to cart:', poster);
-    const cartItem = { ...poster, quantity: 1 };
-    setCartItems((prev) => {
-      const existingItem = prev.find(
-        (item) => item.posterId === poster.posterId && item.selectedSize === poster.selectedSize
-      );
-      if (existingItem) {
-        return prev.map((item) =>
-          item.posterId === poster.posterId && item.selectedSize === poster.selectedSize
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, cartItem];
-    });
 
-    if (user && firestore) {
-      const cartItemId = `${poster.posterId}-${poster.selectedSize}`;
-      const cartDocRef = doc(firestore, `users/${user.uid}/cart`, cartItemId);
-      try {
-        await setDoc(cartDocRef, {
+    setCartItems((prev) => {
+      let updatedCart = [...prev];
+      posters.forEach((poster) => {
+        const cartItem = {
           posterId: poster.posterId,
           title: poster.title,
           selectedSize: poster.selectedSize,
           price: poster.price,
-          quantity: (cartItems.find((item) => item.posterId === poster.posterId && item.selectedSize === poster.selectedSize)?.quantity || 0) + 1,
-          image: poster.image || null,
-          seller: poster.seller,
-          addedAt: new Date(),
-        });
-        console.log('Added to Firestore cart:', cartItemId);
-      } catch (error) {
-        console.error('Error adding to Firestore cart:', error);
+          quantity: 1,
+          image: poster.image || 'https://via.placeholder.com/60',
+          seller: poster.seller || 'Unknown',
+          collectionId: collectionId || null,
+          collectionDiscount: collectionId ? collectionDiscount : 0,
+        };
+
+        const existingItem = updatedCart.find(
+          (item) => item.posterId === poster.posterId && item.selectedSize === poster.selectedSize
+        );
+        if (existingItem) {
+          updatedCart = updatedCart.map((item) =>
+            item.posterId === poster.posterId && item.selectedSize === poster.selectedSize
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
+        } else {
+          updatedCart = [...updatedCart, cartItem];
+        }
+      });
+      return updatedCart;
+    });
+
+    if (user && firestore) {
+      for (const poster of posters) {
+        const cartItemId = `${poster.posterId}-${poster.selectedSize}`;
+        const cartDocRef = doc(firestore, `users/${user.uid}/cart`, cartItemId);
+        try {
+          const existingItem = cartItems.find(
+            (item) => item.posterId === poster.posterId && item.selectedSize === poster.selectedSize
+          );
+          await setDoc(cartDocRef, {
+            posterId: poster.posterId,
+            title: poster.title,
+            selectedSize: poster.selectedSize,
+            price: poster.price,
+            quantity: (existingItem?.quantity || 0) + 1,
+            image: poster.image || 'https://via.placeholder.com/60',
+            seller: poster.seller || 'Unknown',
+            collectionId: collectionId || null,
+            collectionDiscount: collectionId ? collectionDiscount : 0,
+            addedAt: new Date(),
+          });
+        } catch (error) {
+          console.error('Error adding to Firestore cart:', error);
+        }
       }
     }
   };
@@ -88,11 +111,10 @@ export default function HomeLayout() {
       console.error('Invalid buy now poster:', poster);
       return;
     }
-    setBuyNowItem({ ...poster, quantity: 1 });
+    setBuyNowItem({ ...poster, quantity: 1, collectionId: null, collectionDiscount: 0 });
   };
 
   const removeFromCart = async (posterId, selectedSize) => {
-    console.log('Removing from cart:', { posterId, selectedSize: selectedSize || 'none' });
     setCartItems((prev) =>
       prev.filter((item) => !(item.posterId === posterId && (item.selectedSize || '') === (selectedSize || '')))
     );
@@ -102,7 +124,6 @@ export default function HomeLayout() {
       const cartDocRef = doc(firestore, `users/${user.uid}/cart`, cartItemId);
       try {
         await deleteDoc(cartDocRef);
-        console.log('Removed from Firestore cart:', cartItemId);
       } catch (error) {
         console.error('Error removing from Firestore cart:', error);
       }
@@ -123,10 +144,7 @@ export default function HomeLayout() {
       const cartItemId = `${posterId}-${selectedSize || 'none'}`;
       const cartDocRef = doc(firestore, `users/${user.uid}/cart`, cartItemId);
       try {
-        await setDoc(cartDocRef, {
-          quantity: newQuantity,
-        }, { merge: true });
-        console.log('Updated Firestore cart quantity:', cartItemId, newQuantity);
+        await setDoc(cartDocRef, { quantity: newQuantity }, { merge: true });
       } catch (error) {
         console.error('Error updating Firestore cart quantity:', error);
       }

@@ -1,5 +1,32 @@
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
+} from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
+// Helper function to normalize text for keywords
+const normalizeText = (text) => {
+  if (!text) return [];
+  const lower = text.toLowerCase().trim();
+  const title = lower
+    .split(/\s+|-/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+  const hyphenated = lower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  return [...new Set([lower, title, hyphenated])].filter(Boolean);
+};
+
+// Helper function to normalize collections
+const normalizeCollection = (text) => {
+  if (!text) return "";
+  return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+};
 
 // Helper function to generate keywords
 const generateKeywords = (title, description, tags, collections = []) => {
@@ -7,17 +34,17 @@ const generateKeywords = (title, description, tags, collections = []) => {
   const words = [
     ...(title?.toLowerCase().split(/\s+/) || []),
     ...(description?.toLowerCase().split(/\s+/) || []),
-    ...(tags?.map((tag) => tag.toLowerCase()) || []),
-    ...(collections?.map((col) => col.toLowerCase()) || []),
+    ...(tags?.flatMap(normalizeText) || []),
+    ...(collections?.flatMap(normalizeText) || []),
   ];
   const keywords = [...new Set(words)]
-    .filter(word => !stopWords.has(word) && word.length > 2)
+    .filter((word) => !stopWords.has(word) && word.length > 2)
     .slice(0, 50);
   console.log("Generated keywords:", keywords);
   return keywords;
 };
 
-// Save a poster (handles image upload and calls appropriate function)
+// Save a poster
 export const savePoster = async (firestore, storage, posterData, imageFile, isUpdate = false) => {
   try {
     let imageUrl = posterData.imageUrl || "";
@@ -33,14 +60,15 @@ export const savePoster = async (firestore, storage, posterData, imageFile, isUp
     const posterWithImage = {
       ...posterData,
       imageUrl,
-      collections: posterData.collections || [],
+      collections: (posterData.collections || []).map(normalizeCollection), // e.g., "k-pop"
+      tags: (posterData.tags || []).map(normalizeCollection), // e.g., "k-pop"
       sizes: Array.isArray(posterData.sizes) ? posterData.sizes : [{ size: "", price: 0, finalPrice: 0 }],
     };
 
     const result = isUpdate
       ? await updatePosterInFirebase(firestore, posterWithImage, posterData.id)
       : await addPosterToFirebase(firestore, posterWithImage, posterData.id);
-    
+
     if (!result.success) {
       throw new Error(result.error);
     }
@@ -58,12 +86,10 @@ export const addPosterToFirebase = async (firestore, posterData, posterId = null
     if (!posterData.title) {
       throw new Error("Poster title is required");
     }
-
     if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0) {
       throw new Error("At least one valid size is required");
     }
 
-    // Prepare poster data with keywords
     const { id: _, ...data } = posterData;
     const poster = {
       ...data,
@@ -72,39 +98,34 @@ export const addPosterToFirebase = async (firestore, posterData, posterId = null
       updatedAt: serverTimestamp(),
     };
 
-    // Generate ID if not provided
     const id = posterId || `${posterData.title
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9\-_]/g, "")}-${Date.now()}`;
     const posterRef = doc(firestore, "posters", id);
 
-    // Check for duplicate ID
     const docSnap = await getDoc(posterRef);
     if (docSnap.exists()) {
       throw new Error("Poster ID already exists");
     }
 
-    // Run a transaction to update posters and collections
     const collectionRefs = (data.collections || []).map((col) =>
-      doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
+      doc(firestore, "collections", normalizeCollection(col))
     );
 
     await runTransaction(firestore, async (transaction) => {
       const collectionDocs = await Promise.all(
-        collectionRefs.map(ref => transaction.get(ref))
+        collectionRefs.map((ref) => transaction.get(ref))
       );
 
-      // Set poster
       transaction.set(posterRef, poster);
 
-      // Update collections
       data.collections.forEach((col, index) => {
         const colDoc = collectionDocs[index];
-        const colId = col.toLowerCase().replace(/\s+/g, "-");
+        const colId = normalizeCollection(col); // e.g., "k-pop"
         if (!colDoc.exists()) {
           transaction.set(doc(firestore, "collections", colId), {
-            name: col,
+            name: colId, // e.g., "k-pop"
             posterIds: [posterRef.id],
             createdAt: serverTimestamp(),
           });
@@ -133,16 +154,13 @@ export const updatePosterInFirebase = async (firestore, posterData, posterId) =>
     if (!posterData.title) {
       throw new Error("Poster title is required");
     }
-
     if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0) {
       throw new Error("At least one valid size is required");
     }
-
     if (!posterId) {
       throw new Error("Poster ID is required for update");
     }
 
-    // Prepare poster data with keywords
     const { id: _, ...data } = posterData;
     const poster = {
       ...data,
@@ -152,39 +170,34 @@ export const updatePosterInFirebase = async (firestore, posterData, posterId) =>
 
     const posterRef = doc(firestore, "posters", posterId);
 
-    // Run a transaction to update posters and collections
-    const collectionRefs = (data.collections || []).map((col) =>
-      doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
-    );
-
     await runTransaction(firestore, async (transaction) => {
-      // Perform all reads
       const existingPoster = await transaction.get(posterRef);
       if (!existingPoster.exists()) {
         throw new Error("Poster not found");
       }
       const oldCollections = existingPoster.data().collections || [];
 
-      const collectionsToRemove = oldCollections.filter(col => !data.collections.includes(col));
-      const collectionsToAdd = data.collections.filter(col => !oldCollections.includes(col));
+      const collectionsToRemove = oldCollections.filter((col) => !data.collections.includes(col));
+      const collectionsToAdd = data.collections.filter((col) => !oldCollections.includes(col));
       const collectionDocsToRemove = await Promise.all(
-        collectionsToRemove.map(col => transaction.get(doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-")))
-      ));
+        collectionsToRemove.map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
       const collectionDocsToAdd = await Promise.all(
-        collectionsToAdd.map(col => transaction.get(doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-")))
-      ));
+        collectionsToAdd.map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
 
-      // Perform all writes
-      // Update poster
       transaction.update(posterRef, poster);
 
-      // Update collections
       collectionsToAdd.forEach((col, index) => {
         const colDoc = collectionDocsToAdd[index];
-        const colId = col.toLowerCase().replace(/\s+/g, "-");
+        const colId = normalizeCollection(col); // e.g., "k-pop"
         if (!colDoc.exists()) {
           transaction.set(doc(firestore, "collections", colId), {
-            name: col,
+            name: colId, // e.g., "k-pop"
             posterIds: [posterRef.id],
             createdAt: serverTimestamp(),
           });
@@ -198,14 +211,13 @@ export const updatePosterInFirebase = async (firestore, posterData, posterId) =>
         }
       });
 
-      // Remove poster from old collections
       collectionsToRemove.forEach((col, index) => {
         const colDoc = collectionDocsToRemove[index];
-        const colId = col.toLowerCase().replace(/\s+/g, "-");
+        const colId = normalizeCollection(col); // e.g., "k-pop"
         if (colDoc?.exists() && colDoc.data().posterIds) {
           const posterIds = colDoc.data().posterIds || [];
           transaction.update(doc(firestore, "collections", colId), {
-            posterIds: posterIds.filter(pid => pid !== posterRef.id),
+            posterIds: posterIds.filter((pid) => pid !== posterRef.id),
           });
         }
       });
@@ -259,19 +271,21 @@ export const deletePosterInFirebase = async (firestore, posterId) => {
         throw new Error("Poster not found");
       }
       const { collections } = posterDoc.data();
-
-      // Read collections
       const collectionDocs = await Promise.all(
-        (collections || []).map(col => transaction.get(doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-")))
-      ));
+        (collections || []).map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
 
-      // Write updates
       collectionDocs.forEach((colDoc, index) => {
         if (colDoc.exists() && colDoc.data().posterIds) {
           const posterIds = colDoc.data().posterIds || [];
-          transaction.update(doc(firestore, "collections", collections[index].toLowerCase().replace(/\s+/g, "-")), {
-            posterIds: posterIds.filter(pid => pid !== posterId),
-          });
+          transaction.update(
+            doc(firestore, "collections", normalizeCollection(collections[index])),
+            {
+              posterIds: posterIds.filter((pid) => pid !== posterId),
+            }
+          );
         }
       });
 

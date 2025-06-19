@@ -142,9 +142,9 @@ export default function AccountLayout() {
                     <li className="nav-item">
                       <div
                         className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                          isActive("/seller-dashboard") ? "fw-bold text-primary bg-light border" : "text-dark"
+                          isActive("/seller") ? "fw-bold text-primary bg-light border" : "text-dark"
                         } sidebar-item`}
-                        onClick={() => handleSectionClick("/seller-dashboard")}
+                        onClick={() => handleSectionClick("/seller")}
                       >
                         Seller Dashboard
                         <i className="bi bi-chevron-right d-md-none"></i>

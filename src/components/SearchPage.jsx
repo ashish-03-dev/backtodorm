@@ -10,6 +10,17 @@ export default function SearchPage() {
   const { searchState, updateSearchState } = useSearch();
   const { queryString, results, loading, imagesLoading, error } = searchState;
 
+  const normalizeSearchTerm = (term) => {
+    if (!term || typeof term !== "string") return [];
+    const lower = term.toLowerCase().trim();
+    const title = lower
+      .split(/\s+|-/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+    const hyphenated = lower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    return [...new Set([lower, title, hyphenated])].filter(Boolean);
+  };
+
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!queryString.trim()) {
@@ -21,55 +32,86 @@ export default function SearchPage() {
     try {
       const postersRef = collection(firestore, "posters");
       let posterIds = new Set();
-      const searchTerm = queryString.toLowerCase().trim();
+      const searchTerms = normalizeSearchTerm(queryString);
 
-      // Search by keywords
-      const keywordQuery = query(
-        postersRef,
-        where("keywords", "array-contains", searchTerm),
-        where("approved", "==", "approved"),
-        where("isActive", "==", true)
-      );
-      const keywordSnapshot = await getDocs(keywordQuery);
-      console.log("Keyword query results:", keywordSnapshot.docs.length);
-      keywordSnapshot.forEach((doc) => posterIds.add(doc.id));
+      if (!searchTerms.length) {
+        throw new Error("Invalid search term after normalization");
+      }
 
-      // Search by collections field in posters
-      const collectionQuery = query(
-        postersRef,
-        where("collections", "array-contains", searchTerm),
-        where("approved", "==", "approved"),
-        where("isActive", "==", true)
-      );
-      const collectionSnapshot = await getDocs(collectionQuery);
-      console.log("Collections field query results:", collectionSnapshot.docs.length);
-      collectionSnapshot.forEach((doc) => posterIds.add(doc.id));
-
-      // Search by collection document IDs in collections collection
-      const collectionsRef = collection(firestore, "collections");
-      const collectionsQuery = query(
-        collectionsRef,
-        where("__name__", ">=", searchTerm),
-        where("__name__", "<=", searchTerm + "\uf8ff")
-      );
-      const collectionsSnapshot = await getDocs(collectionsQuery);
-      console.log("Collections ID query results:", collectionsSnapshot.docs.length);
-      collectionsSnapshot.forEach((doc) => {
-        const collectionData = doc.data();
-        console.log(`Collection document (ID: ${doc.id}):`, collectionData);
-        const posterIdsArray = collectionData.posterIds || [];
-        console.log(`Collection ${collectionData.name} posterIds:`, posterIdsArray);
-        if (posterIdsArray.length === 0) {
-          console.warn(`No posterIds found in collection ${collectionData.name} (ID: ${doc.id})`);
+      for (const searchTerm of searchTerms) {
+        try {
+          // Search by keywords
+          const keywordQuery = query(
+            postersRef,
+            where("keywords", "array-contains", searchTerm),
+            where("approved", "==", "approved"),
+            where("isActive", "==", true)
+          );
+          const keywordSnapshot = await getDocs(keywordQuery);
+          console.log(`Keyword query results for ${searchTerm}:`, keywordSnapshot.docs.length);
+          keywordSnapshot.forEach((doc) => posterIds.add(doc.id));
+        } catch (err) {
+          console.warn(`Keyword query failed for ${searchTerm}:`, err.message);
         }
-        posterIdsArray.forEach((id) => {
-          if (id && typeof id === "string") {
-            posterIds.add(id);
-          } else {
-            console.warn(`Invalid posterId in ${collectionData.name} (ID: ${doc.id}):`, id);
+
+        // Search by tags (use hyphenated form)
+        if (searchTerm === searchTerms[2]) {
+          try {
+            const tagQuery = query(
+              postersRef,
+              where("tags", "array-contains", searchTerm),
+              where("approved", "==", "approved"),
+              where("isActive", "==", true)
+            );
+            const tagSnapshot = await getDocs(tagQuery);
+            console.log(`Tag query results for ${searchTerm}:`, tagSnapshot.docs.length);
+            tagSnapshot.forEach((doc) => posterIds.add(doc.id));
+          } catch (err) {
+            console.warn(`Tag query failed for ${searchTerm}:`, err.message);
           }
-        });
-      });
+        }
+
+        // Search by collections
+        try {
+          const collectionQuery = query(
+            postersRef,
+            where("collections", "array-contains", searchTerm.toLowerCase()),
+            where("approved", "==", "approved"),
+            where("isActive", "==", true)
+          );
+          const collectionSnapshot = await getDocs(collectionQuery);
+          console.log(`Collections field query results for ${searchTerm}:`, collectionSnapshot.docs.length);
+          collectionSnapshot.forEach((doc) => posterIds.add(doc.id));
+        } catch (err) {
+          console.warn(`Collection query failed for ${searchTerm}:`, err.message);
+        }
+      }
+
+      // Search by collection document IDs
+      const collectionsRef = collection(firestore, "collections");
+      for (const searchTerm of searchTerms) {
+        const normalizedCollectionId = searchTerm.toLowerCase().replace(/\s+/g, "-");
+        try {
+          const collectionsQuery = query(
+            collectionsRef,
+            where("__name__", ">=", normalizedCollectionId),
+            where("__name__", "<=", normalizedCollectionId + "\uf8ff")
+          );
+          const collectionsSnapshot = await getDocs(collectionsQuery);
+          console.log(`Collections ID query results for ${searchTerm}:`, collectionsSnapshot.docs.length);
+          collectionsSnapshot.forEach((doc) => {
+            const collectionData = doc.data();
+            const posterIdsArray = collectionData.posterIds || [];
+            posterIdsArray.forEach((id) => {
+              if (id && typeof id === "string") {
+                posterIds.add(id);
+              }
+            });
+          });
+        } catch (err) {
+          console.warn(`Collections ID query failed for ${searchTerm}:`, err.message);
+        }
+      }
 
       console.log("Total unique poster IDs:", posterIds.size);
       if (posterIds.size === 0) {
@@ -78,13 +120,14 @@ export default function SearchPage() {
 
       const searchResults = [];
       for (const posterId of posterIds) {
-        const posterRef = doc(firestore, "posters", posterId);
-        const docSnap = await getDoc(posterRef);
-        if (docSnap.exists()) {
-          const posterData = docSnap.data();
-          // TODO: Revert to `if (posterData.approved === "approved" && posterData.isActive)` in production
-          if (true) {
-            // Validate sizes field
+        try {
+          const posterRef = doc(firestore, "posters", posterId);
+          const docSnap = await getDoc(posterRef);
+          if (docSnap.exists()) {
+            const posterData = docSnap.data();
+            if (posterData.approved !== "approved" || !posterData.isActive) {
+              continue;
+            }
             if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0) {
               console.warn(`Poster ${posterId} has invalid sizes:`, posterData.sizes);
               continue;
@@ -98,7 +141,7 @@ export default function SearchPage() {
                 sellerName = userDoc.data().name || "Unknown User";
               }
             } catch (err) {
-              console.error(`Error fetching seller name for poster ${posterId}:`, err);
+              console.warn(`Error fetching seller name for poster ${posterId}:`, err.message);
             }
 
             const cheapestPrice = posterData.sizes.reduce((min, size) => {
@@ -106,41 +149,43 @@ export default function SearchPage() {
             }, Infinity);
 
             searchResults.push({ ...poster, sellerName, cheapestPrice });
-            console.log(`Poster ${posterId} included:`, { approved: posterData.approved, isActive: posterData.isActive, sizes: posterData.sizes });
-          } else {
-            console.log(
-              `Poster ${posterId} skipped: approved=${posterData.approved}, isActive=${posterData.isActive}`
-            );
+            console.log(`Poster ${posterId} included:`, {
+              approved: posterData.approved,
+              isActive: posterData.isActive,
+              sizes: posterData.sizes,
+            });
           }
-        } else {
-          console.log(`Poster ${posterId} does not exist`);
+        } catch (err) {
+          console.warn(`Error processing poster ${posterId}:`, err.message);
         }
       }
 
       console.log("Final search results:", searchResults.length);
       updateSearchState({ results: searchResults, imagesLoading: true });
     } catch (err) {
-      updateSearchState({ error: "Failed to fetch search results.", imagesLoading: false });
-      console.error("Error searching posters:", err);
+      console.error("Search failed:", err);
+      updateSearchState({
+        error: `Failed to fetch search results: ${err.message}`,
+        imagesLoading: false,
+      });
+    } finally {
+      updateSearchState({ loading: false });
     }
-    updateSearchState({ loading: false });
   };
 
-  // Simulate image loading completion
   useEffect(() => {
     if (imagesLoading && results.length > 0) {
       const timer = setTimeout(() => {
         updateSearchState({ imagesLoading: false });
-      }, 1000); // 1 second delay
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [imagesLoading, results]);
+  }, [imagesLoading, results, updateSearchState]);
 
   const handleViewPoster = (posterId) => {
     navigate(`/poster/${posterId}`);
   };
 
-  // Skeleton component for loading state using Bootstrap
   const PosterSkeleton = () => (
     <div className="col-6 col-md-3 mb-4">
       <div className="card h-100 shadow-sm">
@@ -166,14 +211,14 @@ export default function SearchPage() {
   );
 
   return (
-    <div className="container py-4"  style={{minHeight:"calc(100svh - 65px)"}}>
+    <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
       <h2>Search Posters</h2>
       <form onSubmit={handleSearch} className="mb-4">
         <div className="input-group mb-3">
           <input
             type="text"
             className="form-control"
-            placeholder="Search posters by title, tags, style, or collection (e.g., movies, cars)..."
+            placeholder="Search posters by title, tags, style, or collection (e.g., k-pop, Minimalist)..."
             value={queryString}
             onChange={(e) => updateSearchState({ queryString: e.target.value })}
             aria-label="Search posters"
