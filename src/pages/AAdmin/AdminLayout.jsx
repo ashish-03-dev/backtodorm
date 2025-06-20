@@ -8,13 +8,12 @@ export default function AdminLayout() {
     { path: "/admin", label: "Dashboard" },
     { path: "/admin/orders", label: "Orders" },
     { path: "/admin/home-content", label: "Home Content" },
-    { path: "/admin/tag-manager", label: "Tag Manager" },
     { path: "/admin/posters", label: "Posters" },
     { path: "/admin/sellers", label: "Sellers" },
-    { path: "/admin/customers", label: "Customers" },
-    { path: "/admin/support", label: "Support" },
+    { path: "/admin/users", label: "Users" },
     { path: "/admin/settings", label: "Site Settings" },
-    { path: "/admin/users", label: "Admin Users" },
+    { path: "/admin/admin-users", label: "Admin Users" },
+    { path: "/admin/support", label: "Support" },
   ];
 
   return (

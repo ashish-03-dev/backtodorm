@@ -15,9 +15,7 @@ import SectionManager from './pages/AAdmin/HomeContentManager/SectionManager';
 import Sellers from "./pages/AAdmin/Sellers";
 import Posters from "./pages/AAdmin/Posters/Posters";
 import Customers from "./pages/AAdmin/Customers";
-import Support from "./pages/AAdmin/Support";
 import Settings from "./pages/AAdmin/SiteSettings";
-import TagManager from "./pages/AAdmin/TagManager";
 import AdminUsers from "./pages/AAdmin/AdminUsers";
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
@@ -32,6 +30,8 @@ import SalesHistory from './components/Seller/SalesHistory';
 import Payouts from "./components/Seller/Payouts";
 import SellerSettings from "./components/Seller/SellerSettings";
 import SearchPage from './components/SearchPage';
+import HelpCentre from "./components/Account/HelpCentre";
+import AdminSupport from './pages/AAdmin/AdminSupport';
 
 function App() {
 
@@ -51,6 +51,7 @@ function App() {
             <Route path="addresses" element={<ProfileAddresses />} />
             <Route path="security" element={<SecuritySettings />} />
             <Route path="become-seller" element={<BecomeSeller />} />
+            <Route path="help-centre" element={<HelpCentre />} />
           </Route>
           <Route path="seller" element={<SellerLayout />}>
             <Route index element={<SellerDashboard />} />
@@ -69,11 +70,10 @@ function App() {
           <Route path="sellers" element={<Sellers />} />
           <Route path="posters" element={<Posters />} />
           <Route path="home-content" element={<SectionManager />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="support" element={<Support />} />
+          <Route path="users" element={<Customers />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="tag-manager" element={<TagManager />} />
-          <Route path="users" element={<AdminUsers />} />
+          <Route path="admin-users" element={<AdminUsers />} />
+          <Route path="support" element={<AdminSupport />} />
         </Route>
       </Routes>
     </Router>

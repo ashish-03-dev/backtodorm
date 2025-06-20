@@ -9,16 +9,18 @@ const PosterFilter = ({ filter, onFilterChange, onAdd, hideApprovedFilter }) => 
 
   return (
     <div className="d-flex mb-3 gap-3">
-      <Form.Group>
-        <Form.Label>Search</Form.Label>
-        <Form.Control
-          type="text"
-          name="search"
-          value={filter.search}
-          onChange={handleChange}
-          placeholder="Search by title, description, or tags"
-        />
-      </Form.Group>
+      <div className="col-md-6">
+        <Form.Group>
+          <Form.Label>Search</Form.Label>
+          <Form.Control
+            type="text"
+            name="search"
+            value={filter.search}
+            onChange={handleChange}
+            placeholder="Search by title, description, or tags"
+          />
+        </Form.Group>
+      </div>
       {!hideApprovedFilter && (
         <Form.Group>
           <Form.Label>Status</Form.Label>

@@ -236,6 +236,14 @@ export default function MobileSidebar({ show, onClose }) {
               <i className="bi bi-cart3 me-3"></i>
               <span>My Cart</span>
             </Link>
+            <Link
+              to="/account/help-centre"
+              onClick={onClose}
+              className="d-flex align-items-center text-decoration-none text-dark py-3"
+            >
+              <i className="bi bi-question-circle me-3"></i>
+              <span>Help Centre</span>
+            </Link>
             {isAdmin && (
               <Link
                 to="/admin"

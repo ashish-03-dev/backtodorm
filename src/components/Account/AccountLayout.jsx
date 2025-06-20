@@ -94,11 +94,10 @@ export default function AccountLayout() {
                 <ul className="nav flex-column gap-2">
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        !isMobile && (isActive("/account") || isActive("/account/profile"))
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${!isMobile && (isActive("/account") || isActive("/account/profile"))
                           ? "fw-bold text-primary bg-light border"
                           : "text-dark"
-                      } sidebar-item`}
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/account/profile")}
                     >
                       Profile Info
@@ -107,9 +106,8 @@ export default function AccountLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/account/addresses") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/addresses") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/account/addresses")}
                     >
                       Saved Addresses
@@ -118,9 +116,8 @@ export default function AccountLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/account/orders") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/orders") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/account/orders")}
                     >
                       Orders
@@ -129,21 +126,29 @@ export default function AccountLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/account/security") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/security") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/account/security")}
                     >
                       Security
                       <i className="bi bi-chevron-right d-md-none"></i>
                     </div>
                   </li>
+                  <li className="nav-item">
+                    <div
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/help-centre") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
+                      onClick={() => handleSectionClick("/account/help-centre")}
+                    >
+                      Help Centre
+                      <i className="bi bi-chevron-right d-md-none"></i>
+                    </div>
+                  </li>
                   {userData?.isSeller ? (
                     <li className="nav-item">
                       <div
-                        className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                          isActive("/seller") ? "fw-bold text-primary bg-light border" : "text-dark"
-                        } sidebar-item`}
+                        className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/seller") ? "fw-bold text-primary bg-light border" : "text-dark"
+                          } sidebar-item`}
                         onClick={() => handleSectionClick("/seller")}
                       >
                         Seller Dashboard
@@ -153,9 +158,8 @@ export default function AccountLayout() {
                   ) : (
                     <li className="nav-item">
                       <div
-                        className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                          isActive("/account/become-seller") ? "fw-bold text-primary bg-light border" : "text-dark"
-                        } sidebar-item`}
+                        className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/account/become-seller") ? "fw-bold text-primary bg-light border" : "text-dark"
+                          } sidebar-item`}
                         onClick={() => handleSectionClick("/account/become-seller")}
                       >
                         Become a Seller
@@ -178,9 +182,8 @@ export default function AccountLayout() {
 
           {/* Main Content */}
           <div
-            className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${
-              showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
-            }`}
+            className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+              }`}
             style={{ maxWidth: "100%", overflow: "auto" }}
           >
             {error && <div className="alert alert-danger">{error}</div>}

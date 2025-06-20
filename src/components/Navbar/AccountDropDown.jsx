@@ -108,6 +108,13 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
               </div>
             )}
             <div
+              className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
+              onClick={() => handleNavigation('/account/help-centre')}
+              style={{ cursor: 'pointer' }}
+            >
+              <i className="bi bi-question-circle me-2"></i> Help Centre
+            </div>
+            <div
               style={{
                 height: '1px',
                 backgroundColor: '#dee2e6',

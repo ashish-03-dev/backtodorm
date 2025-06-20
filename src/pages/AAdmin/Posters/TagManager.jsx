@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Button, Form, Table, Modal, Spinner, Alert } from "react-bootstrap";
-import { useFirebase } from "../../context/FirebaseContext";
-import { useNavigate } from "react-router-dom";
+import { Form, Table, Modal, Button, Spinner, Alert } from "react-bootstrap";
 import { collection, query, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import "../../styles/SellerComponents.css";
+import "../../../styles/SellerComponents.css";
 
-const TagManager = () => {
-  const { firestore, user, userData, loadingUserData } = useFirebase();
-  const navigate = useNavigate();
+const TagManager = ({ firestore, userData, loadingUserData }) => {
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState("");
   const [editItem, setEditItem] = useState({ id: "", value: "" });
@@ -15,15 +11,12 @@ const TagManager = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Fetch tags
   useEffect(() => {
-    if (loadingUserData) return;
-    if (!user || !userData?.isAdmin) {
-      navigate("/login", { replace: true });
+    if (!firestore || !userData?.isAdmin || loadingUserData) {
+      setLoading(false);
+      return;
     }
-  }, [user, userData, loadingUserData, navigate]);
-
-  useEffect(() => {
-    if (!firestore || !userData?.isAdmin || loadingUserData) return;
 
     const tagsQuery = query(collection(firestore, "tags"));
     const unsubscribe = onSnapshot(
@@ -40,6 +33,7 @@ const TagManager = () => {
     return () => unsubscribe();
   }, [firestore, userData, loadingUserData]);
 
+  // Add new tag
   const handleAdd = async () => {
     if (!newTag.trim()) return;
     setSubmitting(true);
@@ -61,6 +55,7 @@ const TagManager = () => {
     }
   };
 
+  // Delete tag
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this tag?")) return;
     setSubmitting(true);
@@ -74,6 +69,7 @@ const TagManager = () => {
     }
   };
 
+  // Edit tag
   const handleEdit = (id, value) => {
     setEditItem({ id, value });
   };
@@ -104,29 +100,28 @@ const TagManager = () => {
     }
   };
 
-  if (loadingUserData || loading) {
+  if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
-        <Spinner animation="border" className="text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
+      <div className="text-center my-3">
+        <Spinner animation="border" variant="primary" />
       </div>
     );
   }
 
-  if (!user || !userData?.isAdmin) return null;
-
   return (
     <div className="container mx-auto mt-4">
-      <h2 className="mb-4">🏷️ Tag Manager</h2>
+      <h4 className="mb-4">🏷️ Tag Manager</h4>
       {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
       <Form className="d-flex mb-4">
-        <Form.Control
-          placeholder="Add new tag (e.g., minimalist, k-pop)"
-          value={newTag}
-          onChange={(e) => setNewTag(e.target.value)}
-          disabled={submitting}
-        />
+        <div className="col-md-6">
+          <Form.Control
+
+            placeholder="Add new tag (e.g., minimalist, k-pop)"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            disabled={submitting}
+          />
+        </div>
         <Button
           className="ms-2"
           variant="primary"
