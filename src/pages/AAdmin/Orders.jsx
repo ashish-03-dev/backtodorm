@@ -27,14 +27,11 @@ const Orders = () => {
 
   // Redirect non-admins
   useEffect(() => {
-    if (loadingUserData || !userData) {
-      return;
-    }
-    // console.log("Orders redirect check: user =", user?.uid, "isAdmin =", userData?.isAdmin, "type =", typeof userData?.isAdmin);
-    if (!user?.uid || userData.isAdmin !== true) {
+    if (loadingUserData || !userData || !user) return;
+    if (userData.isAdmin !== true) {
       if (!hasRedirected.current) {
         hasRedirected.current = true;
-        setTimeout(() => navigate("/login", { replace: true }), 100);
+        navigate("/login", { replace: true });
       }
     } else {
       hasRedirected.current = false;
@@ -46,35 +43,48 @@ const Orders = () => {
     if (!firestore || !userData?.isAdmin || loadingUserData) return;
 
     const ordersQuery = query(collection(firestore, "orders"));
-
     const unsubscribe = onSnapshot(
       ordersQuery,
       async (snapshot) => {
-        const orderList = [];
-        for (const orderDoc of snapshot.docs) {
-          const orderData = { id: orderDoc.id, ...orderDoc.data() };
+        try {
+          const orderList = await Promise.all(
+            snapshot.docs.map(async (orderDoc) => {
+              const orderData = orderDoc.data();
+              const customerDoc = await getDoc(doc(firestore, "users", orderData.customerId));
+              const customerName = customerDoc.exists() ? customerDoc.data().name || "Unknown" : "Unknown";
 
-          // Fetch customer name
-          const customerDoc = await getDoc(doc(firestore, "users", orderData.customerId));
-          const customerName = customerDoc.exists() ? customerDoc.data().name : "Unknown";
+              const items = await Promise.all(
+                (orderData.items || []).map(async (item) => {
+                  if (item.type === "poster") {
+                    const posterDoc = await getDoc(doc(firestore, "posters", item.posterId));
+                    return {
+                      ...item,
+                      posterTitle: posterDoc.exists() ? posterDoc.data().title : "Unknown Poster",
+                    };
+                  } else {
+                    const collectionDoc = await getDoc(doc(firestore, "standaloneCollections", item.collectionId));
+                    return {
+                      ...item,
+                      collectionTitle: collectionDoc.exists() ? collectionDoc.data().title : "Unknown Collection",
+                    };
+                  }
+                })
+              );
 
-          // Fetch poster details
-          const posterDoc = await getDoc(doc(firestore, "posters", orderData.posterId));
-          const posterTitle = posterDoc.exists() ? posterDoc.data().title : "Unknown Poster";
-
-          // Fetch seller name
-          const sellerDoc = await getDoc(doc(firestore, "users", orderData.sellerId));
-          const sellerName = sellerDoc.exists() ? sellerDoc.data().name : "Unknown";
-
-          orderList.push({
-            ...orderData,
-            customerName,
-            posterTitle,
-            sellerName,
-          });
+              return {
+                id: orderDoc.id,
+                ...orderData,
+                customerName,
+                items,
+              };
+            })
+          );
+          setOrders(orderList);
+          setLoading(false);
+        } catch (err) {
+          setError(`Failed to fetch orders: ${err.message}`);
+          setLoading(false);
         }
-        setOrders(orderList);
-        setLoading(false);
       },
       (err) => {
         setError(`Failed to fetch orders: ${err.message}`);
@@ -89,7 +99,12 @@ const Orders = () => {
     setSubmitting(true);
     setError("");
     try {
-      await updateDoc(doc(firestore, "orders", orderId), { status: newStatus });
+      const orderRef = doc(firestore, "orders", orderId);
+      await updateDoc(orderRef, { status: newStatus });
+
+      // Update userOrders collection
+      const userOrderRef = doc(firestore, `userOrders/${orders.find(o => o.id === orderId)?.customerId}/orders`, orderId);
+      await updateDoc(userOrderRef, { status: newStatus });
     } catch (err) {
       setError(`Failed to update status: ${err.message}`);
     } finally {
@@ -103,7 +118,11 @@ const Orders = () => {
       (filter.search === "" ||
         order.customerName.toLowerCase().includes(filter.search.toLowerCase()) ||
         order.id.toLowerCase().includes(filter.search.toLowerCase()) ||
-        order.posterTitle.toLowerCase().includes(filter.search.toLowerCase()))
+        order.items.some(
+          (item) =>
+            (item.type === "poster" && item.posterTitle.toLowerCase().includes(filter.search.toLowerCase())) ||
+            (item.type === "collection" && item.collectionTitle.toLowerCase().includes(filter.search.toLowerCase()))
+        ))
     );
   });
 
@@ -129,6 +148,13 @@ const Orders = () => {
         },
       });
       setShowSupplierModal(false);
+      setSupplierData({
+        supplierName: "",
+        contact: "",
+        notes: "",
+        trackingId: "",
+        sentOrderId: null,
+      });
     } catch (err) {
       setError(`Failed to send to supplier: ${err.message}`);
     } finally {
@@ -136,7 +162,7 @@ const Orders = () => {
     }
   };
 
-  if (loadingUserData || !userData) {
+  if (loading || loadingUserData) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
         <Spinner animation="border" className="text-primary" role="status">
@@ -176,7 +202,7 @@ const Orders = () => {
         <div className="col-md-5">
           <Form.Control
             type="search"
-            placeholder="Search by Customer, Order ID, or Poster"
+            placeholder="Search by Customer, Order ID, or Item"
             value={filter.search}
             onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value }))}
             disabled={submitting}
@@ -225,8 +251,7 @@ const Orders = () => {
             <tr>
               <th>Order ID</th>
               <th>Customer</th>
-              <th>Seller</th>
-              <th>Poster</th>
+              <th>Items</th>
               <th>Date</th>
               <th>Status</th>
               <th>Total (₹)</th>
@@ -242,9 +267,27 @@ const Orders = () => {
                   {order.sentToSupplier && <Badge bg="success" className="ms-2">Sent</Badge>}
                 </td>
                 <td>{order.customerName}</td>
-                <td>{order.sellerName}</td>
-                <td>{order.posterTitle}</td>
-                <td>{order.orderDate}</td>
+                <td>
+                  {order.items.map((item, index) => (
+                    <div key={index}>
+                      {item.type === "poster" ? (
+                        <span>{item.posterTitle} ({item.size}) × {item.quantity}</span>
+                      ) : (
+                        <span>
+                          Collection: {item.collectionTitle} × {item.quantity}
+                          <ul className="ms-3">
+                            {item.posters.map((poster, i) => (
+                              <li key={i}>
+                                {poster.title} ({poster.size})
+                              </li>
+                            ))}
+                          </ul>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </td>
+                <td>{new Date(order.orderDate).toLocaleDateString('en-IN')}</td>
                 <td>
                   <Form.Select
                     size="sm"
@@ -298,7 +341,7 @@ const Orders = () => {
             ))}
             {filteredOrders.length === 0 && (
               <tr>
-                <td colSpan="9" className="text-center text-muted">
+                <td colSpan="8" className="text-center text-muted">
                   No orders found.
                 </td>
               </tr>
@@ -307,7 +350,7 @@ const Orders = () => {
         </Table>
       </div>
 
-      <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)}>
+      <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Order Details</Modal.Title>
         </Modal.Header>
@@ -316,25 +359,59 @@ const Orders = () => {
             <>
               <p><strong>Order ID:</strong> {selectedOrder.id}</p>
               <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
-              <p><strong>Seller:</strong> {selectedOrder.sellerName}</p>
-              <p><strong>Poster:</strong> {selectedOrder.posterTitle}</p>
-              <p><strong>Quantity:</strong> {selectedOrder.quantity}</p>
-              <p><strong>Date:</strong> {selectedOrder.orderDate}</p>
+              <p><strong>Items:</strong></p>
+              <ul>
+                {selectedOrder.items.map((item, index) => (
+                  <li key={index}>
+                    {item.type === "poster" ? (
+                      <span>{item.posterTitle} ({item.size}) × {item.quantity} - ₹{item.price * item.quantity}</span>
+                    ) : (
+                      <span>
+                        Collection: {item.collectionTitle} × {item.quantity} (Discount: {item.collectionDiscount}%)
+                        <ul className="ms-3">
+                          {item.posters.map((poster, i) => (
+                            <li key={i}>
+                              {poster.title} ({poster.size}) - ₹{poster.price}
+                            </li>
+                          ))}
+                        </ul>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p><strong>Date:</strong> {new Date(selectedOrder.orderDate).toLocaleDateString('en-IN')}</p>
               <p><strong>Status:</strong> {selectedOrder.status}</p>
               <p><strong>Total:</strong> ₹{selectedOrder.totalPrice}</p>
+              {selectedOrder.shippingAddress && (
+                <>
+                  <p><strong>Shipping Address:</strong></p>
+                  <p>
+                    {selectedOrder.shippingAddress.name}, {selectedOrder.shippingAddress.address},{' '}
+                    {selectedOrder.shippingAddress.locality}, {selectedOrder.shippingAddress.city},{' '}
+                    {selectedOrder.shippingAddress.state} - {selectedOrder.shippingAddress.pincode}
+                    {selectedOrder.shippingAddress.landmark && `, Landmark: ${selectedOrder.shippingAddress.landmark}`}
+                  </p>
+                </>
+              )}
               {selectedOrder.sentToSupplier && selectedOrder.supplierInfo && (
                 <>
                   <hr />
                   <h6>Supplier Info:</h6>
                   <p><strong>Name:</strong> {selectedOrder.supplierInfo.supplierName}</p>
                   <p><strong>Contact:</strong> {selectedOrder.supplierInfo.contact}</p>
-                  <p><strong>Tracking ID:</strong> {selectedOrder.supplierInfo.trackingId}</p>
-                  <p><strong>Notes:</strong> {selectedOrder.supplierInfo.notes}</p>
+                  <p><strong>Tracking ID:</strong> {selectedOrder.supplierInfo.trackingId || 'N/A'}</p>
+                  <p><strong>Notes:</strong> {selectedOrder.supplierInfo.notes || 'None'}</p>
                 </>
               )}
             </>
           )}
         </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDetailModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <Modal show={showSupplierModal} onHide={() => setShowSupplierModal(false)}>

@@ -45,17 +45,17 @@ export default function ProductDetail() {
         setPoster({
           id: posterSnap.id,
           title: posterData.title || "Untitled",
-          image: posterData.imageUrl || "",
+          image: posterData.imageUrl || "https://via.placeholder.com/300",
           description: posterData.description || "No description available.",
           discount: posterData.discount || 0,
           sizes: sizes,
-          seller: posterData.seller || null,
+          seller: posterData.seller || "Unknown",
         });
         setSelectedSize(defaultSize);
         setLoading(false);
       } catch (err) {
         console.error("Error fetching poster:", err);
-        setError("Failed to load poster: " + err.message);
+        setError(`Failed to load poster: ${err.message}`);
         setLoading(false);
       }
     };
@@ -79,19 +79,19 @@ export default function ProductDetail() {
     const cartItem = {
       posterId: poster.id,
       title: poster.title,
-      selectedSize,
+      size: selectedSize, // Changed from selectedSize to size
       price: displayPrice,
       seller: poster.seller,
       image: poster.image,
     };
 
-    addToCart(cartItem);
+    try {
+      addToCart(cartItem);
+    } catch (err) {
+      console.error("Error adding to cart:", err);
+      alert("Failed to add item to cart.");
+    }
   };
-
-  const selectedSizeObj = poster?.sizes.find(s => s.size === selectedSize) || {};
-  const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
-  const originalPrice = selectedSizeObj.price || 0;
-  const isDiscounted = poster?.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
 
   const handleBuyNow = () => {
     if (!selectedSize) {
@@ -99,16 +99,25 @@ export default function ProductDetail() {
       return;
     }
 
-    const item = { 
-      posterId: poster.id, 
-      title: poster.title, 
-      selectedSize, 
-      price: displayPrice, 
+    const selectedSizeObj = poster.sizes.find(s => s.size === selectedSize) || {};
+    const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
+
+    const item = {
+      posterId: poster.id,
+      title: poster.title,
+      size: selectedSize, // Changed from selectedSize to size
+      price: displayPrice,
       seller: poster.seller,
       image: poster.image,
     };
-    buyNow(item);
-    navigate('/checkout');
+
+    try {
+      buyNow(item);
+      navigate('/checkout');
+    } catch (err) {
+      console.error("Error processing buy now:", err);
+      alert("Failed to proceed to checkout.");
+    }
   };
 
   if (loading) {
@@ -123,10 +132,15 @@ export default function ProductDetail() {
     return <div className="text-center mt-5">{error || "Poster not found."}</div>;
   }
 
+  const selectedSizeObj = poster.sizes.find(s => s.size === selectedSize) || {};
+  const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
+  const originalPrice = selectedSizeObj.price || 0;
+  const isDiscounted = poster.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
+
   return (
     <div className="container my-5">
-      <div className="row g-5">
-        <div className="col-md-6">
+      <div className="row">
+        <div className="col-md-6 mb-4">
           <img src={poster.image} className="img-fluid rounded shadow-sm" alt={poster.title} />
         </div>
 
@@ -143,6 +157,7 @@ export default function ProductDetail() {
                     key={size}
                     className={`btn btn-outline-dark ${selectedSize === size ? 'active' : ''}`}
                     onClick={() => handleSizeChange(size)}
+                    aria-label={`Select size ${size}`}
                   >
                     {size}
                   </button>
@@ -153,11 +168,11 @@ export default function ProductDetail() {
             <div className="mb-4">
               {isDiscounted ? (
                 <div>
-                  <h5 className="text-muted text-decoration-line-through">₹{originalPrice}</h5>
-                  <h5 className="text-success">₹{displayPrice} ({poster.discount}% off)</h5>
+                  <h5 className="text-muted text-decoration-line-through">₹{originalPrice.toLocaleString('en-IN')}</h5>
+                  <h5 className="text-success">₹{displayPrice.toLocaleString('en-IN')} ({poster.discount}% off)</h5>
                 </div>
               ) : (
-                <h5 className="text-muted">₹{displayPrice}</h5>
+                <h5 className="text-muted">₹{displayPrice.toLocaleString('en-IN')}</h5>
               )}
             </div>
           </div>
@@ -169,15 +184,20 @@ export default function ProductDetail() {
                 All posters ship in 2–4 business days. Easy returns within 7 days of delivery.
               </p>
             </div>
-              
+
             <div className="d-flex flex-column gap-2 mb-4">
               <button
                 className="btn btn-dark btn-lg"
                 onClick={handleAddToCart}
+                aria-label="Add to cart"
               >
                 🛒 Add to Cart
               </button>
-              <button className="btn btn-outline-dark btn-lg" onClick={handleBuyNow}>
+              <button
+                className="btn btn-outline-dark btn-lg"
+                onClick={handleBuyNow}
+                aria-label="Buy now"
+              >
                 Buy Now
               </button>
             </div>

@@ -1,12 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
+import { useOutletContext } from 'react-router-dom';
 
-export default function YouMayAlsoLike({ addToCart }) {
+export default function YouMayAlsoLike() {
   const { firestore } = useFirebase();
+  const { addToCart } = useOutletContext();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     if (!firestore) {
@@ -17,25 +22,32 @@ export default function YouMayAlsoLike({ addToCart }) {
 
     const fetchPosters = async () => {
       try {
-        // Query to fetch approved, active posters, ordered by a 'popularity' field or recent creation
-        // You can replace 'popularity' with any relevant field in your Firestore (e.g., 'views', 'sales')
-        // Fallback to 'createdAt' if no personalization data is available
         const postersQuery = query(
           collection(firestore, 'posters'),
           where('approved', '==', 'approved'),
           where('isActive', '==', true),
           orderBy('createdAt', 'desc'),
-          // orderBy('popularity', 'desc'), // Adjust this field based on your data model
-          limit(6) // Limit to 6 posters for the carousel
+          limit(6)
         );
 
         const querySnapshot = await getDocs(postersQuery);
-        const fetchedPosters = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          title: doc.data().title || 'Untitled',
-          image: doc.data().imageUrl || '',
-          price: doc.data().finalPrice || 0,
-        }));
+        const fetchedPosters = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+          const lowestPrice = sizes.length > 0
+            ? Math.min(...sizes.map(s => s.finalPrice || s.price || 0))
+            : 0;
+
+          return {
+            id: doc.id,
+            title: data.title || 'Untitled',
+            image: data.imageUrl || 'https://via.placeholder.com/300',
+            sizes: sizes,
+            price: lowestPrice,
+            discount: data.discount || 0,
+            seller: data.seller || 'Unknown',
+          };
+        });
 
         setPosters(fetchedPosters);
         setLoading(false);
@@ -49,11 +61,104 @@ export default function YouMayAlsoLike({ addToCart }) {
     fetchPosters();
   }, [firestore]);
 
+  const handleAddToCart = (poster, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!poster.sizes || poster.sizes.length === 0) {
+      alert('No sizes available for this poster.');
+      return;
+    }
+
+    const defaultSize = poster.sizes[0].size;
+    const selectedSizeObj = poster.sizes[0] || {};
+    const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
+
+    const cartItem = {
+      posterId: poster.id,
+      title: poster.title,
+      size: defaultSize,
+      price: displayPrice,
+      image: poster.image,
+      seller: poster.seller,
+    };
+
+    try {
+      addToCart(cartItem);
+    } catch (err) {
+      console.error('Error adding to cart:', err);
+      alert('Failed to add to cart.');
+    }
+  };
+
+  const scroll = (direction) => {
+    const container = scrollRef.current;
+    if (container) {
+      container.scrollBy({ left: direction === 'left' ? -300 : 300, behavior: 'smooth' });
+    }
+  };
+
+  const SkeletonCard = () => (
+    <div
+      className="border rounded shadow-sm w-100 bg-white overflow-hidden flex-shrink-0"
+      style={{ width: '80%', maxWidth: '18rem', scrollSnapAlign: 'start' }}
+    >
+      <div
+        className="bg-light"
+        style={{
+          width: '100%',
+          aspectRatio: '4/5',
+          backgroundColor: '#e0e0e0',
+          animation: 'pulse 1.5s infinite',
+        }}
+      />
+      <div className="p-3 text-center">
+        <div
+          className="bg-light mb-1"
+          style={{
+            height: '1rem',
+            width: '80%',
+            margin: '0 auto',
+            backgroundColor: '#e0e0e0',
+            animation: 'pulse 1.5s infinite',
+          }}
+        />
+        <div
+          className="bg-light mb-2"
+          style={{
+            height: '1rem',
+            width: '60%',
+            margin: '0 auto',
+            backgroundColor: '#e0e0e0',
+            animation: 'pulse 1.5s infinite',
+          }}
+        />
+        <div
+          className="bg-light mt-auto"
+          style={{
+            height: '2.5rem',
+            width: '100%',
+            backgroundColor: '#e0e0e0',
+            animation: 'pulse 1.5s infinite',
+          }}
+        />
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <section className="py-5 bg-light">
-        <div className="container text-center">
-          <div className="spinner-border text-dark" role="status" />
+        <div className="container">
+          <div
+            className="d-flex overflow-auto gap-3 pb-2"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {Array(6)
+              .fill()
+              .map((_, index) => (
+                <SkeletonCard key={index} />
+              ))}
+          </div>
         </div>
       </section>
     );
@@ -68,17 +173,51 @@ export default function YouMayAlsoLike({ addToCart }) {
   }
 
   return (
-    <section className="py-5 bg-light">
+    <section
+      className="py-5 bg-light position-relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="container">
         <h2 className="text-center fw-bold fs-2 mb-4">You May Also Like</h2>
-        <div className="d-flex overflow-auto gap-3 pb-2" style={{ scrollSnapType: 'x mandatory' }}>
+        {isHovered && posters.length > 0 && (
+          <>
+            <button
+              onClick={() => scroll('left')}
+              className="btn btn-light rounded-circle position-absolute top-50 start-0 translate-middle-y d-none d-md-flex align-items-center justify-content-center shadow-sm"
+              style={{ width: '40px', height: '40px', zIndex: 10 }}
+              aria-label="Scroll left"
+            >
+              <i className="bi bi-chevron-left fs-5" />
+            </button>
+            <button
+              onClick={() => scroll('right')}
+              className="btn btn-light rounded-circle position-absolute top-50 end-0 translate-middle-y d-none d-md-flex align-items-center justify-content-center shadow-sm"
+              style={{ width: '40px', height: '40px', zIndex: 10 }}
+              aria-label="Scroll right"
+            >
+              <i className="bi bi-chevron-right fs-5" />
+            </button>
+          </>
+        )}
+        <div
+          ref={scrollRef}
+          className="d-flex overflow-auto gap-3 pb-2"
+          style={{
+            scrollSnapType: 'x mandatory',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {posters.map((poster) => (
             <div
               key={poster.id}
               className="flex-shrink-0"
               style={{
-                width: '80%', // Mobile default
-                maxWidth: '18rem', // Limit card size on large screens
+                width: '80%',
+                maxWidth: '18rem',
                 scrollSnapAlign: 'start',
               }}
             >
@@ -96,23 +235,40 @@ export default function YouMayAlsoLike({ addToCart }) {
                   e.currentTarget.style.boxShadow = '';
                 }}
               >
-                <img
-                  src={poster.image}
-                  alt={poster.title}
-                  style={{
-                    width: '100%',
-                    aspectRatio: '4/5',
-                    objectFit: 'cover',
-                    display: 'block',
-                    borderRadius: '0.5rem 0.5rem 0 0',
-                  }}
-                />
-                <div className="p-3 text-center">
-                  <h3 className="fs-6 fw-semibold mb-1 text-truncate">{poster.title}</h3>
-                  <p style={{ fontSize: '16px' }}>From ₹{poster.price}</p>
+                <Link
+                  to={`/poster/${poster.id}`}
+                  className="text-decoration-none text-dark"
+                >
+                  <img
+                    src={poster.image}
+                    alt={poster.title}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '4/5',
+                      objectFit: 'cover',
+                      display: 'block',
+                      borderRadius: '0.5rem 0.5rem 0 0',
+                    }}
+                  />
+                  <div className="p-3 text-center">
+                    <h3 className="fs-6 fw-semibold mb-1 text-truncate">
+                      {poster.title}
+                    </h3>
+                    <p className="mb-2" style={{ fontSize: '16px' }}>
+                      From ₹{poster.price.toLocaleString('en-IN')}
+                      {poster.discount > 0 && (
+                        <span className="text-success ms-1">
+                          ({poster.discount}% off)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </Link>
+                <div className="px-3 pb-3 text-center">
                   <button
-                    onClick={() => addToCart(poster)}
+                    onClick={(e) => handleAddToCart(poster, e)}
                     className="btn btn-dark btn-sm rounded-pill px-4"
+                    aria-label={`Add ${poster.title} to cart`}
                   >
                     Add to Cart
                   </button>

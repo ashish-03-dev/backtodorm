@@ -1,18 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { ListGroup, Button, Modal, Form } from "react-bootstrap";
 import { BiPlus, BiClipboard, BiTrash, BiImage } from "react-icons/bi";
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
+import { useFirebase } from "../../../context/FirebaseContext";
+import { fetchImages } from "./utils";
+
+// Helper to ensure string or empty string
+const ensureString = (value) => (typeof value === "string" ? value : "");
+
+// Validate Firestore document ID
+const isValidDocumentId = (id) => {
+  return id && /^[a-z0-9-]+$/.test(id.trim());
+};
 
 const HomeCollectionsTab = ({
-  collections,
-  setCollections,
   filter,
   posterImages,
-  validateForm,
-  handleSubmit,
-  handleDelete,
+  setPosterImages,
   handleFetchImage,
 }) => {
+  const { firestore } = useFirebase();
+  const [collections, setCollections] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -20,11 +29,126 @@ const HomeCollectionsTab = ({
   const [formData, setFormData] = useState({ name: "", imageIds: [""] });
   const [formErrors, setFormErrors] = useState({});
   const [formPosterImages, setFormPosterImages] = useState({});
+  const [submissionError, setSubmissionError] = useState(null);
+
+  // Fetch home collections
+  useEffect(() => {
+    const fetchCollections = async () => {
+      if (!firestore) {
+        console.log("Firestore not initialized");
+        return;
+      }
+      try {
+        const collectionsRef = collection(firestore, "homeSections/homeCollections/collectionItems");
+        const collectionsSnapshot = await getDocs(collectionsRef);
+        const collections = collectionsSnapshot.docs.map((d) => ({
+          id: d.id,
+          type: "collection",
+          name: ensureString(d.data().name),
+          imageIds: d.data().imageIds || [],
+        }));
+        setCollections(collections);
+        console.log("Fetched homeCollections:", collections);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setSubmissionError(
+          err.code === "permission-denied"
+            ? "Permission denied: Check Firestore rules."
+            : `Failed to fetch collections: ${err.message}`
+        );
+      }
+    };
+    fetchCollections();
+  }, [firestore]);
 
   const filteredCollections = collections.filter((collection) =>
     (collection?.name || collection?.id || "").toLowerCase().includes((filter?.search || "").toLowerCase())
   );
   const isFiltering = !!filter?.search?.trim();
+
+  const normalizeDocumentId = (name) => {
+    return name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-");
+  };
+
+  const validateForm = async (formData, selectedItem, items) => {
+    const errors = {};
+    const name = ensureString(formData.name).trim();
+    const id = normalizeDocumentId(name);
+    if (!name) {
+      errors.name = "Collection Name is required.";
+    } else if (!isValidDocumentId(id)) {
+      errors.name = "Invalid name format. Use lowercase alphanumeric characters and hyphens only.";
+    } else if (!selectedItem && items.some((c) => c.id === id)) {
+      errors.name = "Collection already exists.";
+    }
+
+    const imageErrors = await Promise.all(
+      (formData.imageIds || []).map(async (id, index) => {
+        const safeId = ensureString(id).trim();
+        if (!safeId) return null;
+        if (!isValidDocumentId(safeId)) return "Invalid ID format.";
+        try {
+          const posterRef = doc(firestore, "posters", id);
+          const posterSnap = await getDoc(posterRef);
+          if (!posterSnap.exists()) return "Image ID does not exist.";
+          return null;
+        } catch (err) {
+          return `Failed to validate ID: ${err.message}`;
+        }
+      })
+    );
+    if (imageErrors.some((err) => err)) errors.imageIds = imageErrors;
+
+    console.log("Validation result:", errors);
+    return errors;
+  };
+
+  const handleSubmit = async (formData, selectedItem) => {
+    try {
+      const id = normalizeDocumentId(formData.name);
+      if (!isValidDocumentId(id)) {
+        throw new Error("Invalid collection ID format.");
+      }
+      const name = ensureString(formData.name).trim();
+      const imageIds = (formData.imageIds || []).map(ensureString).filter((id) => id.trim());
+      await setDoc(doc(firestore, "homeSections/homeCollections/collectionItems", id), {
+        name,
+        imageIds,
+      });
+      setCollections((prev) =>
+        prev.some((c) => c.id === id)
+          ? prev.map((c) => (c.id === id ? { id, type: "collection", name, imageIds } : c))
+          : [...prev, { id, type: "collection", name, imageIds }]
+      );
+
+      const newIds = imageIds.filter((id) => id.trim() && !posterImages[id]);
+      if (newIds.length) {
+        const imageResults = await fetchImages(newIds, firestore);
+        setPosterImages((prev) => ({ ...prev, ...Object.fromEntries(imageResults) }));
+      }
+      setSubmissionError(null);
+    } catch (error) {
+      console.error("Submission error:", error);
+      setSubmissionError(`Failed to save collection: ${error.message}`);
+      throw error;
+    }
+  };
+
+  const handleDelete = async (item) => {
+    try {
+      await deleteDoc(doc(firestore, "homeSections/homeCollections/collectionItems", item.id));
+      setCollections((prev) => prev.filter((c) => c.id !== item.id));
+      setSubmissionError(null);
+    } catch (error) {
+      console.error("Deletion error:", error);
+      setSubmissionError(`Failed to delete collection: ${error.message}`);
+      throw error;
+    }
+  };
 
   const handleShowDetail = (item) => {
     setSelectedItem(item);
@@ -41,7 +165,9 @@ const HomeCollectionsTab = ({
     const initialImages = {};
     if (item?.imageIds?.length) {
       item.imageIds.forEach((id) => {
-        if (posterImages[id] !== undefined) initialImages[id] = posterImages[id];
+        if (posterImages[id] !== undefined) {
+          initialImages[id] = posterImages[id];
+        }
       });
     }
     setFormPosterImages(initialImages);
@@ -61,77 +187,110 @@ const HomeCollectionsTab = ({
   };
 
   const handleRemoveImage = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      imageIds: prev.imageIds.filter((_, i) => i !== index),
-    }));
-    setFormErrors((prev) => ({
-      ...prev,
-      imageIds: prev.imageIds?.filter((_, i) => i !== index),
-    }));
-    setFormPosterImages((prev) => {
-      const newImages = { ...prev };
-      const id = formData.imageIds[index];
-      delete newImages[id];
-      return newImages;
-    });
+    try {
+      setFormData((prev) => ({
+        ...prev,
+        imageIds: prev.imageIds?.filter((_, i) => i !== index) || [],
+      }));
+      setFormErrors((prev) => ({
+        ...prev,
+        imageIds: prev.imageIds?.filter((_, i) => i !== index) || [],
+      }));
+      setFormPosterImages((prev) => {
+        const newImages = { ...prev };
+        const id = formData.imageIds[index];
+        delete newImages[id];
+        return newImages;
+      });
+    } catch (error) {
+      console.error("Error removing image:", error);
+      setSubmissionError("Failed to remove image.");
+    }
   };
 
   const handleImageChange = (index, value) => {
-    const oldId = formData.imageIds[index];
-    setFormData((prev) => ({
-      ...prev,
-      imageIds: prev.imageIds.map((id, i) => (i === index ? value : id)),
-    }));
-    if (value.trim()) {
-      if (posterImages[value] !== undefined) {
-        setFormPosterImages((prev) => ({ ...prev, [value]: posterImages[value] }));
-      } else {
-        handleFetchImage(value.trim(), setFormPosterImages);
+    try {
+      const oldId = formData.imageIds?.[index] || null;
+      setFormData((prev) => ({
+        ...prev,
+        imageIds: prev.imageIds?.map((id, i) => (i === index ? value : id)) || [],
+      }));
+      if (value.trim()) {
+        if (posterImages[value] !== undefined) {
+          setFormPosterImages((prev) => ({ ...prev, [value]: posterImages[value] }));
+        } else {
+          handleFetchImage(value.trim(), setFormPosterImages); // Fix: Pass setFormPosterImages
+        }
       }
-    }
-    if (oldId) {
-      setFormPosterImages((prev) => {
-        const newImages = { ...prev };
-        delete newImages[oldId];
-        return newImages;
-      });
+      if (oldId) {
+        setFormPosterImages((prev) => {
+          const newImages = { ...prev };
+          delete newImages[oldId];
+          return newImages;
+        });
+      }
+      setFormErrors((prev) => ({
+        ...prev,
+        imageIds: prev.imageIds?.map((err, i) => (i === index ? undefined : err)) || [],
+      }));
+    } catch (error) {
+      console.error("Error changing image:", error);
+      setSubmissionError("Failed to update image ID.");
     }
   };
 
   const handlePasteClipboard = async (index) => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text.trim()) {
-        handleImageChange(index, text.trim());
+      const safeText = ensureString(text.trim());
+      if (safeText) {
+        handleImageChange(index, safeText);
         setFormErrors((prev) => ({
           ...prev,
-          imageIds: prev.imageIds?.map((err, i) => (i === index ? null : err)),
+          imageIds: prev.imageIds?.map((err, i) => (i === index ? null : err)) || [],
         }));
       } else {
-        alert("Clipboard is empty.");
+        alert("Clipboard is empty or contains invalid data.");
       }
-    } catch {
+    } catch (error) {
+      console.error("Failed to paste from clipboard:", error);
       alert("Failed to paste from clipboard.");
     }
   };
 
   const handleViewImage = (id) => {
-    const imageUrl = formPosterImages[id] || posterImages[id];
-    if (id && imageUrl) {
-      window.open(imageUrl, "_blank", "noopener,noreferrer");
-    } else if (imageUrl === "" && formPosterImages[id] !== null) {
-      alert("Invalid ID: No image found.");
+    try {
+      const imageUrl = formPosterImages[id] || posterImages[id];
+      if (id && imageUrl) {
+        window.open(imageUrl, "_blank", "noopener,noreferrer");
+      } else if (imageUrl === "" && formPosterImages[id] !== null) {
+        alert("Invalid ID: No image found.");
+      } else {
+        alert("No image available for this ID.");
+      }
+    } catch (error) {
+      console.error("Error viewing image:", error);
+      alert("Failed to view image.");
     }
   };
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    const errors = await validateForm(formData, selectedItem);
-    setFormErrors(errors);
-    if (!Object.keys(errors).length) {
-      await handleSubmit(formData, selectedItem);
-      setShowEditModal(false);
+    try {
+      const normalizedFormData = {
+        ...formData,
+        documentId: normalizeDocumentId(formData.name),
+        imageIds: formData.imageIds.filter((id) => id.trim()),
+      };
+      const errors = await validateForm(normalizedFormData, selectedItem, collections);
+      setFormErrors(errors);
+      if (!Object.keys(errors).length) {
+        await handleSubmit(normalizedFormData, selectedItem);
+        setShowEditModal(false);
+      }
+    } catch (error) {
+      console.error("Form submission error:", error);
+      setSubmissionError(`Failed to submit form: ${error.message}`);
     }
   };
 
@@ -142,6 +301,11 @@ const HomeCollectionsTab = ({
           Create Collection
         </Button>
       </div>
+      {submissionError && (
+        <div className="alert alert-danger" role="alert">
+          {submissionError}
+        </div>
+      )}
       <ListGroup>
         {filteredCollections.map((collection) => (
           <ListGroup.Item
@@ -245,12 +409,15 @@ const HomeCollectionsTab = ({
                 name="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Movies, Comics"
+                placeholder="e.g., TV Series, Comics"
                 required
                 disabled={!!selectedItem}
                 isInvalid={!!formErrors.name}
                 aria-describedby="collection-name-error"
               />
+              <Form.Text className="text-muted">
+                The collection ID will be generated from the name (e.g., "TV Series" becomes "tv-series").
+              </Form.Text>
               <Form.Control.Feedback type="invalid" id="collection-name-error">
                 {formErrors.name}
               </Form.Control.Feedback>
@@ -349,27 +516,15 @@ const HomeCollectionsTab = ({
 };
 
 HomeCollectionsTab.propTypes = {
-  collections: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      name: PropTypes.string,
-      imageIds: PropTypes.arrayOf(PropTypes.string),
-      type: PropTypes.string,
-    })
-  ).isRequired,
-  setCollections: PropTypes.func.isRequired,
   filter: PropTypes.shape({
     search: PropTypes.string,
   }).isRequired,
   posterImages: PropTypes.object.isRequired,
-  validateForm: PropTypes.func.isRequired,
-  handleSubmit: PropTypes.func.isRequired,
-  handleDelete: PropTypes.func.isRequired,
+  setPosterImages: PropTypes.func.isRequired,
   handleFetchImage: PropTypes.func.isRequired,
 };
 
 HomeCollectionsTab.defaultProps = {
-  collections: [],
   filter: { search: "" },
 };
 

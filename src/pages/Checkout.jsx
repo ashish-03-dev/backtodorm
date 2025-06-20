@@ -3,9 +3,9 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useFirebase } from '../context/FirebaseContext';
 import { useAddress } from '../context/AddressContext';
 import { collection, addDoc, doc, deleteDoc } from 'firebase/firestore';
-import { Form, Button, Alert, ListGroup, Card, FormSelect } from 'react-bootstrap';
+import { Form, Button, Alert, ListGroup, Card, FormSelect, Spinner } from 'react-bootstrap';
 
-function AddressForm({ setShowForm, fetchAddresses, addAddress, setFormData }) {
+function AddressForm({ setShowForm, getAddressList, addAddress, setFormData }) {
   const [newAddress, setNewAddress] = useState({
     title: '',
     name: '',
@@ -28,8 +28,8 @@ function AddressForm({ setShowForm, fetchAddresses, addAddress, setFormData }) {
     }
     try {
       await addAddress(newAddress);
-      await fetchAddresses();
-      setFormData(newAddress);
+      const updatedList = await getAddressList();
+      setFormData(updatedList[0] || newAddress); // Select newest address
       setShowForm(false);
     } catch (err) {
       setError(`Failed to add address: ${err.message}`);
@@ -160,9 +160,9 @@ function AddressForm({ setShowForm, fetchAddresses, addAddress, setFormData }) {
 }
 
 export default function Checkout() {
-  const { user, firestore, userData } = useFirebase();
+  const { user, firestore, userData, authLoading, loadingUserData } = useFirebase();
+  const { addresses, getAddressList, addAddress, loading: addressLoading, error: addressError } = useAddress();
   const { cartItems, buyNowItem, setCartItems, setBuyNowItem } = useOutletContext();
-  const { getAddressList, addAddress } = useAddress();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
@@ -176,7 +176,6 @@ export default function Checkout() {
     landmark: '',
     type: 'Home',
   });
-  const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
@@ -184,38 +183,53 @@ export default function Checkout() {
   const [showPayment, setShowPayment] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
-  const items = buyNowItem ? [buyNowItem] : cartItems;
+  const items = buyNowItem ? [buyNowItem] : cartItems || [];
   const groupedByCollection = items.reduce((acc, item) => {
-    const key = item.collectionId || 'individual';
+    const key = item.collectionId ? `collection-${item.collectionId}` : `individual-${item.posterId || item.id}-${item.selectedSize}`;
     if (!acc[key]) {
-      acc[key] = { items: [], discount: item.collectionDiscount || 0 };
+      acc[key] = { items: [], discount: item.collectionDiscount || 0, type: item.type || 'poster' };
     }
     acc[key].items.push(item);
     return acc;
   }, {});
   const totalPrice = Object.values(groupedByCollection).reduce((acc, group) => {
-    const groupTotal = group.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
+    const groupTotal = group.items.reduce((sum, item) => {
+      if (group.type === 'collection') {
+        return sum + (item.posters || []).reduce((pSum, p) => pSum + (p.price || 0), 0) * (item.quantity || 1);
+      }
+      return sum + (item.price || 0) * (item.quantity || 1);
+    }, 0);
     return acc + groupTotal * (1 - group.discount / 100);
   }, 0).toFixed(2);
 
   useEffect(() => {
-    if (user) {
+    if (authLoading || loadingUserData || addressLoading) return;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!firestore) {
+      setError('Firestore is not available. Please try again later.');
+      return;
+    }
+  }, [user, firestore, authLoading, loadingUserData, addressLoading, navigate]);
+
+  useEffect(() => {
+    if (user && !addressLoading) {
+      const fetchAddresses = async () => {
+        try {
+          const addressList = await getAddressList();
+          if (addressList.length > 0 && !selectedAddressId) {
+            setSelectedAddressId(addressList[0].id);
+            setFormData(addressList[0]);
+          }
+        } catch (err) {
+          setError(`Failed to load addresses: ${err.message}`);
+        }
+      };
       fetchAddresses();
     }
-  }, [user]);
-
-  const fetchAddresses = async () => {
-    try {
-      const addressList = await getAddressList();
-      setAddresses(addressList);
-      if (addressList.length > 0 && !selectedAddressId) {
-        setSelectedAddressId(addressList[0].id);
-        setFormData(addressList[0]);
-      }
-    } catch (err) {
-      setError(`Failed to load addresses: ${err.message}`);
-    }
-  };
+  }, [user, addressLoading, getAddressList, selectedAddressId]);
 
   const handleAddressSelect = (id) => {
     setSelectedAddressId(id);
@@ -260,49 +274,88 @@ export default function Checkout() {
     setError('');
 
     try {
-      // Simulate payment
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const orderData = {
+        customerId: user.uid,
+        items: items.map(item => ({
+          type: item.type || 'poster',
+          ...(item.type === 'collection'
+            ? {
+                collectionId: item.collectionId || 'unknown',
+                quantity: item.quantity || 1,
+                collectionDiscount: item.collectionDiscount || 0,
+                posters: (item.posters || []).map(poster => ({
+                  posterId: poster.posterId || 'unknown',
+                  size: poster.size || 'N/A',
+                  price: poster.price || 0,
+                  title: poster.title || 'Untitled',
+                  image: poster.image || 'https://via.placeholder.com/50',
+                  seller: poster.seller || null,
+                })),
+              }
+            : {
+                posterId: item.posterId || 'unknown',
+                size: item.selectedSize || 'N/A',
+                quantity: item.quantity || 1,
+                price: item.price || 0,
+                title: item.title || 'Untitled',
+                image: item.image || 'https://via.placeholder.com/50',
+                seller: item.seller || null,
+                collectionId: item.collectionId || null,
+                collectionDiscount: item.collectionDiscount || 0,
+              }),
+        })),
+        totalPrice: parseFloat(totalPrice),
+        orderDate: new Date().toISOString(),
+        status: 'Pending',
+        paymentStatus: 'Completed',
+        paymentMethod: 'Razorpay',
+        shippingAddress: formData,
+        sentToSupplier: false,
+      };
 
-      // Save orders to Firestore
-      for (const item of items) {
-        await addDoc(collection(firestore, 'orders'), {
-          customerId: user.uid,
-          sellerId: item.seller || 'Unknown',
-          posterId: item.posterId,
-          status: 'Pending',
-          totalPrice: item.price * item.quantity * (1 - (item.collectionDiscount || 0) / 100),
-          orderDate: new Date().toISOString(),
-          quantity: item.quantity,
-          sentToSupplier: false,
-          supplierInfo: null,
-          size: item.selectedSize,
-          shippingAddress: formData,
-          paymentStatus: 'Completed',
-          paymentMethod: 'Razorpay',
-          collectionId: item.collectionId || null,
-          collectionDiscount: item.collectionDiscount || 0,
-        });
-      }
+      const orderRef = await addDoc(collection(firestore, 'orders'), orderData);
+      await addDoc(collection(firestore, `userOrders/${user.uid}/orders`), {
+        orderId: orderRef.id,
+        orderDate: orderData.orderDate,
+        status: orderData.status,
+        totalPrice: orderData.totalPrice,
+      });
 
-      // Clear cart
       if (buyNowItem) {
         setBuyNowItem(null);
       } else {
+        await Promise.all(
+          cartItems.map(item =>
+            deleteDoc(doc(firestore, `users/${user.uid}/cart`, item.id))
+          )
+        );
         setCartItems([]);
         localStorage.removeItem('cartItems');
-        if (user && firestore) {
-          for (const item of cartItems) {
-            const cartItemId = `${item.posterId}-${item.selectedSize}`;
-            await deleteDoc(doc(firestore, `users/${user.uid}/cart`, cartItemId));
-          }
-        }
       }
+
       navigate('/account/orders', { state: { orderSuccess: true } });
     } catch (err) {
       setError(`Payment failed: ${err.message}`);
       setPaymentProcessing(false);
     }
   };
+
+  if (authLoading || loadingUserData || addressLoading) {
+    return (
+      <div className="text-center my-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2">Loading...</p>
+      </div>
+    );
+  }
+
+  if (addressError && !user) {
+    return (
+      <Alert variant="danger" dismissible onClose={() => setError('')}>
+        Please log in to access checkout.
+      </Alert>
+    );
+  }
 
   return (
     <div className="container my-5" style={{ minHeight: 'calc(100svh - 65px)' }}>
@@ -317,27 +370,36 @@ export default function Checkout() {
               <ListGroup variant="flush">
                 {Object.entries(groupedByCollection).map(([groupId, group]) => (
                   <React.Fragment key={groupId}>
-                    {groupId !== 'individual' && (
+                    {group.type === 'collection' && (
                       <div className="mb-2">
                         <h6 className="fw-semibold">Collection Pack (Discount: {group.discount}%)</h6>
                       </div>
                     )}
                     {group.items.map((item, index) => (
-                      <ListGroup.Item key={`${item.posterId}-${item.selectedSize}-${index}`}>
+                      <ListGroup.Item key={`${item.posterId || item.collectionId}-${item.selectedSize || 'collection'}-${index}`}>
                         <div className="d-flex align-items-center">
                           <img
-                            src={item.image || 'https://via.placeholder.com/50'}
-                            alt={`${item.title} (${item.selectedSize})`}
+                            src={item.image || (item.posters && item.posters[0]?.image) || 'https://via.placeholder.com/50'}
+                            alt={`${item.title || 'Untitled'} (${item.selectedSize || 'Collection'})`}
                             style={{ width: '50px', height: '50px', objectFit: 'cover', marginRight: '10px' }}
                           />
                           <div className="flex-grow-1">
-                            <h6>{item.title} ({item.selectedSize})</h6>
-                            <p className="mb-0">Quantity: {item.quantity}</p>
-                            {item.collectionDiscount > 0 && (
-                              <p className="mb-0 text-success">Discount: {item.collectionDiscount}%</p>
+                            <h6>
+                              {item.type === 'collection' ? `Collection: ${item.collectionId || 'Untitled'}` : `${item.title || 'Untitled'} (${item.selectedSize || 'N/A'})`}
+                            </h6>
+                            <p className="mb-0">Quantity: {item.quantity || 1}</p>
+                            {group.discount > 0 && (
+                              <p className="mb-0 text-success">Discount: {group.discount}%</p>
                             )}
                           </div>
-                          <p>₹{(item.price * item.quantity * (1 - (item.collectionDiscount || 0) / 100)).toLocaleString('en-IN')}</p>
+                          <p>
+                            ₹{(
+                              (item.type === 'collection'
+                                ? (item.posters || []).reduce((sum, p) => sum + (p.price || 0), 0) * (item.quantity || 1)
+                                : (item.price || 0) * (item.quantity || 1)
+                              ) * (1 - group.discount / 100)
+                            ).toLocaleString('en-IN')}
+                          </p>
                         </div>
                       </ListGroup.Item>
                     ))}
@@ -357,7 +419,7 @@ export default function Checkout() {
           <Card>
             <Card.Body>
               <h4 className="mb-3">Shipping Details</h4>
-              {user && !showPayment && (
+              {user && !showPayment ? (
                 <>
                   <Form.Group className="mb-3">
                     <Form.Label>Select Saved Address</Form.Label>
@@ -387,7 +449,7 @@ export default function Checkout() {
                   {showForm && (
                     <AddressForm
                       setShowForm={setShowForm}
-                      fetchAddresses={fetchAddresses}
+                      getAddressList={getAddressList}
                       addAddress={addAddress}
                       setFormData={setFormData}
                     />
@@ -422,8 +484,7 @@ export default function Checkout() {
                     </Button>
                   </Form>
                 </>
-              )}
-              {user && showPayment && (
+              ) : user && showPayment ? (
                 <>
                   <h4 className="mb-3">Payment Options</h4>
                   <Card className="p-3 mb-3">
@@ -447,8 +508,7 @@ export default function Checkout() {
                     Back to Shipping
                   </Button>
                 </>
-              )}
-              {!user && (
+              ) : (
                 <Alert variant="warning">
                   Please <a href="/login">log in</a> to proceed with checkout.
                 </Alert>

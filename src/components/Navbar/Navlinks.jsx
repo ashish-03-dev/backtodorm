@@ -84,7 +84,7 @@ export default function NavLinks() {
   }
 
   return (
-    <nav className="col-md-5 d-none d-lg-flex justify-content-center h-100">
+    <nav className="col-md-5 d-none d-lg-flex flex-grow-1 justify-content-center h-100">
       <ul className="nav h-100 justify-content-between align-items-stretch py-0 my-0" style={{ fontSize: '17px' }}>
         <li className="nav-item">
           <a className="nav-link text-dark h-100 d-flex align-items-center" href="/">

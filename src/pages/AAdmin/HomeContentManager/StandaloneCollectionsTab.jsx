@@ -1,52 +1,254 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { ListGroup, Button, Modal, Form, Collapse } from "react-bootstrap";
 import { BiPlus, BiClipboard, BiTrash, BiImage, BiChevronDown, BiChevronUp } from "react-icons/bi";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
 import { useFirebase } from "../../../context/FirebaseContext";
+import { fetchImages } from "./utils";
+
+// Helper to generate standardized document ID
+const generateDocId = (name) => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/[^a-z0-9-]/g, ''); // Remove special characters
+};
+
+// Helper to ensure string or empty string
+const ensureString = (value) => (typeof value === "string" ? value : "");
+
+// Validate Firestore document ID
+const isValidDocumentId = (id) => {
+  return id && /^[a-z0-9-]+$/.test(id.trim());
+};
 
 const StandaloneCollectionsTab = ({
-  collections,
-  setCollections,
   filter,
   posterImages,
   setPosterImages,
-  validateForm,
-  handleSubmit,
-  handleDelete,
   handleFetchImage,
 }) => {
   const { firestore } = useFirebase();
+  const [collections, setCollections] = useState([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [formData, setFormData] = useState({
-    id: "",
+    name: "",
     title: "",
     description: "",
-    image: "", // Stores posterId
-    posters: [], // Array of { posterId, size, price }
-    discount: 20, // Default discount percentage
+    image: "",
+    posters: [],
+    discount: 20,
   });
   const [formErrors, setFormErrors] = useState({});
   const [formPosterImages, setFormPosterImages] = useState({});
-  const [posterDetails, setPosterDetails] = useState({}); // Cache poster details { posterId: { title, imageUrl, sizes: [{ size, price, finalPrice }] } }
+  const [posterDetails, setPosterDetails] = useState({});
   const [activePoster, setActivePoster] = useState(0);
   const [mainImagePosterTitle, setMainImagePosterTitle] = useState("");
   const [submissionError, setSubmissionError] = useState(null);
 
+  // Fetch standalone collections
+  useEffect(() => {
+    const fetchCollections = async () => {
+      if (!firestore) {
+        console.log("Firestore not initialized");
+        return;
+      }
+      try {
+        const standaloneCollectionsRef = collection(firestore, "standaloneCollections");
+        const standaloneSnapshot = await getDocs(standaloneCollectionsRef);
+        const collections = standaloneSnapshot.docs.map((d) => ({
+          id: d.id,
+          type: "standaloneCollection",
+          name: ensureString(d.data().name),
+          title: ensureString(d.data().title),
+          description: ensureString(d.data().description),
+          image: ensureString(d.data().image),
+          posters: Array.isArray(d.data().posters)
+            ? d.data().posters.map((p) => ({
+                posterId: ensureString(p.posterId || p),
+                size: ensureString(p.size),
+                price: Number.isFinite(p.price) ? p.price : 0,
+              }))
+            : [],
+          discount: Number.isFinite(d.data().discount) ? d.data().discount : 20,
+          createdAt: d.data().createdAt,
+          updatedAt: d.data().updatedAt,
+        }));
+        setCollections(collections);
+        console.log("Fetched standaloneCollections:", collections);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setSubmissionError(
+          err.code === "permission-denied"
+            ? "Permission denied: Check Firestore rules."
+            : `Failed to fetch collections: ${err.message}`
+        );
+      }
+    };
+    fetchCollections();
+  }, [firestore]);
+
   const filteredCollections = collections.filter((collection) =>
-    (collection?.title || collection?.id || "").toLowerCase().includes((filter?.search || "").toLowerCase())
+    (collection?.name || collection?.title || collection?.id || "").toLowerCase().includes((filter?.search || "").toLowerCase())
   );
   const isFiltering = !!filter?.search?.trim();
 
-  // Helper to ensure string or empty string
-  const ensureString = (value) => (typeof value === "string" ? value : "");
+  const validateForm = async (formData, selectedItem, items) => {
+    const errors = {};
+    const id = ensureString(formData.id).trim();
+    const name = ensureString(formData.name).trim();
+    const title = ensureString(formData.title).trim();
+    const description = ensureString(formData.description).trim();
+    const image = ensureString(formData.image).trim();
+    const discount = parseFloat(formData.discount);
 
-  // Validate Firestore document ID
-  const isValidDocumentId = (id) => {
-    return id && /^[a-zA-Z0-9_-]+$/.test(id.trim());
+    if (!name) {
+      errors.name = "Name is required.";
+    } else {
+      const generatedId = generateDocId(name);
+      if (!isValidDocumentId(generatedId)) {
+        errors.name = "Name generates an invalid ID. Use alphanumeric characters, spaces, or hyphens.";
+      } else if (!selectedItem && items.some((c) => c.id === generatedId)) {
+        errors.name = "A collection with this name already exists.";
+      }
+    }
+    if (!id) {
+      errors.id = "ID is required.";
+    } else if (!isValidDocumentId(id)) {
+      errors.id = "Invalid ID format. Use lowercase alphanumeric characters and hyphens only.";
+    }
+    if (!title) {
+      errors.title = "Title is required.";
+    }
+    if (!description) {
+      errors.description = "Description is required.";
+    }
+    if (!image) {
+      errors.image = "Main image poster ID is required.";
+    } else if (!isValidDocumentId(image)) {
+      errors.image = "Invalid Poster ID format.";
+    } else if (firestore) {
+      try {
+        const posterRef = doc(firestore, "posters", image);
+        const posterSnap = await getDoc(posterRef);
+        if (!posterSnap.exists()) {
+          errors.image = "Poster ID does not exist.";
+        } else if (!posterSnap.data().imageUrl) {
+          errors.image = "Poster has no image URL.";
+        }
+      } catch (err) {
+        errors.image = `Failed to validate poster: ${err.message}`;
+      }
+    }
+    if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
+      errors.discount = "Discount must be a number between 0 and 100.";
+    }
+
+    const posterErrors = await Promise.all(
+      (formData.posters || []).map(async (poster, index) => {
+        const safePosterId = ensureString(poster.posterId).trim();
+        const size = ensureString(poster.size).trim();
+        const price = parseFloat(poster.price);
+        const posterErr = {};
+        if (!safePosterId) {
+          posterErr.posterId = "Poster ID is required.";
+        } else if (!isValidDocumentId(safePosterId)) {
+          posterErr.posterId = "Invalid Poster ID format.";
+        } else if (firestore) {
+          try {
+            const posterRef = doc(firestore, "posters", safePosterId);
+            const posterSnap = await getDoc(posterRef);
+            if (!posterSnap.exists()) {
+              posterErr.posterId = "Poster ID does not exist.";
+            } else {
+              const sizes = Array.isArray(posterSnap.data().sizes) ? posterSnap.data().sizes : [];
+              if (!sizes.length) {
+                posterErr.posterId = "Poster has no sizes available.";
+              } else if (!size) {
+                posterErr.size = "Size is required.";
+              } else {
+                const selectedSize = sizes.find((s) => s.size === size);
+                if (!selectedSize) {
+                  posterErr.size = "Selected size is not available.";
+                } else if (!Number.isFinite(price) || price <= 0) {
+                  posterErr.price = "Invalid price for selected size.";
+                }
+              }
+            }
+          } catch (err) {
+            posterErr.posterId = `Failed to validate poster: ${err.message}`;
+          }
+        }
+        return Object.keys(posterErr).length ? { index, errors: posterErr } : null;
+      })
+    );
+    if (posterErrors.some((err) => err)) {
+      errors.posters = posterErrors.filter((err) => err);
+    }
+    console.log("Validation result:", errors);
+    return errors;
+  };
+
+  const handleSubmit = async (formData, selectedItem) => {
+    try {
+      const id = ensureString(formData.id).trim();
+      if (!isValidDocumentId(id)) {
+        throw new Error("Invalid standalone collection ID format.");
+      }
+      console.log("Saving collection with ID:", id);
+      const newCollection = {
+        name: ensureString(formData.name).trim(),
+        title: ensureString(formData.title).trim(),
+        description: ensureString(formData.description).trim(),
+        image: ensureString(formData.image).trim(),
+        posters: (formData.posters || []).map((p) => ({
+          posterId: ensureString(p.posterId).trim(),
+          size: ensureString(p.size).trim(),
+          price: parseFloat(p.price) || 0,
+        })).filter((p) => p.posterId && p.size),
+        discount: parseFloat(formData.discount) || 20,
+        createdAt: selectedItem ? selectedItem.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(doc(firestore, "standaloneCollections", id), newCollection);
+      setCollections((prev) => {
+        const newState = prev.some((c) => c.id === id)
+          ? prev.map((c) => (c.id === id ? { id, type: "standaloneCollection", ...newCollection } : c))
+          : [...prev, { id, type: "standaloneCollection", ...newCollection }];
+        console.log("New standaloneCollections state:", newState);
+        return newState;
+      });
+
+      const newIds = [
+        ...(formData.posters || []).map((p) => p.posterId),
+        ...(formData.image ? [formData.image] : []),
+      ].map(ensureString).filter((id) => id.trim() && !posterImages[id]);
+      if (newIds.length) {
+        const imageResults = await fetchImages(newIds, firestore);
+        setPosterImages((prev) => ({ ...prev, ...Object.fromEntries(imageResults) }));
+      }
+      setSubmissionError(null);
+    } catch (err) {
+      console.error("Submission error:", err);
+      setSubmissionError(`Failed to save collection: ${err.message}`);
+      throw err;
+    }
+  };
+
+  const handleDelete = async (item) => {
+    try {
+      await deleteDoc(doc(firestore, "standaloneCollections", item.id));
+      setCollections((prev) => prev.filter((c) => c.id !== item.id));
+      setSubmissionError(null);
+    } catch (err) {
+      console.error("Deletion error:", err);
+      setSubmissionError(`Failed to delete collection: ${err.message}`);
+      throw err;
+    }
   };
 
   const handleShowDetail = (item) => {
@@ -57,16 +259,16 @@ const StandaloneCollectionsTab = ({
   const handleEdit = (item = null) => {
     setSelectedItem(item);
     const initialFormData = {
-      id: ensureString(item?.id),
+      name: ensureString(item?.name),
       title: ensureString(item?.title),
       description: ensureString(item?.description),
       image: ensureString(item?.image),
       posters: Array.isArray(item?.posters)
         ? item.posters.map((p) => ({
-          posterId: ensureString(p.posterId || p), // Handle legacy string arrays
-          size: ensureString(p.size),
-          price: Number.isFinite(p.price) ? p.price : 0,
-        }))
+            posterId: ensureString(p.posterId || p),
+            size: ensureString(p.size),
+            price: Number.isFinite(p.price) ? p.price : -1,
+          }))
         : [],
       discount: Number.isFinite(item?.discount) ? item.discount : 20,
     };
@@ -77,12 +279,11 @@ const StandaloneCollectionsTab = ({
     setPosterDetails({});
     setFormPosterImages({});
 
-    // Fetch poster details
     if (initialFormData.image) {
-      fetchPosterData(initialFormData.image, null);
+      fetchPosterImagesData(initialFormData.image, null);
     }
     initialFormData.posters.forEach((poster, index) => {
-      if (poster.posterId) fetchPosterData(poster.posterId, index);
+      if (poster.posterId) fetchPosterImagesData(poster.posterId, index);
     });
     setActivePoster(0);
     setShowEditModal(true);
@@ -96,7 +297,7 @@ const StandaloneCollectionsTab = ({
   const handleAddPoster = () => {
     setFormData((prev) => ({
       ...prev,
-      posters: [...prev.posters, { posterId: "", size: "", price: 0 }],
+      posters: [...prev.posters, { posterId: "", size: "", price: -1 }],
     }));
     setActivePoster(formData.posters.length);
   };
@@ -127,7 +328,7 @@ const StandaloneCollectionsTab = ({
     }
   };
 
-  const fetchPosterData = async (posterId, index) => {
+  const fetchPosterImagesData = async (posterId, index) => {
     const safePosterId = ensureString(posterId).trim();
     if (!firestore || !safePosterId || !isValidDocumentId(safePosterId)) {
       if (index !== null) {
@@ -178,8 +379,8 @@ const StandaloneCollectionsTab = ({
               imageUrl: ensureString(posterData.imageUrl),
               sizes: sizes.map((s) => ({
                 size: ensureString(s.size),
-                price: Number.isFinite(s.price) ? s.price : 0,
-                finalPrice: Number.isFinite(s.finalPrice) ? s.finalPrice : s.price || 0,
+                price: Number.isFinite(s.price) ? s.price : -1,
+                finalPrice: Number.isFinite(s.finalPrice) ? s.finalPrice : s.price || -1,
               })),
             },
           }));
@@ -195,12 +396,11 @@ const StandaloneCollectionsTab = ({
             setMainImagePosterTitle(ensureString(posterData.title));
             setFormErrors((prev) => ({ ...prev, image: null }));
           } else {
-            // Update price if size is selected
             const currentPoster = formData.posters[index];
-            let price = currentPoster.price || 0;
+            let price = currentPoster.price || -1;
             if (currentPoster.size && sizes.length) {
               const selectedSize = sizes.find((s) => s.size === currentPoster.size);
-              price = selectedSize ? (Number.isFinite(selectedSize.finalPrice) ? selectedSize.finalPrice : selectedSize.price || 0) : 0;
+              price = selectedSize ? (Number.isFinite(selectedSize.finalPrice) ? selectedSize.finalPrice : selectedSize.price || -1) : -1;
             }
             setFormData((prev) => ({
               ...prev,
@@ -257,7 +457,7 @@ const StandaloneCollectionsTab = ({
     const safeValue = ensureString(value);
     setFormData((prev) => ({ ...prev, image: safeValue }));
     if (safeValue && isValidDocumentId(safeValue)) {
-      fetchPosterData(safeValue, null);
+      fetchPosterImagesData(safeValue, null);
     } else {
       setMainImagePosterTitle("");
       setFormErrors((prev) => ({
@@ -281,10 +481,10 @@ const StandaloneCollectionsTab = ({
     const safeValue = ensureString(value);
     setFormData((prev) => ({
       ...prev,
-      posters: prev.posters.map((p, i) => (i === index ? { posterId: safeValue, size: "", price: 0 } : p)),
+      posters: prev.posters.map((p, i) => (i === index ? { posterId: safeValue, size: "", price: -1 } : p)),
     }));
     if (safeValue && isValidDocumentId(safeValue)) {
-      fetchPosterData(safeValue, index);
+      fetchPosterImagesData(safeValue, index);
     } else {
       setPosterDetails((prev) => {
         const newDetails = { ...prev };
@@ -307,7 +507,7 @@ const StandaloneCollectionsTab = ({
     const posterId = formData.posters[index].posterId;
     const sizes = posterDetails[posterId]?.sizes || [];
     const selectedSize = sizes.find((s) => s.size === size);
-    const price = selectedSize ? (Number.isFinite(selectedSize.finalPrice) ? selectedSize.finalPrice : selectedSize.price || 0) : 0;
+    const price = selectedSize ? (Number.isFinite(selectedSize.finalPrice) ? selectedSize.finalPrice : selectedSize.price || -1) : -1;
     setFormData((prev) => ({
       ...prev,
       posters: prev.posters.map((p, i) => (i === index ? { ...p, size, price } : p)),
@@ -333,7 +533,7 @@ const StandaloneCollectionsTab = ({
           handlePosterIdChange(index, safeText);
         }
       } else {
-        alert("Invalid clipboard content: Must be a valid document ID (alphanumeric, underscores, or hyphens).");
+        alert("Invalid clipboard content: Must be a valid document ID (alphanumeric or hyphens).");
       }
     } catch {
       alert("Failed to paste from clipboard.");
@@ -352,14 +552,32 @@ const StandaloneCollectionsTab = ({
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    console.log("Form submission started");
     setSubmissionError(null);
-    const errors = await validateForm(formData, selectedItem);
 
+    console.log("Raw name:", formData.name);
+    const generatedId = generateDocId(formData.name || 'unnamed-collection');
+    console.log("Collection ID:", generatedId);
+    console.log("Is valid ID:", isValidDocumentId(generatedId));
+    if (!isValidDocumentId(generatedId)) {
+      setFormErrors({ name: "Invalid name format. Use alphanumeric characters, spaces, or hyphens only." });
+      return;
+    }
+
+    const updatedFormData = {
+      ...formData,
+      id: generatedId,
+    };
+    console.log("Updated form data:", updatedFormData);
+
+    const errors = await validateForm(updatedFormData, selectedItem, collections);
+    console.log("Validation errors:", errors);
     setFormErrors(errors);
 
     if (!Object.keys(errors).length) {
       try {
-        await handleSubmit(formData, selectedItem);
+        await handleSubmit(updatedFormData, selectedItem);
+        console.log("Submission successful");
         setShowEditModal(false);
       } catch (err) {
         console.error("Submission failed:", err);
@@ -391,7 +609,7 @@ const StandaloneCollectionsTab = ({
             className="d-flex justify-content-between align-items-center"
           >
             <div>
-              <strong>{collection.title}</strong>
+              <strong>{collection.title} (Name: {collection.name}, ID: {collection.id})</strong>
               <div className="text-muted small">Posters: {collection?.posters?.length || 0}, Discount: {collection?.discount || 20}%</div>
             </div>
             <div>
@@ -442,6 +660,7 @@ const StandaloneCollectionsTab = ({
           {selectedItem && (
             <>
               <p><strong>ID:</strong> {selectedItem.id}</p>
+              <p><strong>Name:</strong> {selectedItem.name}</p>
               <p><strong>Title:</strong> {selectedItem.title}</p>
               <p><strong>Description:</strong> {selectedItem.description}</p>
               <p><strong>Discount:</strong> {selectedItem.discount || 20}%</p>
@@ -474,7 +693,7 @@ const StandaloneCollectionsTab = ({
                     <div>
                       <strong>{posterDetails[poster.posterId]?.title || poster.posterId}</strong> (ID: {poster.posterId})<br />
                       Size: {poster.size || "N/A"}<br />
-                      Price: ₹{poster.price || "N/A"}
+                      Price: ₹{poster.price >= 0 ? poster.price : "N/A"}
                     </div>
                     {posterImages[poster.posterId] && (
                       <Button
@@ -511,20 +730,22 @@ const StandaloneCollectionsTab = ({
         <Modal.Body>
           <Form onSubmit={handleFormSubmit}>
             <Form.Group className="mb-3">
-              <Form.Label>Collection ID</Form.Label>
+              <Form.Label>Name</Form.Label>
               <Form.Control
                 type="text"
-                name="id"
-                value={formData.id}
-                onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                placeholder="e.g., nature-landscapes"
+                name="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., TV Series"
                 required
-                disabled={!!selectedItem}
-                isInvalid={!!formErrors.id}
-                aria-describedby="standalone-collection-id-error"
+                isInvalid={!!formErrors.name}
+                aria-describedby="standalone-collection-name-error"
               />
-              <Form.Control.Feedback type="invalid" id="standalone-collection-id-error">
-                {formErrors.id}
+              <Form.Text className="text-muted">
+                Used to generate the collection ID (e.g., "TV Series" becomes "tv-series").
+              </Form.Text>
+              <Form.Control.Feedback type="invalid" id="standalone-collection-name-error">
+                {formErrors.name}
               </Form.Control.Feedback>
             </Form.Group>
             <Form.Group className="mb-3">
@@ -534,7 +755,7 @@ const StandaloneCollectionsTab = ({
                 name="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g., Nature Landscapes"
+                placeholder="e.g., Popular TV Series Collection"
                 required
                 isInvalid={!!formErrors.title}
                 aria-describedby="standalone-collection-title-error"
@@ -551,7 +772,7 @@ const StandaloneCollectionsTab = ({
                 name="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="e.g., Serene and beautiful views of nature."
+                placeholder="e.g., Collection of popular TV series posters."
                 required
                 isInvalid={!!formErrors.description}
                 aria-describedby="standalone-collection-description-error"
@@ -586,7 +807,7 @@ const StandaloneCollectionsTab = ({
                   type="text"
                   value={formData.image}
                   onChange={(e) => handleMainImagePosterIdChange(e.target.value)}
-                  placeholder="e.g., nature-poster-123"
+                  placeholder="e.g., tv-series-poster-123"
                   required
                   isInvalid={!!formErrors.image}
                   aria-describedby="standalone-collection-main-image-poster-id-error"
@@ -648,7 +869,7 @@ const StandaloneCollectionsTab = ({
                               type="text"
                               value={poster.posterId}
                               onChange={(e) => handlePosterIdChange(index, e.target.value)}
-                              placeholder="e.g., nature-poster-123"
+                              placeholder="e.g., tv-series-poster-123"
                               required
                               isInvalid={!!posterError?.errors?.posterId}
                               aria-describedby={`standalone-collection-poster-id-error-${index}`}
@@ -683,7 +904,7 @@ const StandaloneCollectionsTab = ({
                           <Form.Group className="mb-2">
                             <Form.Label>Size</Form.Label>
                             <Form.Select
-                              name={`poster-size-${index}`} // Added name attribute
+                              name={`poster-size-${index}`}
                               value={poster.size}
                               onChange={(e) => handleSizeChange(index, e.target.value)}
                               required
@@ -723,7 +944,7 @@ const StandaloneCollectionsTab = ({
                               <Form.Label>Poster Price (₹)</Form.Label>
                               <Form.Control
                                 type="number"
-                                value={poster.price}
+                                value={poster.price >= 0 ? poster.price : ""}
                                 readOnly
                                 placeholder="Select a size"
                               />
@@ -793,37 +1014,15 @@ const StandaloneCollectionsTab = ({
 };
 
 StandaloneCollectionsTab.propTypes = {
-  collections: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      title: PropTypes.string,
-      description: PropTypes.string,
-      image: PropTypes.string,
-      posters: PropTypes.arrayOf(
-        PropTypes.shape({
-          posterId: PropTypes.string,
-          size: PropTypes.string,
-          price: PropTypes.number,
-        })
-      ),
-      discount: PropTypes.number,
-      type: PropTypes.string,
-    })
-  ).isRequired,
-  setCollections: PropTypes.func.isRequired,
   filter: PropTypes.shape({
     search: PropTypes.string,
   }).isRequired,
   posterImages: PropTypes.object.isRequired,
   setPosterImages: PropTypes.func.isRequired,
-  validateForm: PropTypes.func.isRequired,
-  handleSubmit: PropTypes.func.isRequired,
-  handleDelete: PropTypes.func.isRequired,
   handleFetchImage: PropTypes.func.isRequired,
 };
 
 StandaloneCollectionsTab.defaultProps = {
-  collections: [],
   filter: { search: "" },
 };
 

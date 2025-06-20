@@ -5,13 +5,6 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
 import '../../styles/CategoryScroll.css';
 
-// Utility function to capitalize the first letter of each word
-const capitalizeTitle = (str) =>
-  str
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-
 export default function ShopByCollection() {
   const { firestore } = useFirebase();
   const [isHovered, setIsHovered] = useState(false);
@@ -49,8 +42,8 @@ export default function ShopByCollection() {
                     .filter((url) => url);
                   resolve({
                     id: collectionDoc.id,
-                    title: capitalizeTitle(data.name || collectionDoc.id),
-                    link: data.link || `/collections/${collectionDoc.id}`,
+                    title: data.name || 'Unnamed Collection',
+                    link: `/collections/${collectionDoc.id}`,
                     images: imageUrls,
                   });
                 }, (err) => {

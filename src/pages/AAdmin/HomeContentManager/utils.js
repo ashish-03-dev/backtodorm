@@ -19,7 +19,14 @@ export const fetchImages = async (ids, firestore) => {
   for (const chunk of chunks) {
     const q = query(collection(firestore, "posters"), where("__name__", "in", chunk));
     const querySnap = await getDocs(q);
-    querySnap.forEach(doc => imageResults.push([doc.id, doc.data().imageUrl || ""]));
+    querySnap.forEach(doc => imageResults.push([
+      doc.id,
+      {
+        imageUrl: doc.data().imageUrl || "",
+        prices: doc.data().prices || { small: doc.data().finalPrice || 0 },
+        title: doc.data().title || "Untitled",
+      }
+    ]));
   }
   return imageResults;
 };

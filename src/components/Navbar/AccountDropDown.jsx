@@ -81,13 +81,6 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
             >
               <i className="bi bi-box-seam me-2"></i> Orders
             </div>
-            <div
-              className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
-              onClick={() => handleNavigation('/wishlist')}
-              style={{ cursor: 'pointer' }}
-            >
-              <i className="bi bi-heart me-2"></i> Wishlist
-            </div>
             {isAdmin && (
               <div
                 className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"

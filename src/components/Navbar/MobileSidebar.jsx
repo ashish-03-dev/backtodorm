@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useFirebase } from '../../context/FirebaseContext';
-import { collection, getDocs, doc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import '../../styles/MobileSidebar.css';
 
 const fetchImages = async (ids, firestore) => {
@@ -21,10 +21,11 @@ const fetchImages = async (ids, firestore) => {
 };
 
 export default function MobileSidebar({ show, onClose }) {
-  const { firestore } = useFirebase();
+  const { firestore, user, userData } = useFirebase();
   const [openCategory, setOpenCategory] = useState(null);
   const [menus, setMenus] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const toggleCategory = (index) => {
     setOpenCategory(openCategory === index ? null : index);
@@ -67,7 +68,6 @@ export default function MobileSidebar({ show, onClose }) {
 
         if (imageIds.length) {
           const imageResults = await fetchImages(imageIds, firestore);
-          // Note: Images are not used in MobileSidebar, but fetched for consistency
         }
       } catch (err) {
         console.error('Failed to fetch menus:', err);
@@ -77,40 +77,50 @@ export default function MobileSidebar({ show, onClose }) {
       }
     };
 
+    const fetchUserData = async () => {
+      if (user && firestore) {
+        try {
+          const userDoc = await getDoc(doc(firestore, 'users', user.uid));
+          if (userDoc.exists()) {
+            setIsAdmin(userDoc.data().isAdmin || false);
+          }
+        } catch (err) {
+          console.error('Failed to fetch user data:', err);
+        }
+      }
+    };
+
     fetchMenus();
-  }, [firestore]);
+    fetchUserData();
+  }, [firestore, user]);
 
   if (isLoading) {
-    return null; // Prevent rendering until data is fetched
+    return null;
   }
 
   return (
     <>
-      {/* Overlay */}
       <div
         className={`sidebar-overlay ${show ? 'show' : ''}`}
         onClick={onClose}
       ></div>
 
-      {/* Sidebar */}
       <div className={`mobile-sidebar ${show ? 'open' : ''}`}>
         <div className="bg-secondary text-white d-flex align-items-center justify-content-between px-3" style={{ height: '65px' }}>
           <div className="d-flex align-items-center gap-2">
             <i className="bi bi-person-circle fs-4 me-2"></i>
-            <span className="fw-semibold">ASHISH KUMAR</span>
+            <span className="fw-semibold">{userData?.name || 'Guest'}</span>
           </div>
           <button className="btn btn-close btn-sm btn-close-white" onClick={onClose}></button>
         </div>
 
         <ul className="list-unstyled m-0 p-0">
-          {/* Home */}
           <li className="px-3 py-3 border-bottom">
             <Link to="/" onClick={onClose} className="d-flex align-items-center text-decoration-none text-dark">
               <i className="bi bi-house-door me-3"></i> <span>Home</span>
             </Link>
           </li>
 
-          {/* Shop Categories (Collapsible) */}
           <li className="border-bottom">
             <button
               className="btn w-100 px-3 py-3 d-flex align-items-center justify-content-between text-start bg-light fw-semibold"
@@ -151,7 +161,6 @@ export default function MobileSidebar({ show, onClose }) {
             )}
           </li>
 
-          {/* Collections (Collapsible) */}
           <li className="border-bottom">
             <button
               className="btn w-100 px-3 py-3 d-flex align-items-center justify-content-between text-start bg-light fw-semibold"
@@ -192,7 +201,6 @@ export default function MobileSidebar({ show, onClose }) {
             )}
           </li>
 
-          {/* Custom Poster */}
           <li className="px-3 py-3 border-bottom">
             <Link
               to="/custom"
@@ -203,18 +211,6 @@ export default function MobileSidebar({ show, onClose }) {
             </Link>
           </li>
 
-          {/* Product Request */}
-          <li className="px-3 py-3 border-bottom">
-            <Link
-              to="/products"
-              onClick={onClose}
-              className="d-flex align-items-center text-decoration-none text-dark"
-            >
-              <i className="bi bi-box2-heart me-3"></i> <span>Products</span>
-            </Link>
-          </li>
-
-          {/* Account Section Items */}
           <li className="px-3 py-2 border-bottom">
             <Link
               to="/account"
@@ -240,14 +236,35 @@ export default function MobileSidebar({ show, onClose }) {
               <i className="bi bi-cart3 me-3"></i>
               <span>My Cart</span>
             </Link>
-            <Link
-              to="/wishlist"
-              onClick={onClose}
-              className="d-flex align-items-center text-decoration-none text-dark py-3"
-            >
-              <i className="bi bi-heart me-3"></i>
-              <span>My Wishlist</span>
-            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                onClick={onClose}
+                className="d-flex align-items-center text-decoration-none text-dark py-3"
+              >
+                <i className="bi bi-shield-lock me-3"></i>
+                <span>Admin Dashboard</span>
+              </Link>
+            )}
+            {userData?.isSeller ? (
+              <Link
+                to="/seller"
+                onClick={onClose}
+                className="d-flex align-items-center text-decoration-none text-dark py-3"
+              >
+                <i className="bi bi-shop me-3"></i>
+                <span>Seller Dashboard</span>
+              </Link>
+            ) : (
+              <Link
+                to="/account/become-seller"
+                onClick={onClose}
+                className="d-flex align-items-center text-decoration-none text-dark py-3"
+              >
+                <i className="bi bi-briefcase me-3"></i>
+                <span>Sell Your Design</span>
+              </Link>
+            )}
           </li>
         </ul>
       </div>

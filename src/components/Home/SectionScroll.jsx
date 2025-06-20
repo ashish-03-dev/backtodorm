@@ -40,7 +40,10 @@ export default function SectionScroll({ sectionId, title, firestore }) {
           return;
         }
 
-        const posterIds = section.posterIds?.slice(0, 10) || [];
+        const posterIds = section.posterIds
+          ?.slice(0, 10)
+          .filter(id => typeof id === 'string' && id.trim() !== '') || [];
+
         if (!posterIds.length) {
           setPosters([]);
           setIsLoading(false);
@@ -63,9 +66,9 @@ export default function SectionScroll({ sectionId, title, firestore }) {
               const badges = Array.isArray(data.badges) ? data.badges : [];
               const minPriceSize = sizes.length
                 ? sizes.reduce(
-                  (min, size) => (size.finalPrice < min.finalPrice ? size : min),
-                  sizes[0]
-                )
+                    (min, size) => (size.finalPrice < min.finalPrice ? size : min),
+                    sizes[0]
+                  )
                 : { price: 0, finalPrice: 0, size: '' };
 
               return {
@@ -113,7 +116,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
 
   const handleAddToCart = (poster, e) => {
     e.preventDefault();
-    e.stopPropagation(); // Prevent the Link's navigation
+    e.stopPropagation();
     if (!poster.defaultSize) {
       alert('No size available for this poster.');
       return;
@@ -122,13 +125,14 @@ export default function SectionScroll({ sectionId, title, firestore }) {
     const cartItem = {
       posterId: poster.id,
       title: poster.title,
-      selectedSize: poster.defaultSize,
+      size: poster.defaultSize,
       price: poster.price,
       seller: poster.seller,
-      image: poster.image,
+      image: poster.image || 'https://via.placeholder.com/60',
     };
 
-    addToCart(cartItem);
+    addToCart(cartItem, false);
+    console.log('Added to cart:', cartItem);
   };
 
   const SkeletonCard = () => (
@@ -322,12 +326,11 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                   </div>
                 </Link>
                 <button
-                  className="btn btn-dark mx-3 mb-3"
+                  className="btn btn-dark mb-3"
                   onClick={(e) => {
-                    console.log("button added");
-                    handleAddToCart(item, e)
-                  }
-                  }
+                    console.log('button added');
+                    handleAddToCart(item, e);
+                  }}
                 >
                   Add to Cart
                 </button>

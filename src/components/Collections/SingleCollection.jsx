@@ -94,13 +94,50 @@ export default function SingleCollection() {
   }, [firestore, collectionId]);
 
   const handleBuyAll = () => {
-    if (!collection?.posters?.length) return;
-    addToCart(collection.posters, collection.id, collection.discount);
+    if (!collection?.posters?.length) {
+      setError("No posters available to add to cart.");
+      return;
+    }
+    addToCart(
+      {
+        type: "collection",
+        collectionId: collection.id,
+        posters: collection.posters.map((poster) => ({
+          posterId: poster.posterId,
+          title: poster.title,
+          image: poster.image,
+          size: poster.selectedSize,
+          price: poster.price,
+          seller: poster.seller,
+        })),
+        quantity: 1,
+        collectionDiscount: collection.discount,
+      },
+      true,
+      collection.id,
+      collection.discount
+    );
     console.log("Buy Full Pack clicked for collection:", collection.id, collection.posters);
   };
 
   const handleAddToCart = (poster) => {
-    addToCart([poster]); // Add single poster without collection discount
+    if (!poster) {
+      setError("Invalid poster selected.");
+      return;
+    }
+    addToCart(
+      {
+        type: "poster",
+        posterId: poster.posterId,
+        title: poster.title,
+        image: poster.image,
+        size: poster.selectedSize,
+        price: poster.price,
+        seller: poster.seller,
+        quantity: 1,
+      },
+      false
+    );
   };
 
   if (loading) return <div>Loading...</div>;

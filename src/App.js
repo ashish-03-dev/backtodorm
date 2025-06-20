@@ -24,7 +24,6 @@ import ProfileInfo from './components/Account/ProfileInfo';
 import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
-import Wishlist from './components/Wishlist';
 import BecomeSeller from './components/Account/BecomeSeller';
 import SellerLayout from './components/Seller/SellerLayout';
 import SellerDashboard from './components/Seller/SellerDashboard';
@@ -62,7 +61,6 @@ function App() {
             <Route path="settings" element={<SellerSettings />} />
           </Route>
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/wishlist" element={<Wishlist />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<AdminLayout />} >

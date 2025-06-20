@@ -21,7 +21,7 @@ export default function NavbarComponent({ cartItems = [], removeFromCart, update
         role="banner"
         style={{ height: "65px" }}
       >
-        <nav className="col-md-3 d-flex align-items-center">
+        <nav className="col-md-3 d-flex flex-grow-1 align-items-center">
           <button
             className="btn btn-outline-dark d-lg-none me-3"
             onClick={() => setShowSidebar(true)}
