@@ -4,10 +4,9 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useFirebase } from "../../context/FirebaseContext";
 
 export default function SellerLayout() {
-  const { logout, user, userData, loadingUserData } = useFirebase();
+  const { user, userData, loadingUserData } = useFirebase();
   const location = useLocation();
   const navigate = useNavigate();
-  const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
   const [showContentOnMobile, setShowContentOnMobile] = useState(false);
@@ -29,18 +28,6 @@ export default function SellerLayout() {
     const isBaseRoute = baseRoutes.includes(location.pathname);
     setShowContentOnMobile(location.pathname !== "/seller");
   }, [location.pathname, isMobile]);
-
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    setError("");
-    try {
-      await logout();
-      setTimeout(() => navigate("/"), 1000);
-    } catch (err) {
-      setLoggingOut(false);
-      setError(err.message || "Logout failed");
-    }
-  };
 
   const handleSectionClick = (path) => {
     navigate(path);
@@ -86,11 +73,10 @@ export default function SellerLayout() {
                 <ul className="nav flex-column gap-2">
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        !isMobile && (isActive("/seller") || isActive("/seller/dashboard"))
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${!isMobile && (isActive("/seller") || isActive("/seller/dashboard"))
                           ? "fw-bold text-primary bg-light border"
                           : "text-dark"
-                      } sidebar-item`}
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/seller/dashboard")}
                     >
                       <span><i className="bi bi-house me-2"></i>Dashboard</span>
@@ -99,9 +85,8 @@ export default function SellerLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/seller/products") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/seller/products") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/seller/products")}
                     >
                       <span><i className="bi bi-image me-2"></i>My Products</span>
@@ -110,9 +95,8 @@ export default function SellerLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/seller/sales") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/seller/sales") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/seller/sales")}
                     >
                       <span><i className="bi bi-cart-check me-2"></i>Sales History</span>
@@ -121,9 +105,8 @@ export default function SellerLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/seller/payouts") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/seller/payouts") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/seller/payouts")}
                     >
                       <span><i className="bi bi-wallet2 me-2"></i>Payouts</span>
@@ -132,9 +115,8 @@ export default function SellerLayout() {
                   </li>
                   <li className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${
-                        isActive("/seller/settings") ? "fw-bold text-primary bg-light border" : "text-dark"
-                      } sidebar-item`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${isActive("/seller/settings") ? "fw-bold text-primary bg-light border" : "text-dark"
+                        } sidebar-item`}
                       onClick={() => handleSectionClick("/seller/settings")}
                     >
                       <span><i className="bi bi-gear me-2"></i>Settings</span>
@@ -142,20 +124,12 @@ export default function SellerLayout() {
                     </div>
                   </li>
                 </ul>
-                <button
-                  className="btn btn-danger w-100"
-                  disabled={loggingOut}
-                  onClick={handleLogout}
-                >
-                  {loggingOut ? "Logging out..." : "Logout"}
-                </button>
               </div>
             </div>
           )}
           <div
-            className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${
-              showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
-            }`}
+            className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+              }`}
             style={{ maxWidth: "100%", overflow: "auto" }}
           >
             {error && <div className="alert alert-danger">{error}</div>}
