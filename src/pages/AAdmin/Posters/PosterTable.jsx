@@ -9,7 +9,6 @@ const PosterTable = ({
   onDelete,
   onApprove,
   onReject,
-  onSubmit,
 }) => (
   <div className="table-responsive">
     <table className="table table-hover table-bordered align-middle">
@@ -119,16 +118,6 @@ const PosterTable = ({
                       >
                         Delete
                       </Button>
-                      {p.source === "tempPosters" && p.approved !== "approved" && (
-                        <Button
-                          variant="info"
-                          size="sm"
-                          onClick={() => onSubmit(p.id)}
-                          aria-label={`Submit poster ${p.title || "Untitled"} for review`}
-                        >
-                          Submit
-                        </Button>
-                      )}
                     </>
                   )}
                 </div>

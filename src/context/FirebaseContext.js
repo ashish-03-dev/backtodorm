@@ -17,7 +17,7 @@ import { getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where,
 import { getDatabase, set, ref } from 'firebase/database';
 import { getStorage } from 'firebase/storage'; // Add this import
 import { app } from '../firebase';
-import { getFunctions} from "firebase/functions";
+import { getFunctions } from "firebase/functions";
 
 const FirebaseContext = createContext(null);
 export const useFirebase = () => useContext(FirebaseContext);
@@ -27,7 +27,8 @@ export const FirebaseProvider = (props) => {
   const firestore = getFirestore(app);
   const db = getDatabase(app);
   const storage = getStorage(app); // Initialize Storage
-const functions = getFunctions(app, "us-central1");
+  const functions = getFunctions(app, "asia-south1");
+  console.log("Functions instance initialized:", functions);
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loadingUserData, setLoadingUserData] = useState(true);

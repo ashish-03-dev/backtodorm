@@ -8,7 +8,7 @@ import {
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, deleteObject } from "firebase/storage";
 
 // Helper function to normalize text for keywords
 const normalizeText = (text) => {
@@ -131,7 +131,42 @@ export const addPoster = async (firestore, storage, posterData) => {
   }
 };
 
+// Submit a poster for review
+export const submitPoster = async (firestore, posterId, collectionName = "tempPosters") => {
+  try {
+    const posterRef = doc(firestore, collectionName, posterId);
+    const posterDoc = await getDoc(posterRef);
+    if (!posterDoc.exists()) throw new Error("Poster not found");
+    const sellerUsername = posterDoc.data().sellerUsername;
 
+    await runTransaction(firestore, async (transaction) => {
+      transaction.update(posterRef, {
+        approved: "pending",
+        updatedAt: serverTimestamp(),
+      });
+
+      const sellerRef = doc(firestore, "sellers", sellerUsername);
+      const sellerDoc = await transaction.get(sellerRef);
+      if (sellerDoc.exists()) {
+        const tempPosters = sellerDoc.data().tempPosters || [];
+        const updatedTempPosters = tempPosters.map((p) =>
+          p.posterId === posterId
+            ? { ...p, status: "pending" }
+            : p
+        );
+        transaction.update(sellerRef, {
+          tempPosters: updatedTempPosters,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error submitting poster:", error);
+    return { success: false, error: error.message };
+  }
+};
 
 // Update an existing poster
 export const updatePoster = async (firestore, posterData, posterId, collectionName = "tempPosters") => {
@@ -232,7 +267,6 @@ export const updatePoster = async (firestore, posterData, posterId, collectionNa
   }
 };
 
-
 // Delete a poster
 export const deletePoster = async (firestore, storage, posterId, collectionName = "tempPosters") => {
   try {
@@ -289,43 +323,6 @@ export const deletePoster = async (firestore, storage, posterId, collectionName 
     return { success: true };
   } catch (error) {
     console.error("🔥 Error deleting poster in Firebase:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-// Submit a poster for review
-export const submitPoster = async (firestore, posterId, collectionName = "tempPosters") => {
-  try {
-    const posterRef = doc(firestore, collectionName, posterId);
-    const posterDoc = await getDoc(posterRef);
-    if (!posterDoc.exists()) throw new Error("Poster not found");
-    const sellerUsername = posterDoc.data().sellerUsername;
-
-    await runTransaction(firestore, async (transaction) => {
-      transaction.update(posterRef, {
-        approved: "pending",
-        updatedAt: serverTimestamp(),
-      });
-
-      const sellerRef = doc(firestore, "sellers", sellerUsername);
-      const sellerDoc = await transaction.get(sellerRef);
-      if (sellerDoc.exists()) {
-        const tempPosters = sellerDoc.data().tempPosters || [];
-        const updatedTempPosters = tempPosters.map((p) =>
-          p.posterId === posterId
-            ? { ...p, status: "pending" }
-            : p
-        );
-        transaction.update(sellerRef, {
-          tempPosters: updatedTempPosters,
-          updatedAt: serverTimestamp(),
-        });
-      }
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error submitting poster:", error);
     return { success: false, error: error.message };
   }
 };

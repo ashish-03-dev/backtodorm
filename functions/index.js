@@ -4,84 +4,124 @@ const admin = require("firebase-admin");
 const cloudinary = require("cloudinary").v2;
 
 admin.initializeApp();
-const firestore = admin.firestore();
+const db = admin.firestore();
 const storage = admin.storage().bucket();
 
-const CLOUDINARY_CLOUD_NAME = defineSecret("CLOUDINARY_CLOUD_NAME");
-const CLOUDINARY_API_KEY = defineSecret("CLOUDINARY_API_KEY");
-const CLOUDINARY_API_SECRET = defineSecret("CLOUDINARY_API_SECRET");
+// Cloudinary secrets
+const CLOUDINARY_SECRETS = [
+  defineSecret("CLOUDINARY_CLOUD_NAME"),
+  defineSecret("CLOUDINARY_API_KEY"),
+  defineSecret("CLOUDINARY_API_SECRET"),
+];
 
 exports.approvePoster = onCall(
   {
-    secrets: [CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET],
-    region: "us-central1",
+    secrets: CLOUDINARY_SECRETS,
+    region: "asia-south1",
     timeoutSeconds: 120,
     concurrency: 80,
-    cors: ["http://localhost:3000", "https://back-to-dorm.web.app"], // Adjust production URL
   },
-  async (request) => {
-    const { posterId } = request.data;
-    const { auth } = request.context;
-    const logMeta = {
-      posterId,
-      userId: auth?.uid,
-      timestamp: new Date().toISOString(),
-    };
-    console.log("approvePoster invoked", logMeta);
+  async ({ data: { posterId }, auth }) => {
+    if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
 
-    if (!auth) {
-      console.error("Unauthenticated request", logMeta);
-      throw new HttpsError("unauthenticated", "Authentication required");
-    }
-
-    const userDoc = await firestore.collection("users").doc(auth.uid).get();
-    if (!userDoc.exists || !userDoc.data().isAdmin) {
-      console.error("Non-admin access attempt", { ...logMeta, isAdmin: userDoc.data()?.isAdmin });
+    // Validate admin access
+    const user = await db.collection("users").doc(auth.uid).get();
+    if (!user.exists || !user.data().isAdmin) {
       throw new HttpsError("permission-denied", "Admin access required");
     }
 
-    if (!posterId) {
-      console.error("Missing posterId", logMeta);
-      throw new HttpsError("invalid-argument", "Poster ID is required");
+    // Validate input
+    if (!posterId) throw new HttpsError("invalid-argument", "Poster ID is required");
+
+    // Validate secrets
+    const [cloudName, apiKey, apiSecret] = CLOUDINARY_SECRETS.map((s) => s.value());
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new HttpsError("failed-precondition", "Cloudinary secrets not configured");
     }
 
-    const tempPosterRef = firestore.collection("tempPosters").doc(posterId);
-    const tempPosterDoc = await tempPosterRef.get();
-    if (!tempPosterDoc.exists) {
-      console.error("Poster not found", logMeta);
-      throw new HttpsError("not-found", "Poster not found");
-    }
+    // Configure Cloudinary
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
 
-    const posterData = tempPosterDoc.data();
-    let imageUrl = posterData.originalImageUrl || "";
-    if (posterData.originalImageUrl) {
+    // Get temp poster
+    const tempPosterRef = db.collection("tempPosters").doc(posterId);
+    const tempPoster = await tempPosterRef.get();
+    if (!tempPoster.exists) throw new HttpsError("not-found", "Poster not found");
+
+    const posterData = tempPoster.data();
+    let imageUrl = posterData.originalImageUrl;
+
+    // Process image
+    if (imageUrl) {
       try {
-        const file = storage.file(posterData.originalImageUrl);
+        const file = storage.file(imageUrl);
         const [buffer] = await file.download();
-        const cloudinaryResult = await cloudinary.uploader.upload(
+        const result = await cloudinary.uploader.upload(
           `data:image/jpeg;base64,${buffer.toString("base64")}`,
-          { folder: "posters", public_id: `${posterId}_${Date.now()}` }
+          { folder: "posters", public_id: `${posterId}_${Date.now()}`, timeout: 120000 }
         );
-        imageUrl = cloudinaryResult.secure_url;
-        await file.delete();
+        if (result.secure_url) {
+          imageUrl = result.secure_url;
+          await file.delete();
+        }
       } catch (error) {
-        console.warn("Image processing failed", { ...logMeta, error: error.message });
+        console.warn("Cloudinary upload failed, using Storage URL", error.message);
       }
+    } else {
+      throw new HttpsError("invalid-argument", "Image URL missing");
     }
 
-    await firestore.runTransaction(async (transaction) => {
-      const finalPosterRef = firestore.collection("posters").doc(posterId);
-      transaction.set(finalPosterRef, {
+    // Update Firestore in transaction
+    await db.runTransaction(async (t) => {
+      const sellerRef = db.collection("sellers").doc(posterData.sellerUsername);
+      const collectionRefs = (posterData.collections || []).map((col) =>
+        db.collection("collections").doc(col)
+      );
+
+      const [seller, ...collections] = await Promise.all([
+        t.get(sellerRef),
+        ...collectionRefs.map((ref) => t.get(ref)),
+      ]);
+
+      // Update poster
+      t.set(db.collection("posters").doc(posterId), {
         ...posterData,
         imageUrl,
         originalImageUrl: null,
         approved: "approved",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      transaction.delete(tempPosterRef);
+      t.delete(tempPosterRef);
+
+      // Update collections
+      collections.forEach((col, i) => {
+        if (col.exists && !col.data().posterIds?.includes(posterId)) {
+          t.update(collectionRefs[i], {
+            posterIds: admin.firestore.FieldValue.arrayUnion(posterId),
+          });
+        }
+      });
+
+      // Update seller
+      const approvedPoster = {
+        posterId,
+        createdAt: posterData.createdAt || new Date().toISOString(),
+      };
+      if (seller.exists) {
+        t.update(sellerRef, {
+          tempPosters: admin.firestore.FieldValue.arrayRemove({ posterId }),
+          approvedPosters: admin.firestore.FieldValue.arrayUnion(approvedPoster),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        t.set(sellerRef, {
+          sellerUsername: posterData.sellerUsername,
+          tempPosters: [],
+          approvedPosters: [approvedPoster],
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     });
 
-    console.log("Poster approved", logMeta);
     return { success: true, posterId, imageUrl };
   }
 );

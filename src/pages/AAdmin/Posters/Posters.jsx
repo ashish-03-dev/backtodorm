@@ -144,9 +144,7 @@ const Posters = () => {
         return;
       }
       const approvePosterFn = httpsCallable(functions, "approvePoster");
-      console.log("Calling approvePoster", { userId: user.uid, posterId: id });
       const result = await approvePosterFn({ posterId: id });
-      console.log("approvePoster result", result.data);
 
       if (result.data.success) {
         setTempPosters((prev) =>
@@ -165,13 +163,6 @@ const Posters = () => {
     const result = await rejectPoster(firestore, storage, id);
     if (!result.success) {
       setError("Failed to reject poster: " + result.error);
-    }
-  };
-
-  const submitPosterHandler = async (id) => {
-    const result = await submitPoster(firestore, id, "tempPosters");
-    if (!result.success) {
-      setError("Failed to submit poster: " + result.error);
     }
   };
 
@@ -275,7 +266,6 @@ const Posters = () => {
             onDelete={deletePosterHandler}
             onApprove={approvePosterHandler}
             onReject={rejectPosterHandler}
-            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="all" title="📋 All Posters">
@@ -291,7 +281,6 @@ const Posters = () => {
             onDelete={deletePosterHandler}
             onApprove={approvePosterHandler}
             onReject={rejectPosterHandler}
-            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="inactive" title="🔒 Inactive">
@@ -308,7 +297,6 @@ const Posters = () => {
             onDelete={deletePosterHandler}
             onApprove={approvePosterHandler}
             onReject={rejectPosterHandler}
-            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="pending" title="⏳ Pending Approval">
@@ -325,7 +313,6 @@ const Posters = () => {
             onDelete={deletePosterHandler}
             onApprove={approvePosterHandler}
             onReject={rejectPosterHandler}
-            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="rejected" title="🚫 Rejected">
@@ -342,7 +329,6 @@ const Posters = () => {
             onDelete={deletePosterHandler}
             onApprove={approvePosterHandler}
             onReject={rejectPosterHandler}
-            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="collections" title="📦 Collections">
@@ -352,7 +338,6 @@ const Posters = () => {
             onDelete={deletePosterHandler}
             onApprove={approvePosterHandler}
             onReject={rejectPosterHandler}
-            onSubmit={submitPosterHandler}
           />
         </Tab>
       </Tabs>
