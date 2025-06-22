@@ -5,25 +5,29 @@ import PosterFilter from "./PosterFilter";
 import PosterForm from "./PosterForm";
 import PosterView from "./PosterView";
 import CollectionsManager from "./CollectionsManager";
-import TagManager from "./TagManager";
-import { addPosterToFirebase, updatePosterInFirebase, approvePosterInFirebase, rejectPosterInFirebase, deletePosterInFirebase, submitPosterInFirebase } from "../firebaseUtils";
 import { useFirebase } from "../../../context/FirebaseContext";
 import { useNavigate } from "react-router-dom";
 import { collection, onSnapshot } from "firebase/firestore";
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
+import { addPoster, updatePoster, deletePoster, submitPoster } from "../../../components/Seller/sellerUtils";
+import { rejectPoster } from "../firebaseUtils";
+import { ref, getDownloadURL } from "firebase/storage"; // Import Storage functions
+import "bootstrap/dist/css/bootstrap.min.css";
 import "../../../styles/SellerComponents.css";
 
+
 const Posters = () => {
-  const { firestore, user, userData, loadingUserData } = useFirebase();
+  const { firestore, functions, user, userData, storage, loadingUserData } = useFirebase();
   const navigate = useNavigate();
   const [posters, setPosters] = useState([]);
+  const [tempPosters, setTempPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ search: "", approved: "" });
   const [tabFilters, setTabFilters] = useState({
     recent: { search: "" },
-    drafts: { search: "" },
+    inactive: { search: "" },
     pending: { search: "" },
-    published: { search: "" },
     rejected: { search: "" },
     collections: { search: "" },
   });
@@ -37,35 +41,80 @@ const Posters = () => {
   useEffect(() => {
     if (loadingUserData) return;
     if (!user || !userData?.isAdmin) {
+      console.log("Redirecting: Not an admin or not logged in", { user, userData });
       navigate("/login", { replace: true });
     }
   }, [user, userData, loadingUserData, navigate]);
 
-  // Fetch posters
+  // Fetch posters and tempPosters with image URLs
   useEffect(() => {
-    if (!firestore) {
-      console.error("Firestore instance is undefined. Check useFirebase context.");
-      setError("Firestore is not available.");
+    if (!firestore || !storage) {
+      console.error("Firestore or Storage instance is undefined");
+      setError("Firestore or Storage is not available.");
       setLoading(false);
       return;
     }
-    const unsubscribe = onSnapshot(
+
+    const unsubscribePosters = onSnapshot(
       collection(firestore, "posters"),
       (snapshot) => {
-        setPosters(snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })));
+        setPosters(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            source: "posters",
+          }))
+        );
         setLoading(false);
       },
       (error) => {
-        console.error("Error fetching posters from Firestore:", error);
+        console.error("Error fetching posters:", error);
         setError(`Failed to fetch posters: ${error.message}`);
         setLoading(false);
       }
     );
-    return () => unsubscribe();
-  }, [firestore]);
+
+
+    const unsubscribeTempPosters = onSnapshot(
+      collection(firestore, "tempPosters"),
+      async (snapshot) => {
+        const tempPostersData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          source: "tempPosters",
+        }));
+
+        // Fetch download URLs for tempPosters
+        const tempPostersWithUrls = await Promise.all(
+          tempPostersData.map(async (poster) => {
+            if (poster.originalImageUrl) {
+              try {
+                const imageRef = ref(storage, poster.originalImageUrl);
+                const imageUrl = await getDownloadURL(imageRef);
+                return { ...poster, imageUrl };
+              } catch (err) {
+                console.warn(`Failed to load image URL for poster ${poster.id}:`, err.message);
+                return poster; // Return poster without imageUrl if fetch fails
+              }
+            }
+            return poster;
+          })
+        );
+
+        setTempPosters(tempPostersWithUrls);
+      },
+      (error) => {
+        console.error("Error fetching temp posters:", error);
+        setError(`Failed to fetch temp posters: ${error.message}`);
+      }
+    );
+
+    return () => {
+      unsubscribePosters();
+      unsubscribeTempPosters();
+    };
+  }, [firestore, storage]);
+
 
   // Poster management functions
   const openEdit = (poster = null) => {
@@ -78,42 +127,62 @@ const Posters = () => {
     setShowViewModal(true);
   };
 
-  const deletePoster = async (id) => {
+  const deletePosterHandler = async (id, collectionName = "tempPosters") => {
     if (window.confirm("Delete this poster?")) {
-      const result = await deletePosterInFirebase(firestore, id);
+      const result = await deletePoster(firestore, storage, id, collectionName);
       if (!result.success) {
         setError("Failed to delete poster: " + result.error);
       }
     }
   };
 
-  const approvePoster = async (id) => {
-    const result = await approvePosterInFirebase(firestore, id);
-    if (!result.success) {
-      setError("Failed to approve poster: " + result.error);
+  const approvePosterHandler = async (id) => {
+    try {
+      if (!user) {
+        console.error("No authenticated user", { user });
+        setError("User not authenticated");
+        return;
+      }
+      const approvePosterFn = httpsCallable(functions, "approvePoster");
+      console.log("Calling approvePoster", { userId: user.uid, posterId: id });
+      const result = await approvePosterFn({ posterId: id });
+      console.log("approvePoster result", result.data);
+
+      if (result.data.success) {
+        setTempPosters((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, approved: "approved" } : p))
+        );
+      } else {
+        setError("Approval failed: " + (result.data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Approval error", { code: error.code, message: error.message, details: error.details });
+      setError(`Approval failed: ${error.message} (Code: ${error.code})`);
     }
   };
 
-  const rejectPoster = async (id) => {
-    const result = await rejectPosterInFirebase(firestore, id);
+  const rejectPosterHandler = async (id) => {
+    const result = await rejectPoster(firestore, storage, id);
     if (!result.success) {
       setError("Failed to reject poster: " + result.error);
     }
   };
 
-  const submitPoster = async (id) => {
-    const result = await submitPosterInFirebase(firestore, id);
+  const submitPosterHandler = async (id) => {
+    const result = await submitPoster(firestore, id, "tempPosters");
     if (!result.success) {
       setError("Failed to submit poster: " + result.error);
     }
   };
 
   const savePosterHandler = async (data, posterId) => {
+    console.log("Saving poster:", { data, posterId });
     const isUpdate = !!editing;
     try {
+      const collectionName = editing?.source === "posters" ? "posters" : "tempPosters";
       const result = isUpdate
-        ? await updatePosterInFirebase(firestore, data, posterId)
-        : await addPosterToFirebase(firestore, data, posterId);
+        ? await updatePoster(firestore, data, posterId, collectionName)
+        : await addPoster(firestore, storage, data);
       if (result.success) {
         setShowEditModal(false);
         setEditing(null);
@@ -121,6 +190,7 @@ const Posters = () => {
         setError("Failed to save poster: " + result.error);
       }
     } catch (error) {
+      console.error("Error saving poster:", error);
       setError("Failed to save poster: " + error.message);
     }
   };
@@ -139,37 +209,34 @@ const Posters = () => {
   };
 
   const recentList = applySearchFilter(
-    [...posters].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5),
+    [...posters, ...tempPosters]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5),
     tabFilters.recent.search
   );
-  const allFiltered = posters.filter(
-    (p) =>
-      (filter.approved === "" || p.approved === filter.approved) &&
-      (filter.search === "" ||
-        p.keywords?.some((keyword) =>
-          keyword.toLowerCase().includes(filter.search.toLowerCase())
-        ))
+  const allFiltered = applySearchFilter(
+    [...posters, ...tempPosters],
+    filter.search
   );
-  const draftsList = applySearchFilter(
-    posters.filter((p) => p.approved === "draft"),
-    tabFilters.drafts.search
+  const inactiveList = applySearchFilter(
+    posters.filter((p) => !p.isActive && p.approved === "approved"),
+    tabFilters.inactive.search
   );
   const pendingList = applySearchFilter(
-    posters.filter((p) => p.approved === "pending"),
+    tempPosters.filter((p) => p.approved === "pending"),
     tabFilters.pending.search
   );
-  const publishedList = applySearchFilter(
-    posters.filter((p) => p.approved === "approved"),
-    tabFilters.published.search
-  );
   const rejectedList = applySearchFilter(
-    posters.filter((p) => p.approved === "rejected"),
+    tempPosters.filter((p) => p.approved === "rejected"),
     tabFilters.rejected.search
   );
 
   if (loadingUserData || loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ minHeight: "100vh" }}
+      >
         <Spinner animation="border" className="text-primary" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
@@ -177,12 +244,18 @@ const Posters = () => {
     );
   }
 
-  if (!user || !userData?.isAdmin) return null;
+  if (!user || !userData?.isAdmin) {
+    return null;
+  }
 
   return (
     <div className="container mt-4" style={{ maxWidth: "1400px" }}>
       <h2>🖼️ Posters Management</h2>
-      {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
+      {error && (
+        <Alert variant="danger" onClose={() => setError(null)} dismissible>
+          {error}
+        </Alert>
+      )}
       <Tabs
         id="posters-tabs"
         activeKey={activeTab}
@@ -193,17 +266,16 @@ const Posters = () => {
           <PosterFilter
             filter={tabFilters.recent}
             onFilterChange={(f) => handleTabFilterChange("recent", f)}
-            onAdd={() => openEdit(null)}
             hideApprovedFilter
           />
           <PosterTable
             posters={recentList}
             onEdit={openEdit}
             onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
+            onDelete={deletePosterHandler}
+            onApprove={approvePosterHandler}
+            onReject={rejectPosterHandler}
+            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="all" title="📋 All Posters">
@@ -216,27 +288,27 @@ const Posters = () => {
             posters={allFiltered}
             onEdit={openEdit}
             onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
+            onDelete={deletePosterHandler}
+            onApprove={approvePosterHandler}
+            onReject={rejectPosterHandler}
+            onSubmit={submitPosterHandler}
           />
         </Tab>
-        <Tab eventKey="drafts" title="✏️ Drafts">
+        <Tab eventKey="inactive" title="🔒 Inactive">
           <PosterFilter
-            filter={tabFilters.drafts}
-            onFilterChange={(f) => handleTabFilterChange("drafts", f)}
+            filter={tabFilters.inactive}
+            onFilterChange={(f) => handleTabFilterChange("inactive", f)}
             onAdd={() => openEdit(null)}
             hideApprovedFilter
           />
           <PosterTable
-            posters={draftsList}
+            posters={inactiveList}
             onEdit={openEdit}
             onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
+            onDelete={deletePosterHandler}
+            onApprove={approvePosterHandler}
+            onReject={rejectPosterHandler}
+            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="pending" title="⏳ Pending Approval">
@@ -250,27 +322,10 @@ const Posters = () => {
             posters={pendingList}
             onEdit={openEdit}
             onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
-          />
-        </Tab>
-        <Tab eventKey="published" title="✅ Published">
-          <PosterFilter
-            filter={tabFilters.published}
-            onFilterChange={(f) => handleTabFilterChange("published", f)}
-            onAdd={() => openEdit(null)}
-            hideApprovedFilter
-          />
-          <PosterTable
-            posters={publishedList}
-            onEdit={openEdit}
-            onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
+            onDelete={deletePosterHandler}
+            onApprove={approvePosterHandler}
+            onReject={rejectPosterHandler}
+            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="rejected" title="🚫 Rejected">
@@ -284,41 +339,46 @@ const Posters = () => {
             posters={rejectedList}
             onEdit={openEdit}
             onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
+            onDelete={deletePosterHandler}
+            onApprove={approvePosterHandler}
+            onReject={rejectPosterHandler}
+            onSubmit={submitPosterHandler}
           />
         </Tab>
         <Tab eventKey="collections" title="📦 Collections">
           <CollectionsManager
             onEdit={openEdit}
             onView={openView}
-            onDelete={deletePoster}
-            onApprove={approvePoster}
-            onReject={rejectPoster}
-            onSubmit={submitPoster}
-          />
-        </Tab>
-        <Tab eventKey="tags" title="🏷️ Tags">
-          <TagManager
-            firestore={firestore}
-            userData={userData}
-            loadingUserData={loadingUserData}
+            onDelete={deletePosterHandler}
+            onApprove={approvePosterHandler}
+            onReject={rejectPosterHandler}
+            onSubmit={submitPosterHandler}
           />
         </Tab>
       </Tabs>
 
-      {/* Poster View Modal */}
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg">
+      <Modal
+        show={showViewModal}
+        onHide={() => setShowViewModal(false)}
+        size="lg"
+      >
         <Modal.Header closeButton>
           <Modal.Title>Poster Details</Modal.Title>
         </Modal.Header>
-        <Modal.Body>{viewing && <PosterView poster={viewing} />}</Modal.Body>
+        <Modal.Body>
+          {viewing ? <PosterView poster={viewing} /> : <p>No poster selected</p>}
+        </Modal.Body>
       </Modal>
 
-      {/* Poster Edit Modal */}
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg">
+      <Modal
+        show={showEditModal}
+        onHide={() => {
+          setShowEditModal(false);
+          setEditing(null);
+        }}
+        size="lg"
+        backdrop="static"
+      >
         <Modal.Header closeButton>
           <Modal.Title>{editing ? "Edit Poster" : "Add Poster"}</Modal.Title>
         </Modal.Header>

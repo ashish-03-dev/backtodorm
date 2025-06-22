@@ -15,7 +15,9 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
+import { getStorage } from 'firebase/storage'; // Add this import
 import { app } from '../firebase';
+import { getFunctions} from "firebase/functions";
 
 const FirebaseContext = createContext(null);
 export const useFirebase = () => useContext(FirebaseContext);
@@ -24,6 +26,8 @@ export const FirebaseProvider = (props) => {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
   const db = getDatabase(app);
+  const storage = getStorage(app); // Initialize Storage
+const functions = getFunctions(app, "us-central1");
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
@@ -135,7 +139,7 @@ export const FirebaseProvider = (props) => {
   };
 
   const verifyOtp = (otp) => {
-    if (!confirmationResult) throw new Error("OTP not sent");
+    if (!confirmationResult) throw new Error("OTP not provided");
     return confirmationResult.confirm(otp);
   };
 
@@ -217,6 +221,8 @@ export const FirebaseProvider = (props) => {
       loadingUserData,
       firestore,
       db,
+      storage,
+      functions, // Add storage to context
       putData,
       setUpRecaptcha,
       verifyOtp,

@@ -1,36 +1,62 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Form, Button, Modal } from "react-bootstrap";
-import { doc, getDoc, collection, getDocs, setDoc, query, where } from "firebase/firestore";
+import { Form, Button, Modal, Alert } from "react-bootstrap";
+import { doc, getDoc, collection, getDocs, setDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Select from "react-select";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import { useFirebase } from "../../../context/FirebaseContext";
 
+// Predefined poster sizes with dimensions (300 DPI for print quality)
+const POSTER_SIZES = {
+  A4: { name: "A4", widthPx: 2480, heightPx: 3508, widthCm: 21, heightCm: 29.7, aspectRatio: 2480 / 3508 },
+  A3: { name: "A3", widthPx: 3508, heightPx: 4961, widthCm: 29.7, heightCm: 42, aspectRatio: 3508 / 4961 },
+  "A3*3": { name: "A3*3", widthPx: 3508 * 3, heightPx: 4961, widthCm: 29.7 * 3, heightCm: 42, aspectRatio: (3508 * 3) / 4961 },
+  "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
+};
+
 const PosterForm = ({ poster, onSave }) => {
-  const { firestore, auth } = useFirebase();
+  const { firestore, storage, auth } = useFirebase();
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
   const [idError, setIdError] = useState(null);
-  const [collectionError, setCollectionError] = useState(null);
   const [idChecked, setIdChecked] = useState(!!poster);
+  const [collectionError, setCollectionError] = useState(null);
   const [availableCollections, setAvailableCollections] = useState([]);
-  const [availableTags, setAvailableTags] = useState([]);
+  const [tags, setTags] = useState(poster?.tags?.join(", ") || "");
   const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionError, setNewCollectionError] = useState(null);
   const [selectedCollections, setSelectedCollections] = useState([]);
-  const [selectedTags, setSelectedTags] = useState([]);
-  const [sellerUsername, setSellerUsername] = useState(poster?.sellerUsername || "@");
+  const [sellerUsername, setSellerUsername] = useState(poster?.sellerUsername || "");
   const [sellerName, setSellerName] = useState("");
-  const [sellerId, setSellerId] = useState(poster?.seller || "");
-  const [isSellerValid, setIsSellerValid] = useState(!!poster);
+  const [isSellerValid, setIsSellerValid] = useState(!!poster?.sellerUsername);
+  const [sellerChecked, setSellerChecked] = useState(!!poster?.sellerUsername);
   const [keywords, setKeywords] = useState(poster?.keywords?.join(", ") || "");
   const [showAllKeywords, setShowAllKeywords] = useState(false);
-  const [sizes, setSizes] = useState(
-    Array.isArray(poster?.sizes) && poster.sizes.length > 0
+  const [sizes, setSizes] = useState(() => {
+    const validSizes = Array.isArray(poster?.sizes) && poster.sizes.length > 0
       ? poster.sizes
-      : [{ size: "", price: "" }]
-  );
+          .filter((s) => s.size && POSTER_SIZES[s.size])
+          .map((s) => ({
+            size: s.size,
+            price: s.price?.toString() || "",
+            finalPrice: s.finalPrice?.toString() || "",
+          }))
+      : [{ size: "A4", price: "", finalPrice: "" }];
+    return validSizes;
+  });
+  const [selectedSize, setSelectedSize] = useState(() => {
+    const firstValidSize = sizes.find((s) => POSTER_SIZES[s.size])?.size || "A4";
+    return firstValidSize;
+  });
+  const [crop, setCrop] = useState(null);
+  const [imageSrc, setImageSrc] = useState(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [discount, setDiscount] = useState(poster?.discount?.toString() || "0");
   const formRef = useRef(null);
+  const imgRef = useRef(null);
 
-  // Normalize text for keywords and collections
   const normalizeText = (text) => {
     if (!text) return [];
     const lower = text.toLowerCase().trim();
@@ -42,7 +68,6 @@ const PosterForm = ({ poster, onSave }) => {
     return [...new Set([lower, title, hyphenated])].filter(Boolean);
   };
 
-  // Normalize to hyphenated lowercase
   const normalizeCollection = (text) => {
     if (!text) return "";
     return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -54,8 +79,8 @@ const PosterForm = ({ poster, onSave }) => {
         const collectionsRef = collection(firestore, "collections");
         const snapshot = await getDocs(collectionsRef);
         const collections = snapshot.docs.map((doc) => ({
-          value: doc.id, // e.g., "k-pop"
-          label: doc.data().name, // e.g., "k-pop"
+          value: doc.id,
+          label: doc.data().name,
         }));
         setAvailableCollections(collections);
         if (poster?.collections) {
@@ -70,57 +95,43 @@ const PosterForm = ({ poster, onSave }) => {
       }
     };
 
-    const fetchTags = async () => {
-      try {
-        const tagsRef = collection(firestore, "tags");
-        const snapshot = await getDocs(tagsRef);
-        const tags = snapshot.docs.map((doc) => ({
-          value: doc.id,
-          label: doc.data().name, // e.g., "k-pop"
-        }));
-        setAvailableTags(tags);
-        if (poster?.tags) {
-          const selected = poster.tags.map((tag) => {
-            const existingTag = tags.find((t) => t.value === tag || t.label === tag);
-            return existingTag || { value: tag, label: tag };
-          });
-          setSelectedTags(selected);
-        }
-      } catch (error) {
-        console.error("Error fetching tags:", error);
-      }
-    };
-
     const fetchSellerInfo = async () => {
-      if (poster?.seller && poster?.sellerUsername) {
+      if (sellerUsername) {
         try {
-          const userQuery = query(
-            collection(firestore, "users"),
-            where("sellerUsername", "==", poster.sellerUsername)
-          );
-          const querySnapshot = await getDocs(userQuery);
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
+          const userDoc = await getDoc(doc(firestore, "users", sellerUsername));
+          if (userDoc.exists()) {
             const data = userDoc.data();
             setSellerName(data.name || "Unknown User");
-            setIsSellerValid(!!data.isSeller);
-            setSellerId(userDoc.id);
+            setIsSellerValid(data.isSeller || false);
+            setSellerChecked(true);
           } else {
             setIsSellerValid(false);
+            setSellerName("User not found");
+            setSellerChecked(true);
           }
         } catch (error) {
           console.error("Error fetching seller info:", error);
           setIsSellerValid(false);
+          setSellerName("Error fetching user");
+          setSellerChecked(true);
         }
+      } else {
+        setSellerChecked(false);
       }
     };
 
     if (firestore) {
       fetchCollections();
-      fetchTags();
       fetchSellerInfo();
     }
-  }, [firestore, poster]);
+  }, [firestore, sellerUsername, poster]);
+
+  useEffect(() => {
+    if (!POSTER_SIZES[selectedSize]) {
+      const validSize = sizes.find((s) => POSTER_SIZES[s.size])?.size || "A4";
+      setSelectedSize(validSize);
+    }
+  }, [sizes, selectedSize]);
 
   const checkIdUniqueness = async (posterId) => {
     if (!posterId) {
@@ -139,7 +150,7 @@ const PosterForm = ({ poster, onSave }) => {
       return true;
     }
     try {
-      const docRef = doc(firestore, "posters", posterId);
+      const docRef = doc(firestore, "tempPosters", posterId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         setIdError("Poster ID already exists. Choose a unique ID.");
@@ -159,62 +170,55 @@ const PosterForm = ({ poster, onSave }) => {
   const suggestId = () => {
     const title = formRef.current?.title?.value?.trim();
     if (!title) {
-      alert("Enter a title first to suggest an ID.");
+      setError("Enter a title first to suggest an ID.");
       return;
     }
     const generatedId = `${title
       .toLowerCase()
       .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9\-_]/g, "")}-${Date.now()}`;
+      .replace(/[^a-z0-9-]/g, "")}-${Date.now()}`;
     formRef.current.posterId.value = generatedId;
     checkIdUniqueness(generatedId);
   };
 
-  const checkSellerUsername = async (username) => {
-    if (!username || username.length <= 1) {
+  const checkSellerUsername = async () => {
+    const inputSellerUsername = formRef.current?.seller?.value?.trim();
+    if (!inputSellerUsername) {
+      setError("Please enter a Seller Username to check.");
       setIsSellerValid(false);
-      setSellerName("");
-      setSellerId("");
-      return false;
-    }
-    if (!username.startsWith("@")) {
-      setIsSellerValid(false);
-      setSellerName("");
-      setSellerId("");
-      return false;
+      setSellerChecked(false);
+      return;
     }
     try {
-      const userQuery = query(
-        collection(firestore, "users"),
-        where("sellerUsername", "==", username)
-      );
-      const querySnapshot = await getDocs(userQuery);
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
+      const userDoc = await getDoc(doc(firestore, "users", inputSellerUsername));
+      if (userDoc.exists()) {
         const data = userDoc.data();
         if (data.isSeller) {
+          setSellerUsername(inputSellerUsername);
           setSellerName(data.name || "Unknown User");
           setIsSellerValid(true);
-          setSellerId(userDoc.id);
-          return true;
+          setSellerChecked(true);
+        } else {
+          setSellerName("User is not a seller");
+          setIsSellerValid(false);
+          setSellerChecked(true);
         }
+      } else {
+        setSellerName("User not found");
+        setIsSellerValid(false);
+        setSellerChecked(true);
       }
-      setIsSellerValid(false);
-      setSellerName("");
-      setSellerId("");
-      return false;
     } catch (error) {
       console.error("Error checking seller username:", error);
+      setSellerName("Error checking seller username");
       setIsSellerValid(false);
-      setSellerName("");
-      setSellerId("");
-      return false;
+      setSellerChecked(true);
     }
   };
 
   const insertUserId = async () => {
     if (!auth) {
-      alert("Authentication is not initialized. Please check Firebase setup.");
+      setError("Authentication is not initialized. Please check Firebase setup.");
       return;
     }
     const user = auth.currentUser;
@@ -225,55 +229,29 @@ const PosterForm = ({ poster, onSave }) => {
           const data = userDoc.data();
           if (data.isSeller && data.sellerUsername) {
             setSellerUsername(data.sellerUsername);
-            formRef.current.seller.value = data.sellerUsername;
             setSellerName(data.name || "Unknown User");
             setIsSellerValid(true);
-            setSellerId(user.uid);
+            setSellerChecked(true);
           } else {
-            alert("You are not registered as a seller. Please become a seller first.");
+            setError("You are not registered as a seller. Please become a seller first.");
+            setIsSellerValid(false);
+            setSellerChecked(true);
           }
         } else {
-          alert("User data not found.");
+          setError("User data not found.");
+          setIsSellerValid(false);
+          setSellerChecked(true);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        alert("Failed to fetch user data: " + error.message);
+        setError("Failed to fetch user data: " + error.message);
+        setIsSellerValid(false);
+        setSellerChecked(true);
       }
     } else {
-      alert("No user is currently signed in.");
-    }
-  };
-
-  const handleSellerUsernameChange = (e) => {
-    let value = e.target.value;
-    if (!value.startsWith("@")) {
-      value = "@" + value.replace(/^@+/, "");
-    }
-    setSellerUsername(value);
-    setIsSellerValid(false);
-    setSellerName("");
-    setSellerId("");
-  };
-
-  const handleTagChange = async (selectedOptions) => {
-    setSelectedTags(selectedOptions || []);
-    for (const option of selectedOptions || []) {
-      if (!availableTags.some((tag) => tag.value === option.value)) {
-        try {
-          const newTagName = normalizeCollection(option.label.trim());
-          if (!newTagName || availableTags.some((tag) => tag.label === newTagName)) {
-            continue;
-          }
-          const newTagId = doc(collection(firestore, "tags")).id;
-          await setDoc(doc(firestore, "tags", newTagId), { name: newTagName });
-          setAvailableTags((prev) => [
-            ...prev,
-            { value: newTagId, label: newTagName },
-          ]);
-        } catch (error) {
-          console.error("Error adding new tag:", error);
-        }
-      }
+      setError("No user is currently signed in.");
+      setIsSellerValid(false);
+      setSellerChecked(true);
     }
   };
 
@@ -281,13 +259,13 @@ const PosterForm = ({ poster, onSave }) => {
     const form = formRef.current;
     const title = form?.title?.value?.trim() || "";
     const description = form?.description?.value?.trim() || "";
-    const tags = selectedTags.map((t) => t.label);
+    const tagArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
     const collections = selectedCollections.map((col) => col.label);
     const stopWords = new Set(["a", "an", "the", "and", "or", "but", "in", "on", "at", "to"]);
     const words = [
       ...title.toLowerCase().split(/\s+/),
       ...description.toLowerCase().split(/\s+/),
-      ...tags.flatMap(normalizeText),
+      ...tagArray.flatMap(normalizeText),
       ...collections.flatMap(normalizeText),
     ];
     const newKeywords = [...new Set(words)]
@@ -315,7 +293,7 @@ const PosterForm = ({ poster, onSave }) => {
     try {
       const collectionId = normalizedName;
       await setDoc(doc(firestore, "collections", collectionId), {
-        name: normalizedName, // e.g., "k-pop"
+        name: normalizedName,
         createdAt: new Date(),
         posterIds: [],
       });
@@ -334,141 +312,266 @@ const PosterForm = ({ poster, onSave }) => {
   const handleSizeChange = (index, field, value) => {
     const updatedSizes = [...sizes];
     updatedSizes[index] = { ...updatedSizes[index], [field]: value };
+    if (field === "size" && !POSTER_SIZES[value]) {
+      updatedSizes[index].size = "A4";
+    }
+    if (field === "price" && value) {
+      const price = parseFloat(value) || 0;
+      const disc = parseFloat(discount) || 0;
+      updatedSizes[index].finalPrice = (price - (price * disc) / 100).toFixed(2);
+    }
     setSizes(updatedSizes);
+    if (field === "size" && POSTER_SIZES[value]) {
+      setSelectedSize(value);
+    }
   };
 
   const addSize = () => {
-    if (sizes.length === 0 || sizes.every((s) => s.size && s.price)) {
-      setSizes([...sizes, { size: "", price: "" }]);
+    if (sizes.length === 0 || sizes.every((s) => s.size && s.price && POSTER_SIZES[s.size])) {
+      setSizes([...sizes, { size: "A4", price: "", finalPrice: "" }]);
+      setSelectedSize("A4");
     } else {
-      alert("Please fill in the current size and price before adding a new one.");
+      setError("Please fill in the current size and price before adding a new one.");
     }
   };
 
   const removeSize = (index) => {
     if (sizes.length > 1) {
-      setSizes(sizes.filter((_, i) => i !== index));
+      const newSizes = sizes.filter((_, i) => i !== index);
+      setSizes(newSizes);
+      if (sizes[index].size === selectedSize) {
+        const validSize = newSizes.find((s) => POSTER_SIZES[s.size])?.size || "A4";
+        setSelectedSize(validSize);
+      }
     }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          if (!POSTER_SIZES[selectedSize]) {
+            setError("Invalid poster size selected for cropping.");
+            return;
+          }
+          const targetAspect = POSTER_SIZES[selectedSize].aspectRatio;
+          const imageAspect = img.width / img.height;
+          if (Math.abs(imageAspect - targetAspect) > 0.01) {
+            setImageSrc(event.target.result);
+            setShowCropModal(true);
+            setCrop(
+              centerCrop(
+                makeAspectCrop(
+                  { unit: "%", width: 90, aspect: targetAspect },
+                  targetAspect,
+                  img.width,
+                  img.height
+                ),
+                img.width,
+                img.height
+              )
+            );
+          } else {
+            setImageSrc(null);
+            setShowCropModal(false);
+            setCrop(null);
+          }
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropComplete = (crop) => {
+    if (imgRef.current && crop.width && crop.height) {
+      if (!POSTER_SIZES[selectedSize]) {
+        setError("Invalid poster size selected for cropping.");
+        setShowCropModal(false);
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
+      const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+      canvas.width = crop.width * scaleX;
+      canvas.height = crop.height * scaleY;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(
+        imgRef.current,
+        crop.x * scaleX,
+        crop.y * scaleY,
+        crop.width * scaleX,
+        crop.height * scaleY,
+        0,
+        0,
+        crop.width * scaleX,
+        crop.height * scaleY
+      );
+      canvas.toBlob((blob) => {
+        const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: "image/jpeg" });
+        const fileList = new DataTransfer();
+        fileList.items.add(croppedFile);
+        formRef.current.imageFile.files = fileList.files;
+        setShowCropModal(false);
+        setImageSrc(null);
+      }, "image/jpeg");
+    }
+  };
+
+  const handleDiscountChange = (e) => {
+    const disc = parseFloat(e.target.value) || 0;
+    setDiscount(disc.toString());
+    const updatedSizes = sizes.map((s) => {
+      if (s.price) {
+        const price = parseFloat(s.price) || 0;
+        return { ...s, finalPrice: (price - (price * disc) / 100).toFixed(2) };
+      }
+      return s;
+    });
+    setSizes(updatedSizes);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
     const posterId = (poster?.id || form.posterId.value.trim()).toLowerCase();
-    const discount = parseFloat(form.discount.value) || 0;
-    let imageUrl = poster?.imageUrl || form.imageUrl.value;
-    const collections = selectedCollections.map((col) => normalizeCollection(col.label)); // e.g., "k-pop"
-    const tags = selectedTags.map((tag) => normalizeCollection(tag.label)); // e.g., "k-pop"
+    const collections = selectedCollections.map((col) => normalizeCollection(col.label));
+    const tagArray = tags.split(",").map((t) => normalizeCollection(t.trim())).filter(Boolean);
 
-    if (!poster && (!posterId || !idChecked || idError)) {
-      alert("Please provide a unique Poster ID and check its availability.");
+    if (!posterId || !idChecked || idError) {
+      setError("Please provide a unique Poster ID and check its availability.");
       return;
     }
-    if (!isSellerValid) {
-      alert("Please provide a valid seller username and check its availability.");
+    if (!isSellerValid || !sellerUsername || !sellerChecked) {
+      setError("Please provide and verify a valid Seller Username.");
       return;
     }
-    if (sizes.some((s) => !s.size || !s.price || isNaN(s.price) || parseFloat(s.price) <= 0)) {
-      alert("Please provide valid sizes and prices for all entries.");
+    if (sizes.some((s) => !s.size || !s.price || isNaN(s.price) || parseFloat(s.price) <= 0 || !POSTER_SIZES[s.size])) {
+      setError("Please provide valid sizes and prices for all entries.");
       return;
     }
 
     if (form.imageFile.files[0]) {
       setUploading(true);
       try {
-        const formData = new FormData();
-        formData.append("file", form.imageFile.files[0]);
-        formData.append("upload_preset", "your_unsigned_preset");
-        const response = await fetch(
-          `https://api.cloudinary.com/v1_1/your-cloud-name/image/upload`,
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-        const data = await response.json();
-        if (!data.secure_url) {
-          throw new Error("Image upload failed");
-        }
-        imageUrl = data.secure_url;
+        const imageRef = ref(storage, `posters/${sellerUsername}/${Date.now()}_${form.imageFile.files[0].name}`);
+        await uploadBytes(imageRef, form.imageFile.files[0]);
+        const originalImageUrl = await getDownloadURL(imageRef);
+        formRef.current.originalImageUrl = originalImageUrl;
       } catch (error) {
-        alert("Failed to upload image: " + error.message);
+        setError("Failed to upload image: " + error.message);
         setUploading(false);
         return;
       }
       setUploading(false);
+    } else if (!poster && !formRef.current.originalImageUrl) {
+      setError("An image is required for new posters.");
+      return;
     }
 
     const data = {
-      title: form.title.value,
-      description: form.description.value,
-      tags,
+      title: form.title.value.trim(),
+      description: form.description.value.trim(),
+      tags: tagArray,
       keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
       collections,
-      imageUrl,
-      discount,
+      originalImageUrl: formRef.current.originalImageUrl || poster?.originalImageUrl || "",
+      discount: parseFloat(discount) || 0,
       sizes: sizes.map((s) => ({
         size: s.size,
         price: parseFloat(s.price),
-        finalPrice: Math.round(parseFloat(s.price) - (parseFloat(s.price) * discount) / 100),
+        finalPrice: parseFloat(s.finalPrice) || parseFloat(s.price),
       })),
-      approved: poster?.approved || "draft",
+      approved: poster?.source === "posters" ? "approved" : "pending",
       isActive: form.isActive.checked,
-      seller: sellerId,
       sellerUsername,
       createdAt: poster?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      posterId: posterId,
     };
+
     onSave(data, posterId);
   };
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+      {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
       <Form onSubmit={handleSubmit} ref={formRef}>
-        {!poster ? (
-          <Form.Group className="mb-3">
-            <Form.Label>Poster ID</Form.Label>
-            <div className="input-group">
-              <Form.Control
-                name="posterId"
-                defaultValue=""
-                placeholder="Enter a unique ID (letters, numbers, hyphens, underscores)"
-                required
-                isInvalid={!!idError}
-                isValid={idChecked && !idError}
-                aria-describedby="posterIdFeedback"
-              />
-              <Button
-                variant="outline-secondary"
-                onClick={() => checkIdUniqueness(formRef.current.posterId.value.trim().toLowerCase())}
-                aria-label="Check Poster ID"
-                className="me-1"
-              >
-                Check
-              </Button>
-              <Button
-                variant="outline-secondary"
-                onClick={suggestId}
-                aria-label="Suggest Poster ID"
-              >
-                Suggest
-              </Button>
-              <Form.Control.Feedback type="invalid" id="posterIdFeedback">
-                {idError}
-              </Form.Control.Feedback>
-            </div>
-          </Form.Group>
-        ) : (
-          <Form.Group className="mb-3">
-            <Form.Label>Poster ID</Form.Label>
+        <Form.Group className="mb-3">
+          <Form.Label>Poster ID</Form.Label>
+          <div className="input-group">
             <Form.Control
               name="posterId"
-              defaultValue={poster.id}
-              disabled
-              readOnly
+              defaultValue={poster?.posterId || poster?.id || ""}
+              placeholder="Enter a unique ID (letters, numbers, hyphens, underscores)"
+              required
+              isInvalid={!!idError}
+              isValid={idChecked && !idError}
+              aria-describedby="posterIdFeedback"
             />
-          </Form.Group>
-        )}
+            <Button
+              variant="outline-secondary"
+              onClick={() => checkIdUniqueness(formRef.current.posterId.value.trim().toLowerCase())}
+              aria-label="Check Poster ID"
+              className="me-1"
+            >
+              Check
+            </Button>
+            <Button
+              variant="outline-secondary"
+              onClick={suggestId}
+              aria-label="Suggest Poster ID"
+            >
+              Suggest
+            </Button>
+            <Form.Control.Feedback type="invalid" id="posterIdFeedback">
+              {idError}
+            </Form.Control.Feedback>
+          </div>
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Seller Username</Form.Label>
+          <div className="input-group">
+            <Form.Control
+              name="seller"
+              value={sellerUsername}
+              onChange={(e) => {
+                setSellerUsername(e.target.value);
+                setSellerChecked(false);
+                setIsSellerValid(false);
+                setSellerName("");
+              }}
+              placeholder="Enter Seller Username"
+              required
+              isInvalid={sellerChecked && !isSellerValid}
+              isValid={sellerChecked && isSellerValid}
+              aria-describedby="sellerUsernameFeedback"
+            />
+            <Button
+              variant="outline-secondary"
+              onClick={checkSellerUsername}
+              aria-label="Check Seller Username"
+              className="me-1"
+            >
+              Check
+            </Button>
+            <Button
+              variant="outline-secondary"
+              onClick={insertUserId}
+              aria-label="Use Current User ID"
+            >
+              Use My ID
+            </Button>
+          </div>
+          {sellerChecked && (
+            <Form.Text className={isSellerValid ? "text-muted" : "text-danger"} id="sellerUsernameFeedback">
+              {isSellerValid ? `Seller: ${sellerName}` : sellerName}
+            </Form.Text>
+          )}
+        </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Title</Form.Label>
           <Form.Control
@@ -489,16 +592,12 @@ const PosterForm = ({ poster, onSave }) => {
           />
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Label>Tags</Form.Label>
-          <Select
-            isMulti
-            options={availableTags}
-            value={selectedTags}
-            onChange={handleTagChange}
-            className="flex-grow-1"
-            placeholder="Select or create tags (e.g., k-pop, minimalist)..."
-            isCreatable
-            formatCreateLabel={(inputValue) => `Create tag "${inputValue}"`}
+          <Form.Label>Tags (comma-separated)</Form.Label>
+          <Form.Control
+            name="tags"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="Enter tags (e.g., k-pop, minimalist)"
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -556,20 +655,34 @@ const PosterForm = ({ poster, onSave }) => {
           <Form.Label>Sizes and Prices</Form.Label>
           {sizes.map((sizeObj, index) => (
             <div key={index} className="d-flex align-items-center gap-2 mb-2">
-              <Form.Control
-                type="text"
-                placeholder="Size (e.g., A4)"
+              <Form.Select
                 value={sizeObj.size || ""}
                 onChange={(e) => handleSizeChange(index, "size", e.target.value)}
                 required
-              />
+              >
+                <option value="">Select size</option>
+                {Object.keys(POSTER_SIZES).map((size) => (
+                  <option key={size} value={size}>
+                    {size} ({POSTER_SIZES[size].widthCm}cm x {POSTER_SIZES[size].heightCm}cm)
+                  </option>
+                ))}
+              </Form.Select>
               <Form.Control
                 type="number"
-                placeholder="Price (₹)"
+                placeholder="Price"
                 value={sizeObj.price || ""}
                 onChange={(e) => handleSizeChange(index, "price", e.target.value)}
                 required
                 min="0"
+                step="0.01"
+                style={{ width: "120px" }}
+              />
+              <Form.Control
+                type="text"
+                placeholder="Final Price"
+                value={sizeObj.finalPrice || ""}
+                readOnly
+                style={{ width: "120px" }}
               />
               {sizes.length > 1 && (
                 <Button
@@ -594,95 +707,95 @@ const PosterForm = ({ poster, onSave }) => {
           </Button>
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Label>Image Upload</Form.Label>
-          <Form.Control type="file" name="imageFile" accept="image/*" />
-          {poster?.imageUrl && (
-            <Form.Text className="mt-2">
-              Current: <a href={poster.imageUrl} target="_blank" rel="noopener noreferrer">View Image</a>
-            </Form.Text>
-          )}
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Image URL (optional if uploading)</Form.Label>
-          <Form.Control
-            type="url"
-            name="imageUrl"
-            defaultValue={poster?.imageUrl || ""}
-            placeholder="Enter image URL"
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
           <Form.Label>Discount (%)</Form.Label>
           <Form.Control
             type="number"
             name="discount"
-            defaultValue={poster?.discount || 0}
+            value={discount}
+            onChange={handleDiscountChange}
             placeholder="Enter discount percentage"
+            min="0"
+            max="100"
+            step="0.1"
           />
         </Form.Group>
         <Form.Group className="mb-3">
-          <Form.Label>Seller Username</Form.Label>
-          <div className="input-group" style={{ flexWrap: "nowrap" }}>
-            <div className="position-relative me-2" style={{ minWidth: "150px", flexGrow: 1 }}>
-              <Form.Control
-                name="seller"
-                value={sellerUsername}
-                onChange={handleSellerUsernameChange}
-                required
-                placeholder="@username"
-                isValid={isSellerValid}
-                aria-describedby="sellerFeedback"
-              />
-              {isSellerValid && (
-                <span
-                  className="position-absolute top-50 end-0 translate-middle-y me-2 text-success"
-                  style={{ fontSize: "1rem" }}
-                >
-                  ✓
-                </span>
-              )}
-            </div>
-            <Form.Control
-              type="text"
-              value={sellerName}
-              readOnly
-              placeholder="Seller Name"
-              style={{ width: "35%" }}
-            />
-            <Button
-              variant="outline-secondary"
-              onClick={() => checkSellerUsername(sellerUsername)}
-              aria-label="Check seller username"
-              className="me-1"
-            >
-              Check
-            </Button>
-            <Button
-              variant="outline-secondary"
-              onClick={insertUserId}
-              aria-label="Insert current user"
-            >
-              Me
-            </Button>
-          </div>
+          <Form.Label>Image Upload</Form.Label>
+          <Form.Control
+            type="file"
+            name="imageFile"
+            accept="image/*"
+            onChange={handleImageChange}
+            required={!poster?.originalImageUrl}
+          />
+          {poster?.originalImageUrl && (
+            <Form.Text className="mt-2">
+              Current: <a href={poster.originalImageUrl} target="_blank" rel="noopener noreferrer">View Image</a>
+            </Form.Text>
+          )}
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Check
             type="checkbox"
             name="isActive"
             label="Active"
-            defaultChecked={poster?.isActive ?? true}
-            disabled={poster?.approved !== "approved"}
+            defaultChecked={poster?.isActive !== false}
           />
         </Form.Group>
-        <Button type="submit" variant="success" disabled={uploading} className="w-100">
-          {uploading ? "Uploading..." : poster ? "Update Poster" : "Save Draft"}
-        </Button>
+        <div className="d-flex gap-2">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
+          >
+            {uploading ? "Uploading..." : poster ? "Update Poster" : "Submit Poster"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onSave(null)}
+            disabled={uploading}
+          >
+            Cancel
+          </Button>
+        </div>
       </Form>
+
+      <Modal show={showCropModal} onHide={() => setShowCropModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Crop Image to {selectedSize}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {POSTER_SIZES[selectedSize] ? (
+            <ReactCrop
+              crop={crop}
+              onChange={(_, percentCrop) => setCrop(percentCrop)}
+              aspect={POSTER_SIZES[selectedSize].aspectRatio}
+            >
+              <img
+                ref={imgRef}
+                src={imageSrc}
+                alt="Crop preview"
+                style={{ maxWidth: "100%" }}
+              />
+            </ReactCrop>
+          ) : (
+            <Alert variant="danger">Invalid size selected for cropping. Please select a valid size.</Alert>
+          )}
+          <Button
+            variant="primary"
+            onClick={() => handleCropComplete(crop)}
+            className="mt-3"
+            disabled={!POSTER_SIZES[selectedSize]}
+          >
+            Apply Crop
+          </Button>
+        </Modal.Body>
+      </Modal>
 
       <Modal show={showNewCollectionModal} onHide={() => setShowNewCollectionModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Suggest New Collection</Modal.Title>
+          <Modal.Title>Add New Collection</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleNewCollectionSubmit}>
@@ -692,13 +805,20 @@ const PosterForm = ({ poster, onSave }) => {
                 type="text"
                 value={newCollectionName}
                 onChange={(e) => setNewCollectionName(e.target.value)}
-                placeholder="e.g., K Pop"
+                placeholder="Enter collection name"
+                required
                 isInvalid={!!newCollectionError}
               />
-              <Form.Control.Feedback type="invalid">{newCollectionError}</Form.Control.Feedback>
+              {newCollectionError && (
+                <Form.Control.Feedback type="invalid">{newCollectionError}</Form.Control.Feedback>
+              )}
             </Form.Group>
-            <Button type="submit" variant="success">
-              Add Collection
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!newCollectionName.trim()}
+            >
+              Save Collection
             </Button>
           </Form>
         </Modal.Body>

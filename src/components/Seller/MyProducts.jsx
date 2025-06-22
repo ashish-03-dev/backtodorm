@@ -1,78 +1,129 @@
 import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Button, Modal, Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { deletePoster, submitPoster } from "./sellerUtils";
+import { doc, onSnapshot, getDoc } from "firebase/firestore";
 import SellerPosterForm from "./SellerPosterForm";
-import '../../styles/SellerComponents.css';
+import { deletePoster, submitPoster } from "./sellerUtils";
 
 const PosterTable = lazy(() => import("./PosterTable"));
 const PosterView = lazy(() => import("./PosterView"));
 
-export default function MyProducts() {
-  const { firestore, user } = useFirebase();
+function MyProducts() {
+  const { firestore, user, storage } = useFirebase();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [editingPoster, setEditingPoster] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingPoster, setViewingPoster] = useState(null);
+  const [sellerUsername, setSellerUsername] = useState("");
 
   useEffect(() => {
-    if (!firestore || !user) return;
-    const postersQuery = query(
-      collection(firestore, "posters"),
-      where("seller", "==", user.uid)
-    );
+    const fetchUserData = async () => {
+      if (user && firestore) {
+        try {
+          const userDoc = await getDoc(doc(firestore, "users", user.uid));
+          if (userDoc.exists()) {
+            setSellerUsername(userDoc.data().sellerUsername || "");
+          } else {
+            setError("User profile not found.");
+          }
+        } catch (err) {
+          setError("Failed to load user data: " + err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchUserData();
+  }, [firestore, user]);
+
+  useEffect(() => {
+    if (!firestore || !user || !sellerUsername) {
+      setLoading(false);
+      return;
+    }
+
+    const sellerRef = doc(firestore, "sellers", sellerUsername);
     const unsubscribe = onSnapshot(
-      postersQuery,
-      (snapshot) => {
-        setPosters(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-        setLoading(false);
+      sellerRef,
+      async (docSnap) => {
+        if (!docSnap.exists()) {
+          setPosters([]);
+          setLoading(false);
+          return;
+        }
+
+        const sellerData = docSnap.data();
+        const tempPosterList = sellerData.tempPosters || [];
+
+        try {
+          const fetched = await Promise.all(
+            tempPosterList.map(async (p) => {
+              const posterDoc = await getDoc(doc(firestore, "tempPosters", p.posterId));
+              if (!posterDoc.exists()) return null;
+
+              const posterData = posterDoc.data();
+              let imageUrl = "";
+
+              if (posterData.originalImageUrl) {
+                try {
+                  const { ref, getDownloadURL } = await import("firebase/storage");
+                  const imageRef = ref(storage, posterData.originalImageUrl);
+                  imageUrl = await getDownloadURL(imageRef);
+                } catch (err) {
+                  console.warn("⚠️ Failed to load image URL:", err.message);
+                }
+              }
+
+              return {
+                id: p.posterId,
+                ...posterData,
+                imageUrl,
+                status: p.status,
+                data: p.data || null,
+                source: "tempPosters",
+              };
+            })
+          );
+
+          setPosters(fetched.filter(Boolean));
+        } catch (err) {
+          setError("Error fetching posters: " + err.message);
+        } finally {
+          setLoading(false);
+        }
       },
       (err) => {
-        setError(`Failed to fetch posters: ${err.message}`);
+        setError("Error subscribing to seller data: " + err.message);
         setLoading(false);
       }
     );
+
     return () => unsubscribe();
-  }, [firestore, user]);
+  }, [firestore, user, sellerUsername]);
 
-  const handleAddPoster = () => {
-    setEditingPoster(null);
-    setShowEditModal(true);
-  };
-
-  const handleEditPoster = (poster) => {
-    setEditingPoster(poster);
-    setShowEditModal(true);
+  const handleCreatePoster = () => {
+    setShowCreateModal(true);
   };
 
   const handleViewPoster = (poster) => {
     setViewingPoster(poster);
-    setShowViewModal(true);
   };
 
-  const handleDeletePoster = async (id) => {
-    if (window.confirm("Delete this poster?")) {
-      const result = await deletePoster(firestore, id);
-      if (!result.success) {
-        setError(`Failed to delete poster: ${result.error}`);
-      }
+  const handleDeletePoster = async (id, source) => {
+    if (window.confirm("Are you sure you want to delete this poster?")) {
+      const result = await deletePoster(firestore, storage, id, source);
+      if (!result.success) setError(`Failed to delete poster: ${result.error}`);
     }
   };
 
-  const handleSubmitPoster = async (id) => {
-    const result = await submitPoster(firestore, id);
-    if (!result.success) {
-      setError(`Failed to submit poster: ${result.error}`);
-    }
+  const handleSubmitPoster = async (id, source) => {
+    const result = await submitPoster(firestore, id, source);
+    if (!result.success) setError(`Failed to submit poster: ${result.error}`);
   };
 
-  const handleSavePoster = (data, posterId) => {
-    setShowEditModal(false);
-    setEditingPoster(null);
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
   };
 
   if (loading) {
@@ -81,38 +132,50 @@ export default function MyProducts() {
 
   return (
     <div>
-      <h4 className="mb-4">My Products</h4>
-      {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
-      <Button variant="primary" className="mb-3" onClick={handleAddPoster}>
+      <h4 className="mb-4">🍭 My Products</h4>
+      {error && (
+        <Alert variant="danger" onClose={() => setError("")} dismissible>
+          {error}
+        </Alert>
+      )}
+      <Button variant="primary" className="mb-3" onClick={handleCreatePoster}>
         + Create New Poster
       </Button>
+
       <Suspense fallback={<Spinner animation="border" className="d-block mx-auto my-3" />}>
         <PosterTable
           posters={posters}
-          onEdit={handleEditPoster}
           onView={handleViewPoster}
-          onDelete={handleDeletePoster}
-          onSubmit={handleSubmitPoster}
+          onDelete={(id) => handleDeletePoster(id, "tempPosters")}
+          onSubmit={(id) => handleSubmitPoster(id, "tempPosters")}
         />
       </Suspense>
-      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>{editingPoster ? "Edit Poster" : "Create Poster"}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <SellerPosterForm poster={editingPoster} onSave={handleSavePoster} />
-        </Modal.Body>
-      </Modal>
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)}>
+
+      <Modal show={!!viewingPoster} onHide={() => setViewingPoster(null)}>
         <Modal.Header closeButton>
           <Modal.Title>Poster Preview</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Suspense fallback={<Spinner animation="border" className="d-block mx-auto my-3" />}>
-            {viewingPoster && <PosterView poster={viewingPoster} />}
+            {viewingPoster ? (
+              <PosterView poster={viewingPoster} />
+            ) : (
+              <Alert variant="warning">No poster selected.</Alert>
+            )}
           </Suspense>
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={showCreateModal} onHide={handleCloseCreateModal} size="lg" backdrop="static">
+        <Modal.Header closeButton>
+          <Modal.Title>Create Poster</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <SellerPosterForm poster={null} onSave={handleCloseCreateModal} />
         </Modal.Body>
       </Modal>
     </div>
   );
 }
+
+export default MyProducts;

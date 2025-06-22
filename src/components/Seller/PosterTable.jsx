@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "react-bootstrap";
 import '../../styles/SellerComponents.css';
 
-export default function PosterTable({ posters, onEdit, onView, onDelete, onSubmit, isDashboardView = false }) {
+export default function PosterTable({ posters, onView, onDelete, onSubmit, isDashboardView = false }) {
   return (
     <div className="table-responsive">
       <table className="table table-hover table-bordered align-middle">
@@ -34,14 +34,6 @@ export default function PosterTable({ posters, onEdit, onView, onDelete, onSubmi
                     </Button>
                     {!isDashboardView && (
                       <>
-                        <Button
-                          size="sm"
-                          variant="outline-secondary"
-                          onClick={() => onEdit(poster)}
-                          disabled={poster.approved === "approved"}
-                        >
-                          Edit
-                        </Button>
                         <Button
                           size="sm"
                           variant="outline-danger"
