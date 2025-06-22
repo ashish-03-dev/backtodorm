@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect } from 'react';
 import {
   getAuth,
   signOut,
@@ -13,22 +13,22 @@ import {
   reauthenticateWithCredential,
   reauthenticateWithPopup,
 } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
-import { getStorage } from 'firebase/storage'; // Add this import
+import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import { app } from '../firebase';
-import { getFunctions } from "firebase/functions";
 
 const FirebaseContext = createContext(null);
 export const useFirebase = () => useContext(FirebaseContext);
 
-export const FirebaseProvider = (props) => {
+export const FirebaseProvider = ({ children }) => {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
-  const db = getDatabase(app);
-  const storage = getStorage(app); // Initialize Storage
-  const functions = getFunctions(app, "asia-south1");
-  console.log("Functions instance initialized:", functions);
+  const database = getDatabase(app);
+  const storage = getStorage(app);
+  const functions = getFunctions(app, 'asia-south1');
+
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
@@ -36,7 +36,8 @@ export const FirebaseProvider = (props) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setLoadingUserData(true);
       try {
         if (currentUser) {
           setUser(currentUser);
@@ -46,62 +47,55 @@ export const FirebaseProvider = (props) => {
           if (!snapshot.exists()) {
             const userObj = {
               uid: currentUser.uid,
-              name: currentUser.displayName || "",
-              email: currentUser.email || "",
-              phone: currentUser.phoneNumber || "",
-              photoURL: currentUser.photoURL || "",
+              name: currentUser.displayName || '',
+              email: currentUser.email || '',
+              phone: currentUser.phoneNumber || '',
+              photoURL: currentUser.photoURL || '',
               createdAt: new Date().toISOString(),
               isSeller: false,
-              isAdmin: currentUser.uid === 'xhJlJHvOxgSysxjQl8AJfvdhGPg1' ? true : false,
+              isAdmin: currentUser.uid === 'xhJlJHvOxgSysxjQl8AJfvdhGPg1',
             };
-            try {
-              await setDoc(userRef, userObj);
-              setUserData(userObj);
-            } catch (setError) {
-              setError("Failed to initialize user data");
-              setUserData(userObj);
-            }
+            await setDoc(userRef, userObj);
+            setUserData(userObj);
           } else {
             const data = snapshot.data();
-            const userDataWithFallback = {
+            setUserData({
               ...data,
               isAdmin: data.isAdmin ?? false,
-            };
-            setUserData(userDataWithFallback);
+            });
           }
         } else {
           setUser(null);
           setUserData(null);
         }
       } catch (err) {
-        setError("Authentication error: " + err.message);
-        setUser(null);
-        setUserData(null);
+        setError(`Authentication error: ${err.message}`);
+        console.error('Auth state change error:', err);
       } finally {
         setLoadingUserData(false);
       }
     });
-    return () => unsub();
+
+    return () => unsubscribe();
   }, [auth, firestore]);
 
   const checkUsernameAvailability = async (username) => {
     if (!username.startsWith('@') || username.length < 2) {
-      return { available: false, message: "Username must start with @ and contain at least one character" };
+      return { available: false, message: 'Username must start with @ and contain at least one character' };
     }
-    const usersRef = collection(firestore, 'users');
-    const q = query(usersRef, where('sellerUsername', '==', username));
+    const q = query(collection(firestore, 'users'), where('sellerUsername', '==', username));
     const querySnapshot = await getDocs(q);
     return {
       available: querySnapshot.empty,
-      message: querySnapshot.empty ? "Username is available" : "Username is already taken",
+      message: querySnapshot.empty ? 'Username is available' : 'Username is already taken',
     };
   };
 
   const becomeSeller = async (sellerData) => {
-    if (!user) throw new Error("User not signed in");
+    if (!user) throw new Error('User not signed in');
     const userRef = doc(firestore, 'users', user.uid);
     const { available } = await checkUsernameAvailability(sellerData.sellerUsername);
-    if (!available) throw new Error("Username is already taken");
+    if (!available) throw new Error('Username is already taken');
 
     const updatedData = {
       isSeller: true,
@@ -113,34 +107,31 @@ export const FirebaseProvider = (props) => {
     return updatedData;
   };
 
-  const putData = (key, data) => set(ref(db, key), data);
+  const putData = (key, data) => set(ref(database, key), data);
 
   const logout = () => signOut(auth);
 
   const setUpRecaptcha = async (containerId, phoneNumber) => {
     try {
-      if (window.location.hostname === "localhost") {
+      if (window.location.hostname === 'localhost') {
         auth.settings.appVerificationDisabledForTesting = true;
       }
       if (!window.recaptchaVerifier) {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-          size: "invisible",
-          callback: () => {
-          },
+          size: 'invisible',
         });
         await window.recaptchaVerifier.render();
       }
-      const appVerifier = window.recaptchaVerifier;
-      const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, appVerifier);
+      const result = await signInWithPhoneNumber(auth, `+91${phoneNumber}`, window.recaptchaVerifier);
       setConfirmationResult(result);
       return result;
-    } catch (error) {
-      throw error;
+    } catch (err) {
+      throw new Error(`Recaptcha setup failed: ${err.message}`);
     }
   };
 
   const verifyOtp = (otp) => {
-    if (!confirmationResult) throw new Error("OTP not provided");
+    if (!confirmationResult) throw new Error('No OTP confirmation available');
     return confirmationResult.confirm(otp);
   };
 
@@ -152,92 +143,89 @@ export const FirebaseProvider = (props) => {
   const getUserProfile = async (uid) => {
     if (!uid) return null;
     const userRef = doc(firestore, 'users', uid);
-    const usersnap = await getDoc(userRef);
-    return usersnap.exists() ? usersnap.data() : null;
+    const snapshot = await getDoc(userRef);
+    return snapshot.exists() ? snapshot.data() : null;
   };
 
   const updateUserProfile = async (uid, data) => {
-    if (!uid) throw new Error("No UID provided");
-    const userRef = doc(firestore, "users", uid);
-    return await setDoc(userRef, data, { merge: true });
+    if (!uid) throw new Error('No UID provided');
+    const userRef = doc(firestore, 'users', uid);
+    await setDoc(userRef, data, { merge: true });
   };
 
   const linkPhoneNumber = async (verificationId, otp) => {
-    if (!auth.currentUser) throw new Error("User not signed in");
+    if (!auth.currentUser) throw new Error('User not signed in');
     const credential = PhoneAuthProvider.credential(verificationId, otp);
-    return await linkWithCredential(auth.currentUser, credential);
+    return linkWithCredential(auth.currentUser, credential);
   };
 
   const linkGoogleAccount = async () => {
+    if (!auth.currentUser) throw new Error('User not signed in');
     const provider = new GoogleAuthProvider();
-    if (!auth.currentUser) throw new Error("User not signed in");
-    return await linkWithCredential(auth.currentUser, await signInWithPopup(auth, provider).then(res => res.credential));
+    const result = await signInWithPopup(auth, provider);
+    return linkWithCredential(auth.currentUser, result.credential);
   };
 
   const deleteUserAccount = async (setUpRecaptcha) => {
-    if (!auth.currentUser) return alert("User not signed in");
+    if (!auth.currentUser) throw new Error('User not signed in');
     const user = auth.currentUser;
 
     try {
       await deleteUser(user);
-      alert("Account deleted successfully");
     } catch (err) {
-      if (err.code === "auth/requires-recent-login") {
-        alert("Please re-authenticate to delete your account.");
+      if (err.code === 'auth/requires-recent-login') {
         const providerId = user.providerData[0]?.providerId;
-
         try {
-          if (providerId === "google.com") {
+          if (providerId === 'google.com') {
             const provider = new GoogleAuthProvider();
             await reauthenticateWithPopup(user, provider);
-          } else if (providerId === "phone") {
-            const phoneNumber = user.phoneNumber?.replace("+91", "");
-            const result = await setUpRecaptcha("recaptcha-container", phoneNumber);
-            const otp = prompt("Enter the OTP sent to your phone:");
+          } else if (providerId === 'phone') {
+            const phoneNumber = user.phoneNumber?.replace('+91', '');
+            const result = await setUpRecaptcha('recaptcha-container', phoneNumber);
+            const otp = prompt('Enter the OTP sent to your phone:');
             const credential = PhoneAuthProvider.credential(result.verificationId, otp);
             await reauthenticateWithCredential(user, credential);
           } else {
-            throw new Error("Unsupported provider for re-authentication.");
+            throw new Error('Unsupported provider for re-authentication');
           }
-
           await deleteUser(user);
-          alert("Account deleted successfully after re-authentication.");
         } catch (reauthErr) {
-          console.error("Re-authentication failed:", reauthErr);
-          alert("Re-authentication failed: " + reauthErr.message);
+          throw new Error(`Re-authentication failed: ${reauthErr.message}`);
         }
       } else {
-        console.error("Delete failed:", err);
-        alert("Delete failed: " + err.message);
+        throw new Error(`Delete failed: ${err.message}`);
       }
     }
   };
 
   return (
-    <FirebaseContext.Provider value={{
-      logout,
-      user,
-      auth,
-      userData,
-      loadingUserData,
-      firestore,
-      db,
-      storage,
-      functions, // Add storage to context
-      putData,
-      setUpRecaptcha,
-      verifyOtp,
-      googleLogin,
-      getUserProfile,
-      updateUserProfile,
-      linkPhoneNumber,
-      linkGoogleAccount,
-      deleteUserAccount,
-      becomeSeller,
-      checkUsernameAvailability,
-      error,
-    }}>
-      {props.children}
+    <FirebaseContext.Provider
+      value={{
+        logout,
+        user,
+        auth,
+        userData,
+        loadingUserData,
+        firestore,
+        database,
+        storage,
+        functions,
+        putData,
+        setUpRecaptcha,
+        verifyOtp,
+        googleLogin,
+        getUserProfile,
+        updateUserProfile,
+        linkPhoneNumber,
+        linkGoogleAccount,
+        deleteUserAccount,
+        becomeSeller,
+        checkUsernameAvailability,
+        error,
+        app,
+      }}
+    >
+      {children}
     </FirebaseContext.Provider>
   );
 };

@@ -142,7 +142,7 @@ export default function AddressBook() {
                   <span className="ms-2">+91 {addr.phone}</span>
                 </p>
                 <small className="text-muted">
-                  {addr.address}, {addr.locality}, {addr.district}
+                  {addr.address}, {addr.locality}, {addr.city}
                   {addr.landmark && `, Landmark: ${addr.landmark}`}
                 </small>
                 <br />

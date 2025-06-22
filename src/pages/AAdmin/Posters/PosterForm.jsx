@@ -497,7 +497,7 @@ const PosterForm = ({ poster, onSave }) => {
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+    <div style={{ maxWidth: "600px" }}>
       {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
       <Form onSubmit={handleSubmit} ref={formRef}>
         <Form.Group className="mb-3">

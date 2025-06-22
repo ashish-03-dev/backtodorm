@@ -17,7 +17,7 @@ export default function AddressForm({
       pincode: '',
       locality: '',
       address: '',
-      district: '',
+      city: '',
       state: '',
       landmark: '',
     }
@@ -45,7 +45,7 @@ export default function AddressForm({
       !formData.pincode ||
       !formData.locality ||
       !formData.address ||
-      !formData.district ||
+      !formData.city ||
       !formData.state
     ) {
       setError('Please fill in all required fields.');
@@ -74,7 +74,7 @@ export default function AddressForm({
         pincode: '',
         locality: '',
         address: '',
-        district: '',
+        city: '',
         state: '',
         landmark: '',
       });
@@ -157,13 +157,13 @@ export default function AddressForm({
             />
           </div>
 
-          {/* District and State */}
+          {/* City and State */}
           <div className="col-12 col-md-6">
             <input
               className="form-control"
-              name="district"
+              name="city"
               placeholder="District / City / Town"
-              value={formData.district}
+              value={formData.city}
               onChange={handleChange}
               required
             />

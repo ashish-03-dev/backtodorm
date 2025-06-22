@@ -3,9 +3,10 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useFirebase } from '../context/FirebaseContext';
 import { useAddress } from '../context/AddressContext';
 import { collection, addDoc, doc, deleteDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { Form, Button, Alert, ListGroup, Card, FormSelect, Spinner } from 'react-bootstrap';
 
-function AddressForm({ setShowForm, getAddressList, addAddress, setFormData }) {
+const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData }) => {
   const [newAddress, setNewAddress] = useState({
     title: '',
     name: '',
@@ -29,8 +30,9 @@ function AddressForm({ setShowForm, getAddressList, addAddress, setFormData }) {
     try {
       await addAddress(newAddress);
       const updatedList = await getAddressList();
-      setFormData(updatedList[0] || newAddress); // Select newest address
+      setFormData(updatedList[0] || newAddress);
       setShowForm(false);
+      setError('');
     } catch (err) {
       setError(`Failed to add address: ${err.message}`);
     }
@@ -157,17 +159,18 @@ function AddressForm({ setShowForm, getAddressList, addAddress, setFormData }) {
       </Card.Body>
     </Card>
   );
-}
+};
 
-export default function Checkout() {
-  const { user, firestore, userData, authLoading, loadingUserData } = useFirebase();
+const Checkout = () => {
+  const { user, firestore, userData, authLoading, loadingUserData, functions } = useFirebase();
   const { addresses, getAddressList, addAddress, loading: addressLoading, error: addressError } = useAddress();
   const { cartItems, buyNowItem, setCartItems, setBuyNowItem } = useOutletContext();
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     title: '',
     name: userData?.name || '',
-    phone: '',
+    phone: userData?.phone || '',
     address: '',
     locality: '',
     city: '',
@@ -192,16 +195,30 @@ export default function Checkout() {
     acc[key].items.push(item);
     return acc;
   }, {});
-  const totalPrice = Object.values(groupedByCollection).reduce((acc, group) => {
-    const groupTotal = group.items.reduce((sum, item) => {
-      if (group.type === 'collection') {
-        return sum + (item.posters || []).reduce((pSum, p) => pSum + (p.price || 0), 0) * (item.quantity || 1);
-      }
-      return sum + (item.price || 0) * (item.quantity || 1);
-    }, 0);
-    return acc + groupTotal * (1 - group.discount / 100);
-  }, 0).toFixed(2);
+  const totalPrice = Object.values(groupedByCollection)
+    .reduce((acc, group) => {
+      const groupTotal = group.items.reduce((sum, item) => {
+        if (group.type === 'collection') {
+          return sum + (item.posters || []).reduce((pSum, p) => pSum + (p.price || 0), 0) * (item.quantity || 1);
+        }
+        return sum + (item.price || 0) * (item.quantity || 1);
+      }, 0);
+      return acc + groupTotal * (1 - group.discount / 100);
+    }, 0)
+    .toFixed(2);
 
+  // Load Razorpay script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => console.log('Razorpay script loaded successfully');
+    script.onerror = () => setError('Failed to load Razorpay script. Please try again.');
+    document.body.appendChild(script);
+    return () => document.body.removeChild(script);
+  }, []);
+
+  // Handle authentication and initial address fetch
   useEffect(() => {
     if (authLoading || loadingUserData || addressLoading) return;
     if (!user) {
@@ -212,35 +229,219 @@ export default function Checkout() {
       setError('Firestore is not available. Please try again later.');
       return;
     }
-  }, [user, firestore, authLoading, loadingUserData, addressLoading, navigate]);
 
-  useEffect(() => {
-    if (user && !addressLoading) {
-      const fetchAddresses = async () => {
-        try {
-          const addressList = await getAddressList();
-          if (addressList.length > 0 && !selectedAddressId) {
-            setSelectedAddressId(addressList[0].id);
-            setFormData(addressList[0]);
-          }
-        } catch (err) {
-          setError(`Failed to load addresses: ${err.message}`);
+    const fetchAddresses = async () => {
+      try {
+        const addressList = await getAddressList();
+        if (addressList.length > 0 && !selectedAddressId) {
+          setSelectedAddressId(addressList[0].id);
+          setFormData(addressList[0]);
         }
-      };
-      fetchAddresses();
-    }
-  }, [user, addressLoading, getAddressList, selectedAddressId]);
+      } catch (err) {
+        setError(`Failed to load addresses: ${err.message}`);
+      }
+    };
+    fetchAddresses();
+  }, [user, authLoading, loadingUserData, addressLoading, firestore, navigate, getAddressList, selectedAddressId]);
+
+  // Handle Razorpay payment
+  useEffect(() => {
+    if (!showPayment || !window.Razorpay || paymentProcessing) return;
+
+    const createOrder = async () => {
+      setPaymentProcessing(true);
+      try {
+        if (!process.env.REACT_APP_RAZORPAY_KEY_ID) {
+          throw new Error('Razorpay key is not configured.');
+        }
+        console.log('Calling createRazorpayOrder with:', {
+          amount: parseFloat(totalPrice),
+          itemsCount: items.length,
+          shippingAddressKeys: Object.keys(formData),
+          isBuyNow: !!buyNowItem,
+          userId: user?.uid,
+        });
+        const createRazorpayOrder = httpsCallable(functions, 'createRazorpayOrder');
+        const result = await createRazorpayOrder({
+          amount: parseFloat(totalPrice),
+          items: items.map((item) => ({
+            type: item.type || 'poster',
+            ...(item.type === 'collection'
+              ? {
+                  collectionId: item.collectionId || 'unknown',
+                  quantity: item.quantity || 1,
+                  collectionDiscount: item.collectionDiscount || 0,
+                  posters: (item.posters || []).map((poster) => ({
+                    posterId: poster.posterId || 'unknown',
+                    size: poster.size || 'N/A',
+                    price: poster.price || 0,
+                    title: poster.title || 'Untitled',
+                    image: poster.image || 'https://via.placeholder.com/50',
+                    seller: poster.seller || null,
+                  })),
+                }
+              : {
+                  posterId: item.posterId || 'unknown',
+                  size: item.selectedSize || 'N/A',
+                  quantity: item.quantity || 1,
+                  price: item.price || 0,
+                  title: item.title || 'Untitled',
+                  image: item.image || 'https://via.placeholder.com/50',
+                  seller: item.seller || null,
+                  collectionId: item.collectionId || null,
+                  collectionDiscount: item.collectionDiscount || 0,
+                }),
+          })),
+          shippingAddress: formData,
+          isBuyNow: !!buyNowItem,
+        });
+        console.log('createRazorpayOrder response:', result.data);
+
+        const { orderId, amount, currency } = result.data;
+
+        const options = {
+          key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+          amount: amount.toString(),
+          currency: currency || 'INR',
+          name: 'Back to Dorm',
+          description: buyNowItem ? 'Buy Now Purchase' : 'Cart Purchase',
+          image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098712/image3_qsn98g.webp',
+          order_id: orderId,
+          prefill: {
+            name: formData.name || userData?.name || '',
+            email: userData?.email || '',
+            contact: formData.phone || userData?.phone || '',
+          },
+          notes: {
+            address: `${formData.address}, ${formData.locality}, ${formData.city}, ${formData.state} - ${formData.pincode}`,
+            userId: user.uid,
+          },
+          theme: {
+            color: '#3399cc',
+          },
+          handler: async (response) => {
+            try {
+              console.log('Verifying payment:', {
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              });
+              const verifyRazorpayPayment = httpsCallable(functions, 'verifyRazorpayPayment');
+              const verifyResult = await verifyRazorpayPayment({
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              });
+              console.log('verifyRazorpayPayment result:', verifyResult.data);
+
+              const orderData = {
+                customerId: user.uid,
+                items: items.map((item) => ({
+                  type: item.type || 'poster',
+                  ...(item.type === 'collection'
+                    ? {
+                        collectionId: item.collectionId || 'unknown',
+                        quantity: item.quantity || 1,
+                        collectionDiscount: item.collectionDiscount || 0,
+                        posters: (item.posters || []).map((poster) => ({
+                          posterId: poster.posterId || 'unknown',
+                          size: poster.size || 'N/A',
+                          price: poster.price || 0,
+                          title: poster.title || 'Untitled',
+                          image: poster.image || 'https://via.placeholder.com/50',
+                          seller: poster.seller || null,
+                        })),
+                      }
+                    : {
+                        posterId: item.posterId || 'unknown',
+                        size: item.selectedSize || 'N/A',
+                        quantity: item.quantity || 1,
+                        price: item.price || 0,
+                        title: item.title || 'Untitled',
+                        image: item.image || 'https://via.placeholder.com/50',
+                        seller: item.seller || null,
+                        collectionId: item.collectionId || null,
+                        collectionDiscount: item.collectionDiscount || 0,
+                      }),
+                })),
+                totalPrice: parseFloat(totalPrice),
+                orderDate: new Date().toISOString(),
+                status: 'Pending',
+                paymentStatus: 'Completed',
+                paymentMethod: 'Razorpay',
+                shippingAddress: formData,
+                sentToSupplier: false,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              };
+
+              const orderRef = await addDoc(collection(firestore, 'orders'), orderData);
+              await addDoc(collection(firestore, `userOrders/${user.uid}/orders`), {
+                orderId: orderRef.id,
+                orderDate: orderData.orderDate,
+                status: orderData.status,
+                totalPrice: orderData.totalPrice,
+              });
+
+              if (buyNowItem) {
+                setBuyNowItem(null);
+              } else {
+                await Promise.all(
+                  cartItems.map((item) => deleteDoc(doc(firestore, `users/${user.uid}/cart`, item.id)))
+                );
+                setCartItems([]);
+                localStorage.removeItem('cartItems');
+              }
+
+              console.log('Order created successfully:', orderRef.id);
+              navigate('/account/orders', { state: { orderSuccess: true } });
+            } catch (err) {
+              setError(`Payment verification failed: ${err.message}`);
+              console.error('Payment verification error:', err);
+            } finally {
+              setPaymentProcessing(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              console.log('Razorpay modal dismissed');
+              setPaymentProcessing(false);
+              setShowPayment(false);
+            },
+          },
+        };
+
+        console.log('Opening Razorpay with options:', {
+          key: options.key,
+          amount: options.amount,
+          currency: options.currency,
+          order_id: options.order_id,
+          userId: user.uid,
+        });
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        setError(`Failed to create order: ${err.message}`);
+        console.error('Order creation error:', err);
+        setPaymentProcessing(false);
+      }
+    };
+
+    createOrder();
+  }, [showPayment, user, firestore, functions, totalPrice, items, buyNowItem, formData, userData, navigate, setCartItems, setBuyNowItem]);
 
   const handleAddressSelect = (id) => {
     setSelectedAddressId(id);
     const selected = addresses.find((addr) => addr.id === id);
+    console.log('Selected address:', selected); // Debug log
     if (selected) {
       setFormData(selected);
     } else {
       setFormData({
         title: '',
         name: userData?.name || '',
-        phone: '',
+        phone: userData?.phone || '',
         address: '',
         locality: '',
         city: '',
@@ -262,82 +463,12 @@ export default function Checkout() {
       setError('Please select an address or add a new one.');
       return;
     }
-    setShowPayment(true);
-  };
-
-  const handlePayment = async () => {
-    if (!user) {
-      setError('You must be logged in to place an order.');
+    if (!formData.phone || formData.phone.length < 10) {
+      setError('Please provide a valid phone number.');
       return;
     }
-    setPaymentProcessing(true);
-    setError('');
-
-    try {
-      const orderData = {
-        customerId: user.uid,
-        items: items.map(item => ({
-          type: item.type || 'poster',
-          ...(item.type === 'collection'
-            ? {
-                collectionId: item.collectionId || 'unknown',
-                quantity: item.quantity || 1,
-                collectionDiscount: item.collectionDiscount || 0,
-                posters: (item.posters || []).map(poster => ({
-                  posterId: poster.posterId || 'unknown',
-                  size: poster.size || 'N/A',
-                  price: poster.price || 0,
-                  title: poster.title || 'Untitled',
-                  image: poster.image || 'https://via.placeholder.com/50',
-                  seller: poster.seller || null,
-                })),
-              }
-            : {
-                posterId: item.posterId || 'unknown',
-                size: item.selectedSize || 'N/A',
-                quantity: item.quantity || 1,
-                price: item.price || 0,
-                title: item.title || 'Untitled',
-                image: item.image || 'https://via.placeholder.com/50',
-                seller: item.seller || null,
-                collectionId: item.collectionId || null,
-                collectionDiscount: item.collectionDiscount || 0,
-              }),
-        })),
-        totalPrice: parseFloat(totalPrice),
-        orderDate: new Date().toISOString(),
-        status: 'Pending',
-        paymentStatus: 'Completed',
-        paymentMethod: 'Razorpay',
-        shippingAddress: formData,
-        sentToSupplier: false,
-      };
-
-      const orderRef = await addDoc(collection(firestore, 'orders'), orderData);
-      await addDoc(collection(firestore, `userOrders/${user.uid}/orders`), {
-        orderId: orderRef.id,
-        orderDate: orderData.orderDate,
-        status: orderData.status,
-        totalPrice: orderData.totalPrice,
-      });
-
-      if (buyNowItem) {
-        setBuyNowItem(null);
-      } else {
-        await Promise.all(
-          cartItems.map(item =>
-            deleteDoc(doc(firestore, `users/${user.uid}/cart`, item.id))
-          )
-        );
-        setCartItems([]);
-        localStorage.removeItem('cartItems');
-      }
-
-      navigate('/account/orders', { state: { orderSuccess: true } });
-    } catch (err) {
-      setError(`Payment failed: ${err.message}`);
-      setPaymentProcessing(false);
-    }
+    console.log('Proceeding to payment with address:', formData);
+    setShowPayment(true);
   };
 
   if (authLoading || loadingUserData || addressLoading) {
@@ -350,11 +481,7 @@ export default function Checkout() {
   }
 
   if (addressError && !user) {
-    return (
-      <Alert variant="danger" dismissible onClose={() => setError('')}>
-        Please log in to access checkout.
-      </Alert>
-    );
+    return <Alert variant="danger" dismissible onClose={() => setError('')}>Please log in to access checkout.</Alert>;
   }
 
   return (
@@ -385,19 +512,18 @@ export default function Checkout() {
                           />
                           <div className="flex-grow-1">
                             <h6>
-                              {item.type === 'collection' ? `Collection: ${item.collectionId || 'Untitled'}` : `${item.title || 'Untitled'} (${item.selectedSize || 'N/A'})`}
+                              {item.type === 'collection'
+                                ? `Collection: ${item.collectionId || 'Untitled'}`
+                                : `${item.title || 'Untitled'} (${item.selectedSize || 'N/A'})`}
                             </h6>
                             <p className="mb-0">Quantity: {item.quantity || 1}</p>
-                            {group.discount > 0 && (
-                              <p className="mb-0 text-success">Discount: {group.discount}%</p>
-                            )}
+                            {group.discount > 0 && <p className="mb-0 text-success">Discount: {group.discount}%</p>}
                           </div>
                           <p>
                             ₹{(
                               (item.type === 'collection'
                                 ? (item.posters || []).reduce((sum, p) => sum + (p.price || 0), 0) * (item.quantity || 1)
-                                : (item.price || 0) * (item.quantity || 1)
-                              ) * (1 - group.discount / 100)
+                                : (item.price || 0) * (item.quantity || 1)) * (1 - group.discount / 100)
                             ).toLocaleString('en-IN')}
                           </p>
                         </div>
@@ -489,13 +615,14 @@ export default function Checkout() {
                   <h4 className="mb-3">Payment Options</h4>
                   <Card className="p-3 mb-3">
                     <p className="mb-0">Total Amount: ₹{totalPrice.toLocaleString('en-IN')}</p>
-                    <p className="text-muted">Pay via Razorpay (coming soon)</p>
+                    <p className="text-muted">Pay via Razorpay</p>
                   </Card>
                   <Button
                     variant="success"
                     className="w-100"
-                    onClick={handlePayment}
                     disabled={paymentProcessing}
+                    style={{ display: 'none' }}
+                    id="rzp-button"
                   >
                     {paymentProcessing ? 'Processing Payment...' : 'Pay Now'}
                   </Button>
@@ -519,4 +646,6 @@ export default function Checkout() {
       </div>
     </div>
   );
-}
+};
+
+export default Checkout;

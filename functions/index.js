@@ -1,7 +1,9 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const cloudinary = require("cloudinary").v2;
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -12,6 +14,12 @@ const CLOUDINARY_SECRETS = [
   defineSecret("CLOUDINARY_CLOUD_NAME"),
   defineSecret("CLOUDINARY_API_KEY"),
   defineSecret("CLOUDINARY_API_SECRET"),
+];
+
+// Razorpay secrets
+const RAZORPAY_SECRETS = [
+  defineSecret("RAZORPAY_KEY_ID"),
+  defineSecret("RAZORPAY_KEY_SECRET"),
 ];
 
 exports.approvePoster = onCall(
@@ -126,69 +134,230 @@ exports.approvePoster = onCall(
   }
 );
 
-// const { onRequest } = require("firebase-functions/v2/https");
-// const logger = require("firebase-functions/logger");
+exports.createRazorpayOrder = onCall(
+  {
+    secrets: RAZORPAY_SECRETS,
+    region: "asia-south1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+  },
+  async ({ data: { amount, currency = "INR", items, shippingAddress, isBuyNow }, auth }) => {
+    console.log('createRazorpayOrder called with:', { amount, currency, itemsCount: items?.length, shippingAddressKeys: Object.keys(shippingAddress || {}), isBuyNow });
+    if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
 
-// const functions = require("firebase-functions");
-// const admin = require("firebase-admin");
+    // Validate input
+    if (!amount || typeof amount !== "number" || amount <= 0) {
+      throw new HttpsError("invalid-argument", "Valid amount is required");
+    }
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new HttpsError("invalid-argument", "Items are required");
+    }
+    if (!shippingAddress || typeof shippingAddress !== "object") {
+      throw new HttpsError("invalid-argument", "Shipping address is required");
+    }
+    const requiredAddressFields = ['name', 'phone', 'address', 'locality', 'city', 'state', 'pincode'];
+    const missingFields = requiredAddressFields.filter(field => !shippingAddress[field]);
+    if (missingFields.length > 0) {
+      throw new HttpsError("invalid-argument", `Missing shipping address fields: ${missingFields.join(', ')}`);
+    }
 
-// admin.initializeApp();
-// const db = admin.firestore();
+    // Validate secrets
+    const [keyId, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
+    if (!keyId || !keySecret) {
+      throw new HttpsError("failed-precondition", "Razorpay secrets not configured");
+    }
 
-// exports.submitPoster = functions.https.onCall(async (data, context) => {
-//     if (!context.auth) {
-//         throw new functions.https.HttpsError("unauthenticated", "Please log in");
-//     }
+    // Initialize Razorpay
+    const razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
 
-//     const { title, imageUrl, price, category, tags, stock } = data;
+    try {
+      // Create Razorpay order
+      const order = await razorpay.orders.create({
+        amount: Math.round(amount * 100), // Convert to paise
+        currency,
+        receipt: `receipt_${Date.now()}`,
+        notes: {
+          userId: auth.uid,
+        },
+      });
 
-//     if (!title || !imageUrl || price == null || !category || !Array.isArray(tags) || stock == null) {
-//         throw new functions.https.HttpsError("invalid-argument", "Missing poster data.");
-//     }
+      // Store temporary order in Firestore
+      await db.collection("temporaryOrders").doc(order.id).set({
+        orderId: order.id,
+        userId: auth.uid,
+        items,
+        shippingAddress,
+        amount,
+        isBuyNow: !!isBuyNow,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-//     const sellerId = context.auth.uid;
-//     const sellerRef = db.collection("sellers").doc(sellerId);
+      console.log('Razorpay order created:', { orderId: order.id, amount: order.amount });
+      return {
+        success: true,
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+      };
+    } catch (error) {
+      console.error("Razorpay order creation failed:", error);
+      throw new HttpsError("internal", `Failed to create Razorpay order: ${error.message}`);
+    }
+  }
+);
 
-//     const posterData = {
-//         title,
-//         imageUrl,
-//         price,
-//         category,
-//         tags,
-//         stock,
-//         sellerId: sellerRef,
-//         isPublished: false,
-//         status: "pending", // admin will review
-//         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-//     };
+exports.verifyRazorpayPayment = onCall(
+  {
+    secrets: RAZORPAY_SECRETS,
+    region: "asia-south1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+  },
+  async ({ data: { orderId, paymentId, signature }, auth }) => {
+    console.log('verifyRazorpayPayment called with:', { orderId, paymentId });
+    if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
 
-//     const docRef = await db.collection("posters").add(posterData);
-//     return { success: true, posterId: docRef.id };
-// })
+    // Validate input
+    if (!orderId || !paymentId || !signature) {
+      throw new HttpsError("invalid-argument", "Order ID, Payment ID, and Signature are required");
+    }
 
-// exports.reviewPosterStatus = functions.https.onCall(async (data, context) => {
-//     const { posterId, status } = data;
+    // Validate secrets
+    const [_, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
+    if (!keySecret) {
+      throw new HttpsError("failed-precondition", "Razorpay secret not configured");
+    }
 
-//     // ⚠️ You must check admin role using custom claims (optional for now)
-//     if (!context.auth || context.auth.token.role !== "admin") {
-//         throw new functions.https.HttpsError("permission-denied", "Admins only.");
-//     }
+    try {
+      // Generate expected signature
+      const generatedSignature = crypto
+        .createHmac("sha256", keySecret)
+        .update(`${orderId}|${paymentId}`)
+        .digest("hex");
 
-//     if (!["approved", "rejected"].includes(status)) {
-//         throw new functions.https.HttpsError("invalid-argument", "Invalid status.");
-//     }
+      if (generatedSignature === signature) {
+        console.log('Payment verified successfully for order:', orderId);
+        return { success: true, message: "Payment verified successfully" };
+      } else {
+        throw new HttpsError("invalid-argument", "Invalid payment signature");
+      }
+    } catch (error) {
+      console.error("Razorpay payment verification failed:", error);
+      throw new HttpsError("internal", `Failed to verify payment: ${error.message}`);
+    }
+  }
+);
 
-//     const posterRef = db.collection("posters").doc(posterId);
+exports.razorpayWebhook = onRequest(
+  {
+    secrets: RAZORPAY_SECRETS,
+    region: "asia-south1",
+  },
+  async (req, res) => {
+    console.log('Razorpay webhook received:', req.body.event);
+    const [_, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
+    if (!keySecret) {
+      console.error('Razorpay secret not configured');
+      return res.status(500).json({ error: "Razorpay secret not configured" });
+    }
 
-//     const updateData = {
-//         status,
-//     };
+    const webhookSecret = keySecret;
+    const signature = req.headers["x-razorpay-signature"];
+    const body = JSON.stringify(req.body);
 
-//     if (status === "approved") {
-//         updateData.isPublished = true;
-//     }
+    try {
+      // Verify webhook signature
+      const generatedSignature = crypto
+        .createHmac("sha256", webhookSecret)
+        .update(body)
+        .digest("hex");
 
-//     await posterRef.update(updateData);
+      if (generatedSignature !== signature) {
+        console.error('Invalid webhook signature');
+        return res.status(400).json({ error: "Invalid webhook signature" });
+      }
 
-//     return { success: true };
-// });
+      // Process payment.captured event
+      if (req.body.event === "payment.captured") {
+        const { order_id, payment_id, amount, currency, notes } = req.body.payload.payment.entity;
+        const userId = notes?.userId;
+
+        if (!userId) {
+          console.error('User ID not found in payment notes');
+          return res.status(400).json({ error: "User ID not found in payment notes" });
+        }
+
+        // Check for duplicate order
+        const existingOrder = await db
+          .collection("orders")
+          .where("razorpay_order_id", "==", order_id)
+          .limit(1)
+          .get();
+
+        if (!existingOrder.empty) {
+          console.log('Order already processed:', order_id);
+          return res.status(200).json({ success: true, message: "Order already processed" });
+        }
+
+        // Fetch temporary order
+        const tempOrderRef = await db
+          .collection("temporaryOrders")
+          .where("orderId", "==", order_id)
+          .limit(1)
+          .get();
+
+        if (tempOrderRef.empty) {
+          console.error('Temporary order not found for:', order_id);
+          return res.status(400).json({ error: "Temporary order not found" });
+        }
+
+        const tempOrderData = tempOrderRef.docs[0].data();
+
+        // Save order to Firestore
+        const orderData = {
+          customerId: userId,
+          items: tempOrderData.items,
+          totalPrice: amount / 100,
+          orderDate: new Date().toISOString(),
+          status: "Pending",
+          paymentStatus: "Completed",
+          paymentMethod: "Razorpay",
+          shippingAddress: tempOrderData.shippingAddress,
+          sentToSupplier: false,
+          razorpay_payment_id: payment_id,
+          razorpay_order_id: order_id,
+        };
+
+        const orderRef = await db.collection("orders").add(orderData);
+        await db.collection("userOrders").doc(userId).collection("orders").add({
+          orderId: orderRef.id,
+          orderDate: orderData.orderDate,
+          status: orderData.status,
+          totalPrice: orderData.totalPrice,
+        });
+
+        // Clean up temporary order
+        await tempOrderRef.docs[0].ref.delete();
+
+        // Clear user's cart if not Buy Now
+        if (!tempOrderData.isBuyNow) {
+          const cartItems = await db.collection(`users/${userId}/cart`).get();
+          const batch = db.batch();
+          cartItems.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+
+        console.log('Order processed successfully:', orderRef.id);
+        return res.status(200).json({ success: true, orderId: orderRef.id });
+      }
+
+      return res.status(200).json({ success: true, message: "Event handled" });
+    } catch (error) {
+      console.error("Webhook processing error:", error);
+      return res.status(500).json({ error: "Failed to process webhook" });
+    }
+  }
+);
