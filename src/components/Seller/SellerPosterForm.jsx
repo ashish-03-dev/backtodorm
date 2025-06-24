@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Form, Button, Alert, Modal } from "react-bootstrap";
+import { Form, Button, Alert, Modal, ProgressBar, Spinner } from "react-bootstrap";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import Select from "react-select";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -29,8 +29,11 @@ function SellerPosterForm({ onSave }) {
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [cropping, setCropping] = useState(false); // New state for crop button
   const [crop, setCrop] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
+  const [originalImageSrc, setOriginalImageSrc] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedSize, setSelectedSize] = useState("A4");
   const [rotation, setRotation] = useState(0);
@@ -48,14 +51,12 @@ function SellerPosterForm({ onSave }) {
         return;
       }
       try {
-        // Fetch seller username
         const userDoc = await getDoc(doc(firestore, "users", user.uid));
         if (userDoc.exists() && userDoc.data().sellerUsername) {
           setSellerUsername(userDoc.data().sellerUsername);
         } else {
           setError("Seller profile incomplete. Please set up your username.");
         }
-        // Fetch collections
         const snapshot = await getDocs(collection(firestore, "collections"));
         setCollections(snapshot.docs.map((doc) => ({ value: doc.id, label: doc.data().name })));
       } catch (err) {
@@ -81,8 +82,10 @@ function SellerPosterForm({ onSave }) {
         } else {
           setWarning("");
         }
+        const imageDataUrl = event.target.result;
         if (Math.abs(img.width / img.height - aspectRatio) > 0.05) {
-          setImageSrc(event.target.result);
+          setOriginalImageSrc(imageDataUrl);
+          setImageSrc(imageDataUrl);
           setShowCropModal(true);
           setRotation(0);
           setCrop(
@@ -94,7 +97,7 @@ function SellerPosterForm({ onSave }) {
           );
         } else {
           setFormData((prev) => ({ ...prev, imageFile: file }));
-          setCroppedPreview(event.target.result);
+          setCroppedPreview(imageDataUrl);
         }
       };
       img.src = event.target.result;
@@ -106,6 +109,7 @@ function SellerPosterForm({ onSave }) {
   const handleClearImage = () => {
     setFormData((prev) => ({ ...prev, imageFile: null }));
     setImageSrc(null);
+    setOriginalImageSrc(null);
     setCroppedPreview(null);
     setShowCropModal(false);
     setCrop(null);
@@ -116,77 +120,92 @@ function SellerPosterForm({ onSave }) {
 
   // Rotate image
   const handleRotate = () => {
-    setRotation((prev) => (prev + 90) % 360);
-    if (imgRef.current && imageSrc) {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = img.height;
-        canvas.height = img.width;
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((90 * Math.PI) / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        setImageSrc(canvas.toDataURL("image/png", 1.0));
-        setCrop(
-          centerCrop(
-            makeAspectCrop(
-              { unit: "%", width: 80, aspect: POSTER_SIZES[selectedSize].aspectRatio },
-              POSTER_SIZES[selectedSize].aspectRatio,
-              canvas.width,
-              canvas.height
-            ),
+    if (!imgRef.current || !originalImageSrc) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const newRotation = (rotation + 90) % 360;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = newRotation % 180 === 0 ? img.width : img.height;
+      canvas.height = newRotation % 180 === 0 ? img.height : img.width;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((newRotation * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      setImageSrc(canvas.toDataURL("image/png", 1.0));
+      setCrop(
+        centerCrop(
+          makeAspectCrop(
+            { unit: "%", width: 80, aspect: POSTER_SIZES[selectedSize].aspectRatio },
+            POSTER_SIZES[selectedSize].aspectRatio,
             canvas.width,
             canvas.height
-          )
-        );
-      };
-      img.src = imageSrc;
-    }
+          ),
+          canvas.width,
+          canvas.height
+        )
+      );
+      setRotation(newRotation);
+    };
+    img.src = originalImageSrc;
   };
 
   // Handle crop completion
-  const handleCropComplete = () => {
+  const handleCropComplete = async () => {
     if (!imgRef.current || !crop?.width || !crop?.height || crop.width < 10 || crop.height < 10) {
       setError("Invalid or too small crop region. Please select a larger area.");
       setShowCropModal(false);
       return;
     }
-    const { widthPx, heightPx } = POSTER_SIZES[selectedSize];
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = widthPx;
-    canvas.height = heightPx;
+    setCropping(true); // Set cropping state
+    try {
+      const { widthPx, heightPx } = POSTER_SIZES[selectedSize];
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = widthPx;
+      canvas.height = heightPx;
 
-    ctx.imageSmoothingQuality = "high";
-    ctx.translate(widthPx / 2, heightPx / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.translate(-widthPx / 2, -heightPx / 2);
-    const cropX = (crop.x / 100) * imgRef.current.naturalWidth;
-    const cropY = (crop.y / 100) * imgRef.current.naturalHeight;
-    const cropWidth = (crop.width / 100) * imgRef.current.naturalWidth;
-    const cropHeight = (crop.height / 100) * imgRef.current.naturalHeight;
-    ctx.drawImage(imgRef.current, cropX, cropY, cropWidth, cropHeight, 0, 0, widthPx, heightPx);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      const cropX = (crop.x / 100) * imgRef.current.naturalWidth;
+      const cropY = (crop.y / 100) * imgRef.current.naturalHeight;
+      const cropWidth = (crop.width / 100) * imgRef.current.naturalWidth;
+      const cropHeight = (crop.height / 100) * imgRef.current.naturalHeight;
+      ctx.drawImage(imgRef.current, cropX, cropY, cropWidth, cropHeight, 0, 0, widthPx, heightPx);
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          setError("Failed to generate cropped image.");
-          setShowCropModal(false);
-          return;
-        }
-        const croppedFile = new File([blob], `cropped_${Date.now()}.png`, { type: "image/png" });
-        setFormData((prev) => ({ ...prev, imageFile: croppedFile }));
-        setCroppedPreview(canvas.toDataURL("image/png", 1.0));
-        setShowCropModal(false);
-        setImageSrc(null);
-        setCrop(null);
-        setRotation(0);
-      },
-      "image/png",
-      1.0
-    );
+      await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Failed to generate cropped image."));
+              return;
+            }
+            const croppedFile = new File([blob], `cropped_${Date.now()}.png`, { type: "image/png" });
+            setFormData((prev) => ({ ...prev, imageFile: croppedFile }));
+            setCroppedPreview(canvas.toDataURL("image/png", 1.0));
+            resolve();
+          },
+          "image/png",
+          1.0
+        );
+      });
+
+      setShowCropModal(false);
+      setImageSrc(null);
+      setOriginalImageSrc(null);
+      setCrop(null);
+      setRotation(0);
+    } catch (err) {
+      setError("Failed to process crop: " + err.message);
+    } finally {
+      setCropping(false); // Reset cropping state
+    }
   };
 
   // Handle size change
@@ -196,6 +215,7 @@ function SellerPosterForm({ onSave }) {
     setFormData((prev) => ({ ...prev, sizes: updatedSizes, imageFile: null }));
     setSelectedSize(value in POSTER_SIZES ? value : "A4");
     setImageSrc(null);
+    setOriginalImageSrc(null);
     setCroppedPreview(null);
     setShowCropModal(false);
     setWarning("");
@@ -226,6 +246,7 @@ function SellerPosterForm({ onSave }) {
     e.preventDefault();
     setError("");
     setSubmitting(true);
+    setProgress(0);
 
     if (!user) {
       setError("Please log in to submit the form.");
@@ -270,32 +291,53 @@ function SellerPosterForm({ onSave }) {
       sellerUsername,
       approved: "pending",
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     };
 
     try {
       const imageRef = ref(storage, `posters/${sellerUsername}/${Date.now()}_${formData.imageFile.name}`);
-      await uploadBytes(imageRef, formData.imageFile);
-      data.originalImageUrl = imageRef.fullPath;
-      const result = await addPoster(firestore, storage, data);
-      if (result.success) {
-        onSave(data, result.id);
-      } else {
-        setError(result.error || "Failed to save poster.");
-      }
+      const uploadTask = uploadBytesResumable(imageRef, formData.imageFile);
+
+      // Track upload progress
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progressPercent = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setProgress(progressPercent);
+        },
+        (uploadErr) => {
+          setError("Failed to upload image: " + uploadErr.message);
+          setSubmitting(false);
+          setProgress(0);
+        },
+        async () => {
+          // Upload complete, get download URL
+          try {
+            data.originalImageUrl = imageRef.fullPath;
+            const result = await addPoster(firestore, data);
+            if (result.success) {
+              onSave(data, result.id);
+            } else {
+              setError(result.error || "Failed to save poster.");
+            }
+          } catch (err) {
+            setError("Failed to save poster: " + err.message);
+          } finally {
+            setSubmitting(false);
+            setProgress(0);
+          }
+        }
+      );
     } catch (err) {
       setError("Failed to save poster: " + err.message);
-    } finally {
       setSubmitting(false);
+      setProgress(0);
     }
   };
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+    <div style={{ margin: "0 auto" }}>
       <Form onSubmit={handleSubmit}>
         {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
-        {warning && <Alert variant="warning" onClose={() => setWarning("")} dismissible>{warning}</Alert>}
         <Form.Group className="mb-3">
           <Form.Label>Title</Form.Label>
           <Form.Control
@@ -304,7 +346,8 @@ function SellerPosterForm({ onSave }) {
             onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
             required
             placeholder="Poster title"
-          />
+            disabled={submitting}
+            />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Description</Form.Label>
@@ -315,7 +358,8 @@ function SellerPosterForm({ onSave }) {
             required
             placeholder="Describe your poster"
             rows={2}
-          />
+            disabled={submitting}
+            />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Tags (comma-separated)</Form.Label>
@@ -324,7 +368,8 @@ function SellerPosterForm({ onSave }) {
             value={formData.tags}
             onChange={(e) => setFormData((prev) => ({ ...prev, tags: e.target.value }))}
             placeholder="e.g., k-pop, minimalist"
-          />
+            disabled={submitting}
+            />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Collections</Form.Label>
@@ -334,42 +379,68 @@ function SellerPosterForm({ onSave }) {
             value={formData.collections}
             onChange={(selected) => setFormData((prev) => ({ ...prev, collections: selected }))}
             placeholder="Select collections"
-          />
+            isDisabled={submitting}
+            />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Sizes</Form.Label>
           {formData.sizes.map((size, index) => (
             <div key={index} className="d-flex align-items-center gap-2 mb-2">
-              <Form.Select value={size} onChange={(e) => handleSizeChange(index, e.target.value)} required>
+              <Form.Select
+                value={size}
+                onChange={(e) => handleSizeChange(index, e.target.value)}
+                required
+                disabled={submitting}
+                >
                 <option value="">Select size</option>
                 {Object.keys(POSTER_SIZES).map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </Form.Select>
               {formData.sizes.length > 1 && (
-                <Button variant="outline-danger" onClick={() => removeSize(index)}>
+                <Button variant="outline-danger" onClick={() => removeSize(index)} disabled={submitting}>
                   Remove
                 </Button>
               )}
             </div>
           ))}
-          <Button variant="outline-primary" size="sm" onClick={addSize}>
+          <Button variant="outline-primary" size="sm" onClick={addSize} disabled={submitting}>
             + Add Size
           </Button>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Image</Form.Label>
-          <div className="d-flex gap-2 align-items-center">
-            <Form.Control type="file" accept="image/*" onChange={handleImageChange} required ref={fileInputRef} />
+          <div className="position-relative" style={{ maxWidth: "100%" }}>
+            <Form.Control
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              required
+              ref={fileInputRef}
+              style={{ paddingRight: formData.imageFile ? "60px" : undefined }}
+              disabled={submitting}
+              />
             {formData.imageFile && (
-              <Button variant="outline-danger" size="sm" onClick={handleClearImage}>
+              <span
+              onClick={handleClearImage}
+              style={{
+                position: "absolute",
+                top: "50%",
+                right: "10px",
+                transform: "translateY(-50%)",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                color: "#007bff",
+              }}
+              >
                 Clear
-              </Button>
+              </span>
             )}
           </div>
+          {warning && <p className="mt-2">{warning}</p>}
           {croppedPreview && (
             <div className="mt-3">
-              <p>Preview: {warning ? "(Low Resolution - Upscaled)" : ""}</p>
+              {warning && <p className="mb-1">(Low Resolution - Upscaled)</p>}
               <img src={croppedPreview} alt="Preview" style={{ maxWidth: "200px" }} />
             </div>
           )}
@@ -382,9 +453,29 @@ function SellerPosterForm({ onSave }) {
             Cancel
           </Button>
         </div>
+      {progress > 0 && progress < 100 && (
+        <ProgressBar
+          now={progress}
+          label={`${Math.round(progress)}%`}
+          className="mt-3"
+          animated
+        />
+      )}
       </Form>
-
-      <Modal show={showCropModal} onHide={() => setShowCropModal(false)}>
+      <Modal
+        show={showCropModal}
+        onHide={() => {
+          setShowCropModal(false);
+          setFormData((prev) => ({ ...prev, imageFile: null }));
+          setImageSrc(null);
+          setOriginalImageSrc(null);
+          setCroppedPreview(null);
+          setCrop(null);
+          setRotation(0);
+          setWarning("");
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }}
+      >
         <Modal.Header closeButton>
           <Modal.Title>Crop Image to {selectedSize}</Modal.Title>
         </Modal.Header>
@@ -400,17 +491,32 @@ function SellerPosterForm({ onSave }) {
               ref={imgRef}
               src={imageSrc}
               alt="Crop preview"
-              style={{ maxWidth: "100%", transform: `rotate(${rotation}deg)` }}
+              style={{ maxWidth: "100%" }}
               crossOrigin="anonymous"
             />
           </ReactCrop>
-          <div className="d-flex gap-2 mt-3">
-            <Button variant="primary" onClick={handleCropComplete} disabled={!crop?.width || !crop?.height}>
-              Apply Crop
-            </Button>
-            <Button variant="secondary" onClick={handleRotate}>
-              Rotate 90°
-            </Button>
+          <div className="d-flex flex-column align-items-center gap-2 mt-3">
+            {cropping ? (
+              <div className="d-flex flex-column align-items-center">
+                <Spinner animation="border" className="d-block text-primary" role="status">
+                  <span className="visually-hidden">Processing...</span>
+                </Spinner>
+                <p className="mt-2 text-muted">Processing...</p>
+              </div>
+            ) : (
+              <div className="d-flex gap-2">
+                <Button
+                  variant="primary"
+                  onClick={handleCropComplete}
+                  disabled={!crop?.width || !crop?.height || cropping}
+                >
+                  Apply Crop
+                </Button>
+                <Button variant="secondary" onClick={handleRotate} disabled={cropping}>
+                  Rotate 90°
+                </Button>
+              </div>
+            )}
           </div>
         </Modal.Body>
       </Modal>

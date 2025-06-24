@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useFirebase } from "../../context/FirebaseContext";
 import { useNavigate } from "react-router-dom";
+import { httpsCallable } from 'firebase/functions';
 
 export default function BecomeSeller() {
-  const { becomeSeller, userData, checkUsernameAvailability } = useFirebase();
+  const { functions, userData, checkUsernameAvailability } = useFirebase();
   const navigate = useNavigate();
   const [sellerUsername, setSellerUsername] = useState("@");
   const [error, setError] = useState("");
@@ -51,19 +52,21 @@ export default function BecomeSeller() {
     setLoading(true);
     setError("");
     try {
-      await becomeSeller({ sellerUsername });
-      navigate("/seller-dashboard");
+      const becomeSellerFunction = httpsCallable(functions, 'becomeSeller');
+      await becomeSellerFunction({ sellerUsername });
+      navigate("/seller");
     } catch (err) {
       setError(err.message || "Failed to become a seller");
       setLoading(false);
     }
   };
 
+
   if (userData?.isSeller) {
     return (
       <div className="p-4">
         <h3>You are already a seller!</h3>
-        <a href="/seller-dashboard" className="btn btn-primary mt-3">
+        <a href="/seller" className="btn btn-primary mt-3">
           Go to Seller Dashboard
         </a>
       </div>

@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect} from "react";
 import { Modal, Button, Form, Badge, Table, Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
-import { useNavigate } from "react-router-dom";
 import { collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
-import '../../styles/SellerComponents.css';
 
 const Orders = () => {
-  const { firestore, user, userData, loadingUserData, error: firebaseError } = useFirebase();
-  const navigate = useNavigate();
+  const { firestore, userData, error: firebaseError } = useFirebase();
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState({ status: "", search: "" });
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -23,24 +20,10 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const hasRedirected = useRef(false);
-
-  // Redirect non-admins
-  useEffect(() => {
-    if (loadingUserData || !userData || !user) return;
-    if (userData.isAdmin !== true) {
-      if (!hasRedirected.current) {
-        hasRedirected.current = true;
-        navigate("/login", { replace: true });
-      }
-    } else {
-      hasRedirected.current = false;
-    }
-  }, [user, userData, loadingUserData, navigate]);
 
   // Fetch orders
   useEffect(() => {
-    if (!firestore || !userData?.isAdmin || loadingUserData) return;
+    if (!firestore) return;
 
     const ordersQuery = query(collection(firestore, "orders"));
     const unsubscribe = onSnapshot(
@@ -93,7 +76,7 @@ const Orders = () => {
     );
 
     return () => unsubscribe();
-  }, [firestore, userData, loadingUserData]);
+  }, [firestore, userData]);
 
   const handleStatusChange = async (orderId, newStatus) => {
     setSubmitting(true);
@@ -162,9 +145,9 @@ const Orders = () => {
     }
   };
 
-  if (loading || loadingUserData) {
+  if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100svh" }}>
         <Spinner animation="border" className="text-primary" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>

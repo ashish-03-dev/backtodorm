@@ -1,10 +1,13 @@
 import {
   doc,
+  setDoc,
   updateDoc,
   getDoc,
   runTransaction,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 // Helper function to normalize text for keywords
 const normalizeText = (text) => {
@@ -49,12 +52,106 @@ const generateKeywords = (title, description, tags, collections = []) => {
     .slice(0, 50);
 };
 
-// Update an existing poster for admin panel
-export const updatePosterAdmin = async (
+// Submit a new poster for admin panel
+export const submitPoster = async (
+  firestore,
+  storage,
+  posterData,
+  posterId,
+  adminUser
+) => {
+  try {
+    // Validate inputs
+    if (!posterData.title) throw new Error("Poster title is required");
+    if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0)
+      throw new Error("At least one valid size is required");
+    if (!posterId) throw new Error("Poster ID is required");
+    if (!posterData.sellerUsername) throw new Error("Seller username is required");
+    if (!adminUser?.isAdmin) throw new Error("Admin access required");
+    if (!posterData.imageFile) throw new Error("An image is required for new posters");
+
+    // Upload image
+    const storagePath = `posters/${posterData.sellerUsername}/${Date.now()}_${posterData.imageFile.name}`;
+    const imageRef = ref(storage, storagePath);
+    await uploadBytes(imageRef, posterData.imageFile);
+    const imageUrl = await getDownloadURL(imageRef);
+
+    // Prepare poster data
+    const poster = {
+      ...posterData,
+      posterId,
+      keywords: generateKeywords(
+        posterData.title,
+        posterData.description,
+        posterData.tags,
+        posterData.collections
+      ),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      approved: "pending",
+      isActive: posterData.isActive !== false,
+      originalImageUrl: imageUrl,
+    };
+
+    await runTransaction(firestore, async (transaction) => {
+      const posterRef = doc(firestore, "tempPosters", posterId);
+      const posterDoc = await transaction.get(posterRef);
+      if (posterDoc.exists()) throw new Error("Poster ID already exists");
+
+      // Set poster in tempPosters
+      transaction.set(posterRef, poster);
+
+      // Update seller document
+      const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
+      const sellerDoc = await transaction.get(sellerRef);
+      if (!sellerDoc.exists()) throw new Error("Seller not found");
+      const sellerData = sellerDoc.data();
+      const tempPosters = sellerData.tempPosters || [];
+      transaction.update(sellerRef, {
+        tempPosters: [...tempPosters, { id: posterId, status: "pending" }],
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update collections
+      const collections = posterData.collections || [];
+      const collectionDocs = await Promise.all(
+        collections.map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
+
+      collections.forEach((col, index) => {
+        const colId = normalizeCollection(col);
+        const colDoc = collectionDocs[index];
+        if (!colDoc.exists()) {
+          transaction.set(doc(firestore, "collections", colId), {
+            name: colId,
+            posterIds: [posterId],
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          const posterIds = colDoc.data().posterIds || [];
+          if (!posterIds.includes(posterId)) {
+            transaction.update(doc(firestore, "collections", colId), {
+              posterIds: [...posterIds, posterId],
+            });
+          }
+        }
+      });
+    });
+
+    return { success: true, id: posterId };
+  } catch (error) {
+    console.error("Error submitting poster:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Update an existing approved poster in posters collection
+export const updatePoster = async (
   firestore,
   posterData,
   posterId,
-  collectionName = "tempPosters",
   adminUser
 ) => {
   try {
@@ -76,11 +173,10 @@ export const updatePosterAdmin = async (
         posterData.collections
       ),
       updatedAt: serverTimestamp(),
-      // Allow admin to update approved status explicitly
-      approved: posterData.approved || "pending",
+      approved: "approved",
     };
 
-    const posterRef = doc(firestore, collectionName, posterId);
+    const posterRef = doc(firestore, "posters", posterId);
 
     await runTransaction(firestore, async (transaction) => {
       // Fetch existing poster
@@ -135,7 +231,115 @@ export const updatePosterAdmin = async (
       collectionsToRemove.forEach((col, index) => {
         const colDoc = collectionDocsToRemove[index];
         const colId = normalizeCollection(col);
-        if (colDoc?.exists() && colDoc.data().posterIds) {
+        if (colDoc.exists() && colDoc.data().posterIds) {
+          const posterIds = colDoc.data().posterIds || [];
+          transaction.update(doc(firestore, "collections", colId), {
+            posterIds: posterIds.filter((pid) => pid !== posterId),
+          });
+        }
+      });
+    });
+
+    return { success: true, id: posterId };
+  } catch (error) {
+    console.error("Error updating poster in admin panel:", error);
+    return { success: false, error: error.message };
+  }
+};
+export const updateTempPoster = async (firestore, storage, posterData, posterId) => {
+  try {
+    // Validate inputs
+    if (!posterData.title) throw new Error("Poster title is required");
+    if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0)
+      throw new Error("At least one valid size is required");
+    if (!posterId) throw new Error("Poster ID is required for update");
+    if (!posterData.sellerUsername) throw new Error("Seller username is required");
+
+    // Upload new image if provided
+    let imageUrl = posterData.originalImageUrl;
+    if (posterData.imageFile) {
+      const storagePath = `posters/${posterData.sellerUsername}/${Date.now()}_${posterData.imageFile.name}`;
+      const imageRef = ref(storage, storagePath);
+      await uploadBytes(imageRef, posterData.imageFile);
+      imageUrl = await getDownloadURL(imageRef);
+    }
+
+    // Prepare poster data with keywords
+    const poster = {
+      ...posterData,
+      keywords: generateKeywords(
+        posterData.title,
+        posterData.description,
+        posterData.tags,
+        posterData.collections
+      ),
+      updatedAt: serverTimestamp(),
+      approved: posterData.approved || "pending",
+      originalImageUrl: imageUrl,
+    };
+
+    const posterRef = doc(firestore, "tempPosters", posterId);
+
+    await runTransaction(firestore, async (transaction) => {
+      // Step 1: Perform all reads upfront
+      // Read the existing poster
+      const existingPoster = await transaction.get(posterRef);
+      if (!existingPoster.exists()) throw new Error("Poster not found");
+      const oldCollections = existingPoster.data().collections || [];
+
+      // Determine collections to add/remove
+      const collectionsToRemove = oldCollections.filter(
+        (col) => !posterData.collections?.includes(col)
+      );
+      const collectionsToAdd = posterData.collections?.filter(
+        (col) => !oldCollections.includes(col)
+      ) || [];
+
+      // Read all collection documents
+      const collectionDocsToRemove = await Promise.all(
+        collectionsToRemove.map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
+      const collectionDocsToAdd = await Promise.all(
+        collectionsToAdd.map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
+
+      // Read the seller document
+      const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
+      const sellerDoc = await transaction.get(sellerRef);
+
+      // Step 2: Perform all writes
+      // Update poster document
+      transaction.update(posterRef, poster);
+
+      // Update collections to add
+      collectionsToAdd.forEach((col, index) => {
+        const colDoc = collectionDocsToAdd[index];
+        const colId = normalizeCollection(col);
+        if (!colDoc.exists()) {
+          transaction.set(doc(firestore, "collections", colId), {
+            name: colId,
+            posterIds: [posterId],
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          const posterIds = colDoc.data().posterIds || [];
+          if (!posterIds.includes(posterId)) {
+            transaction.update(doc(firestore, "collections", colId), {
+              posterIds: [...posterIds, posterId],
+            });
+          }
+        }
+      });
+
+      // Update collections to remove
+      collectionsToRemove.forEach((col, index) => {
+        const colDoc = collectionDocsToRemove[index];
+        const colId = normalizeCollection(col);
+        if (colDoc.exists() && colDoc.data().posterIds) {
           const posterIds = colDoc.data().posterIds || [];
           transaction.update(doc(firestore, "collections", colId), {
             posterIds: posterIds.filter((pid) => pid !== posterId),
@@ -143,13 +347,11 @@ export const updatePosterAdmin = async (
         }
       });
 
-      // Update seller document if in tempPosters
-      const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
-      const sellerDoc = await transaction.get(sellerRef);
-      if (sellerDoc.exists() && collectionName === "tempPosters") {
+      // Update seller document
+      if (sellerDoc.exists()) {
         const tempPosters = sellerDoc.data().tempPosters || [];
         const updatedTempPosters = tempPosters.map((p) =>
-          p.posterId === posterId
+          p.id === posterId
             ? { ...p, status: poster.approved || "pending" }
             : p
         );
@@ -162,7 +364,89 @@ export const updatePosterAdmin = async (
 
     return { success: true, id: posterId };
   } catch (error) {
-    console.error("Error updating poster in admin panel:", error);
+    console.error("Error updating temp poster in admin panel:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+
+// Reject a poster and move to sellers.rejectedPosters
+export const rejectPoster = async (firestore, storage, posterId) => {
+  try {
+    // Fetch the poster document first
+    const posterRef = doc(firestore, "tempPosters", posterId);
+    const posterDoc = await getDoc(posterRef);
+    if (!posterDoc.exists()) throw new Error("Poster not found");
+
+    const posterData = posterDoc.data();
+    const sellerUsername = posterData.sellerUsername;
+    const imageUrl = posterData.originalImageUrl;
+    const collections = posterData.collections || [];
+
+    // Fetch seller document outside transaction
+    const sellerRef = doc(firestore, "sellers", sellerUsername);
+    const sellerDoc = await getDoc(sellerRef);
+    if (!sellerDoc.exists()) throw new Error("Seller not found");
+
+    // Fetch collection documents outside transaction
+    const collectionDocs = await Promise.all(
+      collections.map((col) =>
+        getDoc(doc(firestore, "collections", normalizeCollection(col)))
+      )
+    );
+
+    // Run the transaction
+    await runTransaction(firestore, async (transaction) => {
+      // Get seller data
+      const sellerData = sellerDoc.data();
+      const rejectedPosters = sellerData.rejectedPosters || [];
+      const tempPosters = sellerData.tempPosters || [];
+      const updatedTempPosters = tempPosters.filter((p) => p.id !== posterId);
+
+      // Update seller's rejectedPosters
+      transaction.update(sellerRef, {
+        tempPosters: updatedTempPosters,
+        rejectedPosters: [
+          ...rejectedPosters,
+          {
+            id: posterId,
+            title: posterData.title,
+            imageUrl: posterData.originalImageUrl,
+            rejectedAt: new Date(),
+          },
+        ],
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update collections
+      collections.forEach((col, index) => {
+        const colDoc = collectionDocs[index];
+        const colId = normalizeCollection(col);
+        if (colDoc.exists() && colDoc.data().posterIds) {
+          const posterIds = colDoc.data().posterIds || [];
+          transaction.update(doc(firestore, "collections", colId), {
+            posterIds: posterIds.filter((pid) => pid !== posterId),
+          });
+        }
+      });
+
+      // Delete from tempPosters
+      transaction.delete(posterRef);
+    });
+
+    // Delete image from storage
+    if (imageUrl) {
+      try {
+        const imageRef = ref(storage, imageUrl);
+        await deleteObject(imageRef);
+      } catch (error) {
+        console.warn("Failed to delete image from storage:", error);
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error rejecting poster:", error);
     return { success: false, error: error.message };
   }
 };

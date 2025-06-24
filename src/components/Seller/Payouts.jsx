@@ -1,10 +1,9 @@
 import React from "react";
 import { Alert } from "react-bootstrap";
-import '../../styles/SellerComponents.css';
 
 export default function Payouts() {
   return (
-    <div>
+    <div className="p-4 p-md-5">
       <h4 className="mb-4">Payouts</h4>
       <Alert variant="info">
         Payout management is under development. Please contact support for withdrawal requests.

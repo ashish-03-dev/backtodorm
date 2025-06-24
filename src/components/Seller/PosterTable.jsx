@@ -1,8 +1,18 @@
-import React from "react";
-import { Button } from "react-bootstrap";
-import '../../styles/SellerComponents.css';
+import React, { useState } from "react";
+import { Button, Spinner } from "react-bootstrap";
 
-export default function PosterTable({ posters, onView, onDelete, onSubmit, isDashboardView = false }) {
+export default function PosterTable({ posters, onView, onDelete, isDashboardView = false }) {
+  const [viewingId, setViewingId] = useState(null);
+
+  const handleViewClick = async (poster) => {
+    setViewingId(poster.id); // Set loading state for this poster's button
+    try {
+      await onView(poster); // Call the onView function passed from MyProducts
+    } finally {
+      setViewingId(null); // Reset loading state after view operation completes
+    }
+  };
+
   return (
     <div className="table-responsive">
       <table className="table table-hover table-bordered align-middle">
@@ -10,7 +20,7 @@ export default function PosterTable({ posters, onView, onDelete, onSubmit, isDas
           <tr>
             <th>Title</th>
             <th>Status</th>
-            {!isDashboardView && <th>Keywords</th>}
+            <th>{isDashboardView ? "Created At" : "Date"}</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -19,39 +29,52 @@ export default function PosterTable({ posters, onView, onDelete, onSubmit, isDas
             posters.map((poster) => (
               <tr key={poster.id}>
                 <td>{poster.title || "Untitled"}</td>
-                <td>{poster.approved || "Draft"}</td>
-                {!isDashboardView && (
-                  <td>{poster.keywords?.join(", ") || "None"}</td>
-                )}
+                <td>
+                  {poster.status
+                    ? poster.status.charAt(0).toUpperCase() + poster.status.slice(1)
+                    : "Draft"}
+                </td>
+                <td>
+                  {poster.createdAt
+                    ? new Date(
+                        poster.createdAt.seconds
+                          ? poster.createdAt.seconds * 1000
+                          : poster.createdAt
+                      ).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                    : "N/A"}
+                </td>
                 <td>
                   <div className="d-flex gap-2">
                     <Button
                       size="sm"
                       variant="outline-primary"
-                      onClick={() => onView(poster)}
+                      onClick={() => handleViewClick(poster)}
+                      disabled={viewingId === poster.id}
                     >
-                      View
-                    </Button>
-                    {!isDashboardView && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline-danger"
-                          onClick={() => onDelete(poster.id)}
-                          disabled={poster.approved === "approved"}
-                        >
-                          Delete
-                        </Button>
-                        {poster.approved === "draft" && (
-                          <Button
+                      {viewingId === poster.id ? (
+                        <>
+                          <Spinner
+                            as="span"
+                            animation="border"
                             size="sm"
-                            variant="outline-success"
-                            onClick={() => onSubmit(poster.id)}
-                          >
-                            Submit
-                          </Button>
-                        )}
-                      </>
+                            role="status"
+                            aria-hidden="true"
+                            className="me-1"
+                          />
+                          Viewing...
+                        </>
+                      ) : (
+                        "View"
+                      )}
+                    </Button>
+                    {!isDashboardView && poster.status !== "approved" && poster.status !== "rejected" && (
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        onClick={() => onDelete(poster.id, poster.source)}
+                      >
+                        Delete
+                      </Button>
                     )}
                   </div>
                 </td>

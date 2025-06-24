@@ -138,7 +138,7 @@ export default function ProductDetail() {
   const isDiscounted = poster.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
 
   return (
-    <div className="container my-5">
+    <div className="container my-5" style={{ minHeight: "calc(100svh - 65px" }}>
       <div className="row">
         <div className="col-md-6 mb-4">
           <img src={poster.image} className="img-fluid rounded shadow-sm" alt={poster.title} />

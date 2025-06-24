@@ -1,5 +1,4 @@
 import React from "react";
-import '../../styles/SellerComponents.css';
 
 export default function OrderTable({ orders }) {
   return (

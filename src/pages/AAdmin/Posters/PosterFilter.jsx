@@ -33,11 +33,13 @@ const PosterFilter = ({ filter, onFilterChange, onAdd, hideApprovedFilter }) => 
           </Form.Select>
         </Form.Group>
       )}
-      <div className="ms-auto align-self-end">
-        <Button variant="primary" onClick={onAdd}>
-          + Add Poster
-        </Button>
-      </div>
+      {onAdd && (
+        <div className="ms-auto align-self-end">
+          <Button variant="primary" onClick={onAdd}>
+            + Add Poster
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

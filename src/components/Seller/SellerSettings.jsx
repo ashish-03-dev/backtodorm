@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
 import { useFirebase } from "../../context/FirebaseContext";
 import { Button, Form, Alert } from "react-bootstrap";
-import '../../styles/SellerComponents.css';
 
 export default function Settings() {
-  const { user, userData, loadingUserData, getUserProfile, updateUserProfile } = useFirebase();
+  const { user, getUserProfile, updateUserProfile } = useFirebase();
   const [name, setName] = useState("");
   const [tempName, setTempName] = useState("");
   const [editingName, setEditingName] = useState(false);
@@ -32,12 +30,8 @@ export default function Settings() {
     }
   };
 
-  if (!loadingUserData && !user) {
-    return <Navigate to="/login" />;
-  }
-
   return (
-    <div className="d-flex flex-column h-100">
+    <div className="p-4 p-md-5">
       <h4 className="mb-4">Settings</h4>
       {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
       <div className="mb-4">

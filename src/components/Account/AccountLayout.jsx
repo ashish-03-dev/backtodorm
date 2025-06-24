@@ -1,34 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import '../../styles/AccountLayout.css';
 import { useFirebase } from "../../context/FirebaseContext";
 
 export default function AccountLayout() {
-  const { logout, user, userData, loadingUserData } = useFirebase();
+  const { logout, userData } = useFirebase();
   const location = useLocation();
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
-  const [showSidebar, setShowSidebar] = useState(false);
   const [showContentOnMobile, setShowContentOnMobile] = useState(false);
 
   const isMobile = window.innerWidth < 768;
 
-  // Redirect unauthenticated users to login or show loading state
-  useEffect(() => {
-    if (loadingUserData) return; // Wait for Firebase to resolve auth state
-    if (!user) {
-      navigate("/login", { replace: true });
-    }
-  }, [user, loadingUserData, navigate]);
-
-  // Detect when to show sidebar or content on mobile based on current route
   useEffect(() => {
     if (!isMobile) return;
-
-    const baseRoutes = ["/account"];
-    const isBaseRoute = baseRoutes.includes(location.pathname);
-
     setShowContentOnMobile(location.pathname !== "/account");
   }, [location.pathname, isMobile]);
 
@@ -55,35 +40,14 @@ export default function AccountLayout() {
 
   const isActive = (path) => location.pathname === path;
 
-  // Show loading indicator while Firebase resolves auth state
-  if (loadingUserData) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Render nothing until user is confirmed (handled by useEffect redirect)
-  if (!user) return null;
-
   return (
     <>
-      {showSidebar && (
-        <div
-          className="account-overlay d-md-none"
-          onClick={() => setShowSidebar(false)}
-        ></div>
-      )}
-
       <div className="bg-light p-3">
-        <div className="container d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
+        <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
           {/* Sidebar */}
           {!showContentOnMobile && (
             <div
-              className={`account-sidebar bg-light d-flex flex-column gap-3 ${showSidebar ? "show" : ""}`}
+              className="bg-light d-flex flex-column gap-3"
               style={{ minWidth: "300px", flexShrink: 0 }}
             >
               <div className="text-center p-4 bg-white shadow-sm">

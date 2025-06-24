@@ -96,6 +96,7 @@ exports.approvePoster = onCall(
         imageUrl,
         originalImageUrl: null,
         approved: "approved",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       t.delete(tempPosterRef);
@@ -109,22 +110,26 @@ exports.approvePoster = onCall(
         }
       });
 
-      // Update seller
-      const approvedPoster = {
-        posterId,
-        createdAt: posterData.createdAt || new Date().toISOString(),
-      };
+      // Update seller posters
       if (seller.exists) {
+        const sellerData = seller.data();
+        // Filter tempPosters to remove the entry with matching id
+        const updatedTempPosters = (sellerData.tempPosters || []).filter(
+          (entry) => entry.id !== posterId
+        );
         t.update(sellerRef, {
-          tempPosters: admin.firestore.FieldValue.arrayRemove({ posterId }),
-          approvedPosters: admin.firestore.FieldValue.arrayUnion(approvedPoster),
+          tempPosters: updatedTempPosters,
+          approvedPosters: admin.firestore.FieldValue.arrayUnion(posterId), // Store as string
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
         t.set(sellerRef, {
           sellerUsername: posterData.sellerUsername,
+          uid: auth.uid,
           tempPosters: [],
-          approvedPosters: [approvedPoster],
+          approvedPosters: [posterId],
+          rejectedPosters: [],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
@@ -358,6 +363,67 @@ exports.razorpayWebhook = onRequest(
     } catch (error) {
       console.error("Webhook processing error:", error);
       return res.status(500).json({ error: "Failed to process webhook" });
+    }
+  }
+);
+
+exports.becomeSeller = onCall(
+  {
+    region: "asia-south1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+  },
+  async ({ data: { sellerUsername }, auth }) => {
+    if (!auth) throw new HttpsError("unauthenticated", "User not signed in");
+    const uid = auth.uid;
+
+    const userRef = db.doc(`users/${uid}`);
+    const sellerRef = db.doc(`sellers/${sellerUsername}`);
+
+    // Check username availability
+    const usernameSnapshot = await db
+      .collection("sellers")
+      .where("sellerUsername", "==", sellerUsername)
+      .get();
+    if (!usernameSnapshot.empty) {
+      throw new HttpsError("already-exists", "Username is already taken");
+    }
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+          throw new HttpsError("not-found", "User document does not exist");
+        }
+
+        const userData = userDoc.data();
+        const sellerName = userData.name && typeof userData.name === 'string' && userData.name.trim()
+          ? userData.name.trim()
+          : sellerUsername;
+
+        const userUpdatedData = {
+          isSeller: true,
+          sellerUsername,
+          sellerCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        const sellerData = {
+          uid,
+          sellerUsername,
+          sellerName,
+          createdAt: new Date().toISOString(),
+          approvedPosters: [],
+          rejectedPosters: [],
+          tempPosters: [],
+        };
+
+        transaction.set(userRef, userUpdatedData, { merge: true });
+        transaction.set(sellerRef, sellerData);
+      });
+
+      return { success: true, sellerUsername };
+    } catch (error) {
+      throw new HttpsError("internal", error.message || "Failed to create seller account");
     }
   }
 );

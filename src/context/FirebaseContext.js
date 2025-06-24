@@ -91,22 +91,6 @@ export const FirebaseProvider = ({ children }) => {
     };
   };
 
-  const becomeSeller = async (sellerData) => {
-    if (!user) throw new Error('User not signed in');
-    const userRef = doc(firestore, 'users', user.uid);
-    const { available } = await checkUsernameAvailability(sellerData.sellerUsername);
-    if (!available) throw new Error('Username is already taken');
-
-    const updatedData = {
-      isSeller: true,
-      sellerUsername: sellerData.sellerUsername,
-      sellerCreatedAt: new Date().toISOString(),
-    };
-    await setDoc(userRef, updatedData, { merge: true });
-    setUserData((prev) => ({ ...prev, ...updatedData }));
-    return updatedData;
-  };
-
   const putData = (key, data) => set(ref(database, key), data);
 
   const logout = () => signOut(auth);
@@ -219,7 +203,6 @@ export const FirebaseProvider = ({ children }) => {
         linkPhoneNumber,
         linkGoogleAccount,
         deleteUserAccount,
-        becomeSeller,
         checkUsernameAvailability,
         error,
         app,

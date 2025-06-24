@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Button, Form, Modal, Badge, Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
-import '../../styles/SellerComponents.css';
 
 const Sellers = () => {
-  const { firestore, user, userData, loadingUserData, error: firebaseError } = useFirebase();
-  const navigate = useNavigate();
+  const { firestore, userData, error: firebaseError } = useFirebase();
   const [sellers, setSellers] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -16,26 +13,10 @@ const Sellers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const hasRedirected = useRef(false);
-
-  // Check user authentication and admin status
-  useEffect(() => {
-    if (loadingUserData || !userData) {
-      return;
-    }
-    if (!user?.uid || userData.isAdmin !== true) {
-      if (!hasRedirected.current) {
-        hasRedirected.current = true;
-        setTimeout(() => navigate("/login", { replace: true }), 100);
-      }
-    } else {
-      hasRedirected.current = false;
-    }
-  }, [user, userData, loadingUserData, navigate]);
 
   // Fetch sellers and their metrics
   useEffect(() => {
-    if (!firestore || !userData?.isAdmin || loadingUserData) return;
+    if (!firestore) return;
 
     const sellersQuery = query(
       collection(firestore, "users"),
@@ -97,7 +78,7 @@ const Sellers = () => {
     );
 
     return () => unsubscribe();
-  }, [firestore, userData, loadingUserData]);
+  }, [firestore, userData]);
 
   const filteredSellers = sellers.filter((s) => {
     const matchesSearch =
@@ -157,7 +138,7 @@ const Sellers = () => {
     }
   };
 
-  if (loadingUserData || !userData) {
+  if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
         <Spinner animation="border" className="text-primary" role="status">

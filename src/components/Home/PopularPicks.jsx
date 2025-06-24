@@ -7,7 +7,7 @@ export default function PopularPicks() {
 
   return (
     <SectionScroll
-      sectionId="popular"
+      sectionId="popular-picks"
       title="Popular Picks"
       firestore={firestore}
     />

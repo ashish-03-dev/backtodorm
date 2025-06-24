@@ -3,8 +3,7 @@ import { useFirebase } from '../../context/FirebaseContext';
 import { collection, query, onSnapshot, doc, setDoc, addDoc } from 'firebase/firestore';
 import { Alert, Spinner, Form, Button, Card, Table, Badge } from 'react-bootstrap';
 import { Navigate } from 'react-router-dom';
-import '../../styles/AccountLayout.css'; // Reuse existing styles for consistency
-
+  
 export default function HelpCentre() {
   const { user, firestore, userData, loadingUserData } = useFirebase();
   const [orders, setOrders] = useState([]);

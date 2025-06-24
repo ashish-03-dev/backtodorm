@@ -3,7 +3,6 @@ import { Spinner, Alert, Card } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import OrderTable from "./OrderTable";
-import '../../styles/SellerComponents.css';
 
 const PosterTable = lazy(() => import("./PosterTable"));
 const PosterView = lazy(() => import("./PosterView"));
@@ -67,11 +66,19 @@ export default function SellerDashboard() {
   const pendingPosters = posters.filter((p) => p.approved === "pending").length;
 
   if (loading) {
-    return <Spinner animation="border" className="d-block mx-auto my-5" />;
+    return (<div
+      className="d-flex flex-column justify-content-center align-items-center"
+      style={{ minHeight: "100%" }}
+    >
+      <Spinner animation="border" className="d-block text-primary" role="status">
+        <span className="visually-hidden">Loading...</span>
+      </Spinner>
+      <p className="mt-2 text-muted">Loading data...</p>
+    </div>)
   }
 
   return (
-    <div>
+    <div className="p-4 p-md-5 ">
       <h4 className="mb-4">Dashboard</h4>
       {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
       <div className="row g-3 mb-4">

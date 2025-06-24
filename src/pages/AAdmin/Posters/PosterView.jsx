@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Card, ListGroup, Image } from "react-bootstrap";
 import { useFirebase } from "../../../context/FirebaseContext";
 import { doc, getDoc } from "firebase/firestore";
-import '../../../styles/SellerComponents.css';
 
 const PosterView = ({ poster }) => {
   const { firestore } = useFirebase();
@@ -90,12 +89,11 @@ const PosterView = ({ poster }) => {
             {poster.keywords?.length > 0 ? poster.keywords.join(", ") : "No items"}
           </ListGroup.Item>
           <ListGroup.Item>
-            <strong>Seller:</strong> {sellerName} ({poster.seller_id})
+            <strong>Seller:</strong> ({poster.sellerUsername})
           </ListGroup.Item>
           <ListGroup.Item>
             <strong>Status:</strong>{" "}
             {(poster.status || "draft").charAt(0).toUpperCase() + (poster.status || "draft").slice(1)}
-          />
             <strong>Active:</strong> {poster.isActive ? "Yes" : "No"}
           </ListGroup.Item>
           <ListGroup.Item>

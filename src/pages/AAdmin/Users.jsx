@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Badge, Alert, Spinner } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
 import { collection, getDocs, doc, updateDoc, getDoc } from "firebase/firestore";
-import '../../styles/AdminLayout.css'; // Reuse admin styles for consistency
 
 export default function UsersAdmin() {
   const { firestore, user, loadingUserData } = useFirebase();
@@ -15,30 +14,13 @@ export default function UsersAdmin() {
   const [loading, setLoading] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [error, setError] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
 
   // Fetch users and verify admin status
   useEffect(() => {
     const initialize = async () => {
-      if (loadingUserData) return; // Wait for auth state to resolve
-      if (!user) {
-        setError("Please sign in to access this page.");
-        return;
-      }
 
       setLoading(true);
       try {
-        // Check if user is admin
-        const userDoc = await getDoc(doc(firestore, "users", user.uid));
-        if (!userDoc.exists() || !userDoc.data().isAdmin) {
-          setError("Access denied. Admin privileges required.");
-          setIsAdmin(false);
-          setLoading(false);
-          return;
-        }
-        setIsAdmin(true);
-
-        // Fetch all users
         const usersSnapshot = await getDocs(collection(firestore, "users"));
         const userData = await Promise.all(
           usersSnapshot.docs.map(async (doc) => {
@@ -136,31 +118,6 @@ export default function UsersAdmin() {
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase())
   );
-
-  if (loadingUserData) {
-    return (
-      <div className="container mt-4 text-center">
-        <Spinner animation="border" variant="primary" />
-        <p>Loading authentication data...</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="container mt-4">
-        <Alert variant="warning">Please sign in to access user management.</Alert>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="container mt-4">
-        <Alert variant="danger">{error || "Access denied."}</Alert>
-      </div>
-    );
-  }
 
   return (
     <div className="container mt-4">

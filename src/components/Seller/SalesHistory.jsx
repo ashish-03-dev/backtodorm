@@ -3,7 +3,6 @@ import { Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import OrderTable from "./OrderTable";
-import '../../styles/SellerComponents.css';
 
 export default function SalesHistory() {
   const { firestore, user } = useFirebase();
@@ -32,11 +31,19 @@ export default function SalesHistory() {
   }, [firestore, user]);
 
   if (loading) {
-    return <Spinner animation="border" className="d-block mx-auto my-5" />;
+    return (<div
+      className="d-flex flex-column justify-content-center align-items-center"
+      style={{ minHeight: "100%" }}
+    >
+      <Spinner animation="border" className="d-block text-primary" role="status">
+        {/* <span className="visually-hidden">Loading...</span> */}
+      </Spinner>
+      <p className="mt-2 text-muted">Loading Sales History...</p>
+    </div>)
   }
 
   return (
-    <div>
+    <div className="p-4 p-md-5">
       <h4 className="mb-4">Sales History</h4>
       {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
       <OrderTable orders={orders} />

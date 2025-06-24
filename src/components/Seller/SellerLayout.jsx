@@ -1,31 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-// import '../../styles/SellerLayout.css';
 import { useFirebase } from "../../context/FirebaseContext";
 
 export default function SellerLayout() {
-  const { user, userData, loadingUserData } = useFirebase();
+  const { userData } = useFirebase();
   const location = useLocation();
   const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const [showSidebar, setShowSidebar] = useState(false);
   const [showContentOnMobile, setShowContentOnMobile] = useState(false);
 
   const isMobile = window.innerWidth < 768;
 
   useEffect(() => {
-    if (loadingUserData) return;
-    if (!user) {
-      navigate("/login", { replace: true });
-    } else if (!userData?.isSeller) {
-      navigate("/", { replace: true });
+    if (!userData?.isSeller) {
+      navigate("/account/become-seller", { replace: true });
     }
-  }, [user, userData, loadingUserData, navigate]);
+  }, [userData, navigate]);
 
   useEffect(() => {
     if (!isMobile) return;
-    const baseRoutes = ["/seller"];
-    const isBaseRoute = baseRoutes.includes(location.pathname);
     setShowContentOnMobile(location.pathname !== "/seller");
   }, [location.pathname, isMobile]);
 
@@ -33,37 +25,18 @@ export default function SellerLayout() {
     navigate(path);
     if (isMobile) {
       setShowContentOnMobile(true);
-      setShowSidebar(false);
     }
   };
 
   const isActive = (path) => location.pathname === path;
 
-  if (loadingUserData) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user || !userData?.isSeller) return null;
-
   return (
     <>
-      {showSidebar && (
-        <div
-          className="account-overlay d-md-none"
-          onClick={() => setShowSidebar(false)}
-        ></div>
-      )}
       <div className="bg-light p-3">
-        <div className="container d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
+        <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
           {!showContentOnMobile && (
             <div
-              className={`account-sidebar bg-light d-flex flex-column gap-3 ${showSidebar ? "show" : ""}`}
+              className="bg-light d-flex flex-column gap-3"
               style={{ minWidth: "300px", flexShrink: 0 }}
             >
               <div className="text-center p-4 bg-white shadow-sm">
@@ -74,8 +47,8 @@ export default function SellerLayout() {
                   <li className="nav-item">
                     <div
                       className={`nav-link d-flex justify-content-between px-3 py-2 rounded ${!isMobile && (isActive("/seller") || isActive("/seller/dashboard"))
-                          ? "fw-bold text-primary bg-light border"
-                          : "text-dark"
+                        ? "fw-bold text-primary bg-light border"
+                        : "text-dark"
                         } sidebar-item`}
                       onClick={() => handleSectionClick("/seller/dashboard")}
                     >
@@ -128,11 +101,10 @@ export default function SellerLayout() {
             </div>
           )}
           <div
-            className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+            className={`bg-white shadow-sm flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
               }`}
             style={{ maxWidth: "100%", overflow: "auto" }}
           >
-            {error && <div className="alert alert-danger">{error}</div>}
             <Outlet />
           </div>
         </div>

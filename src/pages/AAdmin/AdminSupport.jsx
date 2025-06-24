@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Badge, Table, Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
-import { useNavigate } from "react-router-dom";
 import { collection, query, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import '../../styles/AdminLayout.css'; // Reuse admin styles for consistency
 
 export default function AdminSupport() {
-  const { firestore, user, userData, loadingUserData, error: firebaseError } = useFirebase();
-  const navigate = useNavigate();
+  const { firestore, userData, error: firebaseError } = useFirebase();
   const [tickets, setTickets] = useState([]);
   const [filter, setFilter] = useState({ status: "", search: "" });
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -17,24 +14,10 @@ export default function AdminSupport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const hasRedirected = useRef(false);
-
-  // Redirect non-admins
-  useEffect(() => {
-    if (loadingUserData || !userData || !user) return;
-    if (userData.isAdmin !== true) {
-      if (!hasRedirected.current) {
-        hasRedirected.current = true;
-        navigate("/login", { replace: true });
-      }
-    } else {
-      hasRedirected.current = false;
-    }
-  }, [user, userData, loadingUserData, navigate]);
 
   // Fetch support tickets
   useEffect(() => {
-    if (!firestore || !userData?.isAdmin || loadingUserData) return;
+    if (!firestore) return;
 
     const ticketsQuery = query(collection(firestore, "supportTickets"));
     const unsubscribe = onSnapshot(
@@ -59,7 +42,7 @@ export default function AdminSupport() {
     );
 
     return () => unsubscribe();
-  }, [firestore, userData, loadingUserData]);
+  }, [firestore, userData]);
 
   const handleStatusChange = async (ticketId, newStatus) => {
     setSubmitting(true);
@@ -136,7 +119,7 @@ export default function AdminSupport() {
     setShowDetailModal(true);
   };
 
-  if (loading || loadingUserData) {
+  if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
         <Spinner animation="border" className="text-primary" role="status">

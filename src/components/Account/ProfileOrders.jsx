@@ -10,11 +10,6 @@ export default function ProfileOrders() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user || !firestore) {
-      setError('Please log in to view your orders.');
-      setLoading(false);
-      return;
-    }
 
     const ordersQuery = query(collection(firestore, `userOrders/${user.uid}/orders`));
 
@@ -102,8 +97,10 @@ export default function ProfileOrders() {
 
   if (loading) {
     return (
-      <div className="text-center mt-5">
-        <Spinner animation="border" variant="primary" />
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "calc(100svh - 65px)" }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
       </div>
     );
   }
