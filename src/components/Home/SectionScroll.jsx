@@ -1,11 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { doc, onSnapshot, query, collection, where } from 'firebase/firestore';
+import { useCartContext } from '../../context/CartContext';
 import '../../styles/trendingPosters.css';
 
 export default function SectionScroll({ sectionId, title, firestore }) {
-  const { addToCart } = useOutletContext();
+  const { addToCart } = useCartContext();
   const [posters, setPosters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -75,12 +76,9 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                 id: doc.id,
                 title: data.title || 'Untitled',
                 image: data.imageUrl || '',
-                price: minPriceSize.finalPrice || 0,
-                originalPrice: minPriceSize.price || 0,
-                discount:
-                  sizes.length && minPriceSize.finalPrice < minPriceSize.price
-                    ? Math.round((1 - minPriceSize.finalPrice / minPriceSize.price) * 100)
-                    : 0,
+                price: minPriceSize.price || 0,
+                finalPrice: minPriceSize.finalPrice || minPriceSize.price || 0,
+                discount: minPriceSize.discount || data.discount || 0,
                 sizes,
                 badges,
                 defaultSize: minPriceSize.size,
@@ -127,6 +125,8 @@ export default function SectionScroll({ sectionId, title, firestore }) {
       title: poster.title,
       size: poster.defaultSize,
       price: poster.price,
+      finalPrice: poster.finalPrice,
+      discount: poster.discount,
       seller: poster.seller,
       image: poster.image || 'https://via.placeholder.com/60',
     };
@@ -306,6 +306,12 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                       {item.title}
                     </h6>
                     <p
+                      className="mb-1 text-muted small"
+                      style={{ minHeight: '1rem' }}
+                    >
+                      Size: {item.defaultSize || 'N/A'}
+                    </p>
+                    <p
                       className="price-text mb-2"
                       style={{
                         fontSize: window.innerWidth <= 576 ? '15px' : '17px',
@@ -315,12 +321,12 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                       {item.discount > 0 ? (
                         <>
                           <span className="text-muted text-decoration-line-through me-2">
-                            ₹{item.originalPrice}
+                            ₹{item.price.toLocaleString('en-IN')}
                           </span>
-                          <span>From ₹{item.price}</span>
+                          <span>₹{item.finalPrice.toLocaleString('en-IN')} ({item.discount}% off)</span>
                         </>
                       ) : (
-                        <span>From ₹{item.price}</span>
+                        <span>₹{item.finalPrice.toLocaleString('en-IN')}</span>
                       )}
                     </p>
                   </div>

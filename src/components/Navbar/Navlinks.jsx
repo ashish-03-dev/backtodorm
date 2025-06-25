@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
-import { collection, getDocs, doc, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import NavDropdown from './NavDropdown';
 
 const fetchImages = async (ids, firestore) => {
@@ -37,7 +37,6 @@ export default function NavLinks() {
         return;
       }
       try {
-        const menusDocRef = doc(firestore, 'homeSections', 'menus');
         const menusDoc = await getDocs(collection(firestore, 'homeSections'));
         const menusData = menusDoc.docs.find((d) => d.id === 'menus')?.data();
         const menuList = menusData?.menuList || [];
@@ -49,14 +48,11 @@ export default function NavLinks() {
           return;
         }
 
-        const sanitizedMenus = menuList.map((menu) => {
-          const sanitized = {
-            id: menu.id || '',
-            sections: Array.isArray(menu.sections) ? menu.sections : [],
-            images: Array.isArray(menu.images) ? menu.images : [],
-          };
-          return sanitized;
-        });
+        const sanitizedMenus = menuList.map((menu) => ({
+          id: menu.id || '',
+          sections: Array.isArray(menu.sections) ? menu.sections : [],
+          images: Array.isArray(menu.images) ? menu.images : [],
+        }));
 
         setMenus(sanitizedMenus);
 
@@ -68,10 +64,10 @@ export default function NavLinks() {
           const imageResults = await fetchImages(imageIds, firestore);
           setPosterImages(Object.fromEntries(imageResults));
         }
-        setLoading(false);
       } catch (err) {
         console.error('Failed to fetch menus:', err);
         setMenus([]);
+      } finally {
         setLoading(false);
       }
     };
@@ -91,7 +87,6 @@ export default function NavLinks() {
             Home
           </a>
         </li>
-
         {menus.map((menu) => {
           const menuProp = {
             sections: menu.sections || [],
@@ -113,6 +108,11 @@ export default function NavLinks() {
             />
           );
         })}
+         <li className="nav-item">
+          <a className="nav-link text-dark h-100 d-flex align-items-center" href="/contact">
+            Contact
+          </a>
+        </li>
       </ul>
     </nav>
   );

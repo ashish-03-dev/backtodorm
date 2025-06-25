@@ -22,35 +22,57 @@ const RAZORPAY_SECRETS = [
   defineSecret("RAZORPAY_KEY_SECRET"),
 ];
 
+// Fetch delivery settings from siteSettings/general
+async function fetchDeliveryConfig() {
+  try {
+    const settingsDoc = await db.doc("siteSettings/general").get();
+    if (!settingsDoc.exists) {
+      console.warn("Site settings not found, using defaults");
+      return {
+        standardDeliveryCharge: 50,
+        freeDeliveryThreshold: 1000,
+      };
+    }
+    const data = settingsDoc.data();
+    const config = {
+      standardDeliveryCharge: data.standardDeliveryCharge || 50,
+      freeDeliveryThreshold: data.freeDeliveryThreshold || 1000,
+    };
+    console.log("Fetched delivery config:", config);
+    return config;
+  } catch (error) {
+    console.error("Failed to fetch delivery config:", error.message);
+    return {
+      standardDeliveryCharge: 50,
+      freeDeliveryThreshold: 1000,
+    };
+  }
+}
+
 exports.approvePoster = onCall(
   {
     secrets: CLOUDINARY_SECRETS,
-    region: "asia-south1",
+    region: "us-central1",
     timeoutSeconds: 120,
     concurrency: 80,
   },
   async ({ data: { posterId }, auth }) => {
     if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
 
-    // Validate admin access
     const user = await db.collection("users").doc(auth.uid).get();
     if (!user.exists || !user.data().isAdmin) {
       throw new HttpsError("permission-denied", "Admin access required");
     }
 
-    // Validate input
     if (!posterId) throw new HttpsError("invalid-argument", "Poster ID is required");
 
-    // Validate secrets
     const [cloudName, apiKey, apiSecret] = CLOUDINARY_SECRETS.map((s) => s.value());
     if (!cloudName || !apiKey || !apiSecret) {
       throw new HttpsError("failed-precondition", "Cloudinary secrets not configured");
     }
 
-    // Configure Cloudinary
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
 
-    // Get temp poster
     const tempPosterRef = db.collection("tempPosters").doc(posterId);
     const tempPoster = await tempPosterRef.get();
     if (!tempPoster.exists) throw new HttpsError("not-found", "Poster not found");
@@ -58,7 +80,6 @@ exports.approvePoster = onCall(
     const posterData = tempPoster.data();
     let imageUrl = posterData.originalImageUrl;
 
-    // Process image
     if (imageUrl) {
       try {
         const file = storage.file(imageUrl);
@@ -78,11 +99,10 @@ exports.approvePoster = onCall(
       throw new HttpsError("invalid-argument", "Image URL missing");
     }
 
-    // Update Firestore in transaction
     await db.runTransaction(async (t) => {
       const sellerRef = db.collection("sellers").doc(posterData.sellerUsername);
       const collectionRefs = (posterData.collections || []).map((col) =>
-        db.collection("collections").doc(col)
+        db.collection("standaloneCollections").doc(col)
       );
 
       const [seller, ...collections] = await Promise.all([
@@ -90,7 +110,6 @@ exports.approvePoster = onCall(
         ...collectionRefs.map((ref) => t.get(ref)),
       ]);
 
-      // Update poster
       t.set(db.collection("posters").doc(posterId), {
         ...posterData,
         imageUrl,
@@ -101,7 +120,6 @@ exports.approvePoster = onCall(
       });
       t.delete(tempPosterRef);
 
-      // Update collections
       collections.forEach((col, i) => {
         if (col.exists && !col.data().posterIds?.includes(posterId)) {
           t.update(collectionRefs[i], {
@@ -110,16 +128,14 @@ exports.approvePoster = onCall(
         }
       });
 
-      // Update seller posters
       if (seller.exists) {
         const sellerData = seller.data();
-        // Filter tempPosters to remove the entry with matching id
         const updatedTempPosters = (sellerData.tempPosters || []).filter(
           (entry) => entry.id !== posterId
         );
         t.update(sellerRef, {
           tempPosters: updatedTempPosters,
-          approvedPosters: admin.firestore.FieldValue.arrayUnion(posterId), // Store as string
+          approvedPosters: admin.firestore.FieldValue.arrayUnion(posterId),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
@@ -142,17 +158,30 @@ exports.approvePoster = onCall(
 exports.createRazorpayOrder = onCall(
   {
     secrets: RAZORPAY_SECRETS,
-    region: "asia-south1",
+    region: "us-central1",
     timeoutSeconds: 60,
     concurrency: 80,
   },
-  async ({ data: { amount, currency = "INR", items, shippingAddress, isBuyNow }, auth }) => {
-    console.log('createRazorpayOrder called with:', { amount, currency, itemsCount: items?.length, shippingAddressKeys: Object.keys(shippingAddress || {}), isBuyNow });
+  async ({ data: { subtotal, deliveryCharge, total, items, shippingAddress, isBuyNow }, auth }) => {
+    console.log('createRazorpayOrder called with:', {
+      subtotal,
+      deliveryCharge,
+      total,
+      itemsCount: items?.length,
+      isBuyNow,
+    });
+
     if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
 
     // Validate input
-    if (!amount || typeof amount !== "number" || amount <= 0) {
-      throw new HttpsError("invalid-argument", "Valid amount is required");
+    if (!subtotal || typeof subtotal !== "number" || subtotal <= 0) {
+      throw new HttpsError("invalid-argument", "Valid subtotal is required");
+    }
+    if (typeof deliveryCharge !== "number" || deliveryCharge < 0) {
+      throw new HttpsError("invalid-argument", "Valid delivery charge is required");
+    }
+    if (!total || typeof total !== "number" || total <= 0) {
+      throw new HttpsError("invalid-argument", "Valid total is required");
     }
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new HttpsError("invalid-argument", "Items are required");
@@ -166,41 +195,119 @@ exports.createRazorpayOrder = onCall(
       throw new HttpsError("invalid-argument", `Missing shipping address fields: ${missingFields.join(', ')}`);
     }
 
-    // Validate secrets
     const [keyId, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
     if (!keyId || !keySecret) {
       throw new HttpsError("failed-precondition", "Razorpay secrets not configured");
     }
 
-    // Initialize Razorpay
-    const razorpay = new Razorpay({
-      key_id: keyId,
-      key_secret: keySecret,
-    });
+    const { standardDeliveryCharge, freeDeliveryThreshold } = await fetchDeliveryConfig();
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
     try {
-      // Create Razorpay order
+      // Verify items and calculate subtotal (unchanged validation logic)
+      let calculatedSubtotal = 0;
+      for (const item of items) {
+        if (item.type === 'collection') {
+          if (!item.collectionId || !item.posters || !Array.isArray(item.posters)) {
+            throw new HttpsError("invalid-argument", `Invalid collection item: ${JSON.stringify(item)}`);
+          }
+          const collectionRef = db.collection("standaloneCollections").doc(item.collectionId);
+          const collectionDoc = await collectionRef.get();
+          if (!collectionDoc.exists) {
+            throw new HttpsError("not-found", `Collection ${item.collectionId} not found`);
+          }
+          const collectionData = collectionDoc.data();
+          const submittedCollectionDiscount = item.collectionDiscount || 0;
+          const actualCollectionDiscount = collectionData.discount || 0;
+          if (submittedCollectionDiscount !== actualCollectionDiscount) {
+            throw new HttpsError("invalid-argument", `Collection discount mismatch for ${item.collectionId}`);
+          }
+          let collectionPrice = 0;
+          for (const poster of item.posters) {
+            const posterRef = db.collection("posters").doc(poster.posterId);
+            const posterDoc = await posterRef.get();
+            if (!posterDoc.exists) {
+              throw new HttpsError("not-found", `Poster ${poster.posterId} not found`);
+            }
+            const posterData = posterDoc.data();
+            const sizeData = posterData.sizes?.find(s => s.size === poster.size);
+            if (!sizeData) {
+              throw new HttpsError("invalid-argument", `Invalid size ${poster.size} for poster ${poster.posterId}`);
+            }
+            if (poster.price !== sizeData.price || poster.finalPrice !== sizeData.finalPrice) {
+              throw new HttpsError("invalid-argument", `Price mismatch for poster ${poster.posterId}`);
+            }
+            const expectedDiscount = posterData.discount || 0;
+            if (poster.discount !== expectedDiscount) {
+              throw new HttpsError("invalid-argument", `Discount mismatch for poster ${poster.posterId}`);
+            }
+            collectionPrice += sizeData.finalPrice;
+          }
+          const quantity = item.quantity || 1;
+          calculatedSubtotal += collectionPrice * quantity * (1 - actualCollectionDiscount / 100);
+        } else {
+          if (!item.posterId || !item.size) {
+            throw new HttpsError("invalid-argument", `Invalid poster item: ${JSON.stringify(item)}`);
+          }
+          const posterRef = db.collection("posters").doc(item.posterId);
+          const posterDoc = await posterRef.get();
+          if (!posterDoc.exists) {
+            throw new HttpsError("not-found", `Poster ${item.posterId} not found`);
+          }
+          const posterData = posterDoc.data();
+          const sizeData = posterData.sizes?.find(s => s.size === item.size);
+          if (!sizeData) {
+            throw new HttpsError("invalid-argument", `Invalid size ${item.size} for poster ${item.posterId}`);
+          }
+          if (item.price !== sizeData.price || item.finalPrice !== sizeData.finalPrice) {
+            throw new HttpsError("invalid-argument", `Price mismatch for poster ${item.posterId}`);
+          }
+          const expectedDiscount = posterData.discount || 0;
+          if (item.discount !== expectedDiscount) {
+            throw new HttpsError("invalid-argument", `Discount mismatch for poster ${item.posterId}`);
+          }
+          const quantity = item.quantity || 1;
+          calculatedSubtotal += sizeData.finalPrice * quantity;
+        }
+      }
+
+      calculatedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
+      if (Math.abs(calculatedSubtotal - subtotal) > 0.01) {
+        throw new HttpsError("invalid-argument", `Subtotal mismatch: submitted ₹${subtotal}, calculated ₹${calculatedSubtotal}`);
+      }
+
+      const expectedDeliveryCharge = calculatedSubtotal >= freeDeliveryThreshold ? 0 : standardDeliveryCharge;
+      if (deliveryCharge !== expectedDeliveryCharge) {
+        throw new HttpsError("invalid-argument", `Delivery charge mismatch: submitted ₹${deliveryCharge}, expected ₹${expectedDeliveryCharge}`);
+      }
+
+      const calculatedTotal = parseFloat((calculatedSubtotal + expectedDeliveryCharge).toFixed(2));
+      if (Math.abs(calculatedTotal - total) > 0.01) {
+        throw new HttpsError("invalid-argument", `Total mismatch: submitted ₹${total}, calculated ₹${calculatedTotal}`);
+      }
+
       const order = await razorpay.orders.create({
-        amount: Math.round(amount * 100), // Convert to paise
-        currency,
+        amount: Math.round(total * 100),
+        currency: "INR",
         receipt: `receipt_${Date.now()}`,
-        notes: {
-          userId: auth.uid,
-        },
+        notes: { userId: auth.uid },
       });
 
-      // Store temporary order in Firestore
+      // Store temporary order with Pending status
       await db.collection("temporaryOrders").doc(order.id).set({
         orderId: order.id,
         userId: auth.uid,
         items,
         shippingAddress,
-        amount,
+        subtotal,
+        deliveryCharge,
+        total,
         isBuyNow: !!isBuyNow,
+        paymentStatus: "Pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log('Razorpay order created:', { orderId: order.id, amount: order.amount });
+      console.log('Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
       return {
         success: true,
         orderId: order.id,
@@ -217,7 +324,7 @@ exports.createRazorpayOrder = onCall(
 exports.verifyRazorpayPayment = onCall(
   {
     secrets: RAZORPAY_SECRETS,
-    region: "asia-south1",
+    region: "us-central1",
     timeoutSeconds: 60,
     concurrency: 80,
   },
@@ -225,30 +332,81 @@ exports.verifyRazorpayPayment = onCall(
     console.log('verifyRazorpayPayment called with:', { orderId, paymentId });
     if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
 
-    // Validate input
     if (!orderId || !paymentId || !signature) {
       throw new HttpsError("invalid-argument", "Order ID, Payment ID, and Signature are required");
     }
 
-    // Validate secrets
     const [_, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
     if (!keySecret) {
       throw new HttpsError("failed-precondition", "Razorpay secret not configured");
     }
 
     try {
-      // Generate expected signature
       const generatedSignature = crypto
         .createHmac("sha256", keySecret)
         .update(`${orderId}|${paymentId}`)
         .digest("hex");
 
-      if (generatedSignature === signature) {
-        console.log('Payment verified successfully for order:', orderId);
-        return { success: true, message: "Payment verified successfully" };
-      } else {
+      if (generatedSignature !== signature) {
         throw new HttpsError("invalid-argument", "Invalid payment signature");
       }
+
+      // Update temporary order to Completed
+      const tempOrderRef = db.collection("temporaryOrders").doc(orderId);
+      const tempOrder = await tempOrderRef.get();
+      if (!tempOrder.exists) {
+        throw new HttpsError("not-found", "Temporary order not found");
+      }
+
+      await tempOrderRef.update({
+        paymentStatus: "Completed",
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Move to orders collection
+      const tempOrderData = tempOrder.data();
+      const orderData = {
+        customerId: tempOrderData.userId,
+        items: tempOrderData.items,
+        subtotal: tempOrderData.subtotal,
+        deliveryCharge: tempOrderData.deliveryCharge,
+        totalPrice: tempOrderData.total,
+        orderDate: new Date().toISOString(),
+        status: "Pending",
+        paymentStatus: "Completed",
+        paymentMethod: "Razorpay",
+        shippingAddress: tempOrderData.shippingAddress,
+        sentToSupplier: false,
+        razorpay_payment_id: paymentId,
+        razorpay_order_id: orderId,
+        razorpay_signature: signature,
+      };
+
+      const orderRef = await db.collection("orders").add(orderData);
+      await db.collection("userOrders").doc(tempOrderData.userId).collection("orders").add({
+        orderId: orderRef.id,
+        orderDate: orderData.orderDate,
+        status: orderData.status,
+        subtotal: orderData.subtotal,
+        deliveryCharge: orderData.deliveryCharge,
+        totalPrice: orderData.totalPrice,
+      });
+
+      // Clear cart if not Buy Now
+      if (!tempOrderData.isBuyNow) {
+        const cartItems = await db.collection(`users/${tempOrderData.userId}/cart`).get();
+        const batch = db.batch();
+        cartItems.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+      }
+
+      // Delete temporary order
+      await tempOrderRef.delete();
+
+      console.log('Payment verified and order created:', orderRef.id);
+      return { success: true, message: "Payment verified successfully", orderId: orderRef.id };
     } catch (error) {
       console.error("Razorpay payment verification failed:", error);
       throw new HttpsError("internal", `Failed to verify payment: ${error.message}`);
@@ -256,27 +414,107 @@ exports.verifyRazorpayPayment = onCall(
   }
 );
 
+exports.checkPendingPayments = onCall(
+  {
+    secrets: RAZORPAY_SECRETS,
+    region: "us-central1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+  },
+  async ({ auth }) => {
+    if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
+    const user = await db.collection("users").doc(auth.uid).get();
+    if (!user.exists || !user.data().isAdmin) {
+      throw new HttpsError("permission-denied", "Admin access required");
+    }
+
+    const [keyId, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
+    if (!keyId || !keySecret) {
+      throw new HttpsError("failed-precondition", "Razorpay secrets not configured");
+    }
+
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    const tempOrders = await db.collection("temporaryOrders").where("paymentStatus", "==", "Pending").get();
+
+    const results = await Promise.all(
+      tempOrders.docs.map(async (tempOrder) => {
+        const tempOrderData = tempOrder.data();
+        const orderId = tempOrderData.orderId;
+
+        try {
+          const payment = await razorpay.payments.fetch(tempOrderData.razorpay_payment_id);
+          if (payment.status === "captured") {
+            const orderData = {
+              customerId: tempOrderData.userId,
+              items: tempOrderData.items,
+              subtotal: tempOrderData.subtotal,
+              deliveryCharge: tempOrderData.deliveryCharge,
+              totalPrice: tempOrderData.total,
+              orderDate: new Date().toISOString(),
+              status: "Pending",
+              paymentStatus: "Completed",
+              paymentMethod: "Razorpay",
+              shippingAddress: tempOrderData.shippingAddress,
+              sentToSupplier: false,
+              razorpay_payment_id: payment.id,
+              razorpay_order_id: orderId,
+            };
+
+            const orderRef = await db.collection("orders").add(orderData);
+            await db.collection("userOrders").doc(tempOrderData.userId).collection("orders").add({
+              orderId: orderRef.id,
+              orderDate: orderData.orderDate,
+              status: orderData.status,
+              subtotal: orderData.subtotal,
+              deliveryCharge: orderData.deliveryCharge,
+              totalPrice: orderData.totalPrice,
+            });
+
+            if (!tempOrderData.isBuyNow) {
+              const cartItems = await db.collection(`users/${tempOrderData.userId}/cart`).get();
+              const batch = db.batch();
+              cartItems.forEach((doc) => batch.delete(doc.ref));
+              await batch.commit();
+            }
+
+            await tempOrder.ref.delete();
+            return { orderId, status: "Completed", orderRef: orderRef.id };
+          } else if (payment.status === "failed") {
+            await tempOrder.ref.update({ paymentStatus: "Failed" });
+            return { orderId, status: "Failed" };
+          } else {
+            return { orderId, status: "Pending" };
+          }
+        } catch (error) {
+          console.error(`Failed to check payment for order ${orderId}:`, error);
+          return { orderId, status: "Error", error: error.message };
+        }
+      })
+    );
+
+    return { success: true, results };
+  }
+);
+
 exports.razorpayWebhook = onRequest(
   {
     secrets: RAZORPAY_SECRETS,
-    region: "asia-south1",
+    region: "us-central1",
   },
   async (req, res) => {
-    console.log('Razorpay webhook received:', req.body.event);
+    console.log('Razorpay webhook received:', { event: req.body.event });
     const [_, keySecret] = RAZORPAY_SECRETS.map((s) => s.value());
     if (!keySecret) {
       console.error('Razorpay secret not configured');
       return res.status(500).json({ error: "Razorpay secret not configured" });
     }
 
-    const webhookSecret = keySecret;
     const signature = req.headers["x-razorpay-signature"];
     const body = JSON.stringify(req.body);
 
     try {
-      // Verify webhook signature
       const generatedSignature = crypto
-        .createHmac("sha256", webhookSecret)
+        .createHmac("sha256", keySecret)
         .update(body)
         .digest("hex");
 
@@ -285,8 +523,8 @@ exports.razorpayWebhook = onRequest(
         return res.status(400).json({ error: "Invalid webhook signature" });
       }
 
-      // Process payment.captured event
-      if (req.body.event === "payment.captured") {
+      const { event } = req.body;
+      if (event === "payment.captured" || event === "payment.pending") {
         const { order_id, payment_id, amount, currency, notes } = req.body.payload.payment.entity;
         const userId = notes?.userId;
 
@@ -295,19 +533,6 @@ exports.razorpayWebhook = onRequest(
           return res.status(400).json({ error: "User ID not found in payment notes" });
         }
 
-        // Check for duplicate order
-        const existingOrder = await db
-          .collection("orders")
-          .where("razorpay_order_id", "==", order_id)
-          .limit(1)
-          .get();
-
-        if (!existingOrder.empty) {
-          console.log('Order already processed:', order_id);
-          return res.status(200).json({ success: true, message: "Order already processed" });
-        }
-
-        // Fetch temporary order
         const tempOrderRef = await db
           .collection("temporaryOrders")
           .where("orderId", "==", order_id)
@@ -319,44 +544,151 @@ exports.razorpayWebhook = onRequest(
           return res.status(400).json({ error: "Temporary order not found" });
         }
 
-        const tempOrderData = tempOrderRef.docs[0].data();
+        const tempOrder = tempOrderRef.docs[0];
+        const tempOrderData = tempOrder.data();
 
-        // Save order to Firestore
-        const orderData = {
-          customerId: userId,
-          items: tempOrderData.items,
-          totalPrice: amount / 100,
-          orderDate: new Date().toISOString(),
-          status: "Pending",
-          paymentStatus: "Completed",
-          paymentMethod: "Razorpay",
-          shippingAddress: tempOrderData.shippingAddress,
-          sentToSupplier: false,
-          razorpay_payment_id: payment_id,
-          razorpay_order_id: order_id,
-        };
-
-        const orderRef = await db.collection("orders").add(orderData);
-        await db.collection("userOrders").doc(userId).collection("orders").add({
-          orderId: orderRef.id,
-          orderDate: orderData.orderDate,
-          status: orderData.status,
-          totalPrice: orderData.totalPrice,
-        });
-
-        // Clean up temporary order
-        await tempOrderRef.docs[0].ref.delete();
-
-        // Clear user's cart if not Buy Now
-        if (!tempOrderData.isBuyNow) {
-          const cartItems = await db.collection(`users/${userId}/cart`).get();
-          const batch = db.batch();
-          cartItems.forEach((doc) => batch.delete(doc.ref));
-          await batch.commit();
+        if (event === "payment.pending") {
+          await tempOrder.ref.update({
+            paymentStatus: "Pending",
+            razorpay_payment_id: payment_id,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          console.log('Updated temporary order to Pending:', order_id);
+          return res.status(200).json({ success: true, message: "Pending payment recorded" });
         }
 
-        console.log('Order processed successfully:', orderRef.id);
-        return res.status(200).json({ success: true, orderId: orderRef.id });
+        if (event === "payment.captured") {
+          const existingOrder = await db
+            .collection("orders")
+            .where("razorpay_order_id", "==", order_id)
+            .limit(1)
+            .get();
+
+          if (!existingOrder.empty) {
+            console.log('Order already processed:', order_id);
+            return res.status(200).json({ success: true, message: "Order already processed" });
+          }
+
+          const { standardDeliveryCharge, freeDeliveryThreshold } = await fetchDeliveryConfig();
+          let calculatedSubtotal = 0;
+
+          for (const item of tempOrderData.items) {
+            if (item.type === 'collection') {
+              const collectionRef = db.collection("standaloneCollections").doc(item.collectionId);
+              const collectionDoc = await collectionRef.get();
+              if (!collectionDoc.exists) {
+                throw new Error(`Collection ${item.collectionId} not found`);
+              }
+              const collectionData = collectionDoc.data();
+              const submittedCollectionDiscount = item.collectionDiscount || 0;
+              const actualCollectionDiscount = collectionData.discount || 0;
+              if (submittedCollectionDiscount !== actualCollectionDiscount) {
+                throw new Error(`Collection discount mismatch for ${item.collectionId}`);
+              }
+              let collectionPrice = 0;
+              for (const poster of item.posters) {
+                const posterRef = db.collection("posters").doc(poster.posterId);
+                const posterDoc = await posterRef.get();
+                if (!posterDoc.exists) {
+                  throw new Error(`Poster ${poster.posterId} not found`);
+                }
+                const posterData = posterDoc.data();
+                const sizeData = posterData.sizes?.find(s => s.size === poster.size);
+                if (!sizeData) {
+                  throw new Error(`Invalid size ${poster.size} for poster ${poster.posterId}`);
+                }
+                if (poster.price !== sizeData.price || poster.finalPrice !== sizeData.finalPrice) {
+                  throw new Error(`Price mismatch for poster ${poster.posterId}`);
+                }
+                const expectedDiscount = posterData.discount || 0;
+                if (poster.discount !== expectedDiscount) {
+                  throw new Error(`Discount mismatch for poster ${poster.posterId}`);
+                }
+                collectionPrice += sizeData.finalPrice;
+              }
+              const quantity = item.quantity || 1;
+              calculatedSubtotal += collectionPrice * quantity * (1 - actualCollectionDiscount / 100);
+            } else {
+              const posterRef = db.collection("posters").doc(item.posterId);
+              const posterDoc = await posterRef.get();
+              if (!posterDoc.exists) {
+                throw new Error(`Poster ${item.posterId} not found`);
+              }
+              const posterData = posterDoc.data();
+              const sizeData = posterData.sizes?.find(s => s.size === item.size);
+              if (!sizeData) {
+                throw new Error(`Invalid size ${item.size} for poster ${item.posterId}`);
+              }
+              if (item.price !== sizeData.price || item.finalPrice !== sizeData.finalPrice) {
+                throw new Error(`Price mismatch for poster ${item.posterId}`);
+              }
+              const expectedDiscount = posterData.discount || 0;
+              if (item.discount !== expectedDiscount) {
+                throw new Error(`Discount mismatch for poster ${item.posterId}`);
+              }
+              const quantity = item.quantity || 1;
+              calculatedSubtotal += sizeData.finalPrice * quantity;
+            }
+          }
+
+          calculatedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
+          if (Math.abs(calculatedSubtotal - tempOrderData.subtotal) > 0.01) {
+            throw new Error(`Subtotal mismatch: submitted ₹${tempOrderData.subtotal}, calculated ₹${calculatedSubtotal}`);
+          }
+
+          const expectedDeliveryCharge = calculatedSubtotal >= freeDeliveryThreshold ? 0 : standardDeliveryCharge;
+          if (tempOrderData.deliveryCharge !== expectedDeliveryCharge) {
+            throw new Error(`Delivery charge mismatch: submitted ₹${tempOrderData.deliveryCharge}, expected ₹${expectedDeliveryCharge}`);
+          }
+
+          const calculatedTotal = parseFloat((calculatedSubtotal + expectedDeliveryCharge).toFixed(2));
+          if (Math.abs(calculatedTotal - tempOrderData.total) > 0.01) {
+            throw new Error(`Total mismatch: submitted ₹${tempOrderData.total}, calculated ₹${calculatedTotal}`);
+          }
+
+          const razorpayAmount = amount / 100;
+          if (Math.abs(razorpayAmount - calculatedTotal) > 0.01) {
+            throw new Error(`Razorpay amount mismatch: submitted ₹${razorpayAmount}, expected ₹${calculatedTotal}`);
+          }
+
+          const orderData = {
+            customerId: userId,
+            items: tempOrderData.items,
+            subtotal: tempOrderData.subtotal,
+            deliveryCharge: tempOrderData.deliveryCharge,
+            totalPrice: tempOrderData.total,
+            orderDate: new Date().toISOString(),
+            status: "Pending",
+            paymentStatus: "Completed",
+            paymentMethod: "Razorpay",
+            shippingAddress: tempOrderData.shippingAddress,
+            sentToSupplier: false,
+            razorpay_payment_id: payment_id,
+            razorpay_order_id: order_id,
+          };
+
+          const orderRef = await db.collection("orders").add(orderData);
+          await db.collection("userOrders").doc(userId).collection("orders").add({
+            orderId: orderRef.id,
+            orderDate: orderData.orderDate,
+            status: orderData.status,
+            subtotal: orderData.subtotal,
+            deliveryCharge: orderData.deliveryCharge,
+            totalPrice: orderData.totalPrice,
+          });
+
+          await tempOrder.ref.delete();
+
+          if (!tempOrderData.isBuyNow) {
+            const cartItems = await db.collection(`users/${userId}/cart`).get();
+            const batch = db.batch();
+            cartItems.forEach((doc) => batch.delete(doc.ref));
+            await batch.commit();
+          }
+
+          console.log('Order processed successfully:', orderRef.id);
+          return res.status(200).json({ success: true, orderId: orderRef.id });
+        }
       }
 
       return res.status(200).json({ success: true, message: "Event handled" });
@@ -369,7 +701,7 @@ exports.razorpayWebhook = onRequest(
 
 exports.becomeSeller = onCall(
   {
-    region: "asia-south1",
+    region: "us-central1",
     timeoutSeconds: 60,
     concurrency: 80,
   },
@@ -380,7 +712,6 @@ exports.becomeSeller = onCall(
     const userRef = db.doc(`users/${uid}`);
     const sellerRef = db.doc(`sellers/${sellerUsername}`);
 
-    // Check username availability
     const usernameSnapshot = await db
       .collection("sellers")
       .where("sellerUsername", "==", sellerUsername)

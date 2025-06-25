@@ -1,9 +1,11 @@
 import React from 'react';
-import { Offcanvas, Button, ListGroup, Image } from 'react-bootstrap';
+import { Offcanvas, Button, ListGroup, Image, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { useCartContext } from '../../context/CartContext';
 import '../../styles/CartSidebar.css';
 
-export default function CartSidebar({ cartItems = [], show, onClose, removeFromCart, updateQuantity }) {
+export default function CartSidebar({ show, onClose }) {
+  const { cartItems = [], removeFromCart, updateQuantity, deliveryCharge = 0, freeDeliveryThreshold = 0, loading } = useCartContext();
   const navigate = useNavigate();
 
   const handleGoToCheckout = () => {
@@ -11,13 +13,13 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
     navigate('/checkout');
   };
 
-  // Group items by collectionId to calculate discounted totals
-  const groupedByCollection = cartItems.reduce((acc, item) => {
+  // Group items by collectionId for display purposes
+  const groupedByCollection = (cartItems || []).reduce((acc, item) => {
     const key = item.type === 'collection' ? item.collectionId : `individual-${item.posterId || item.id}-${item.size}`;
     if (!acc[key]) {
       acc[key] = {
         items: [],
-        discount: item.type === 'collection' ? item.collectionDiscount || 0 : 0,
+        collectionDiscount: item.type === 'collection' ? item.collectionDiscount || 0 : 0,
         type: item.type,
         collectionId: item.type === 'collection' ? item.collectionId : null,
       };
@@ -26,15 +28,23 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
     return acc;
   }, {});
 
+  // Calculate total using finalPrice directly, without reapplying discount
   const totalPrice = Object.values(groupedByCollection).reduce((acc, group) => {
     const groupTotal = group.items.reduce((sum, item) => {
       if (item.type === 'collection') {
-        return sum + item.posters.reduce((pSum, p) => pSum + (p.price || 0), 0) * (item.quantity || 1);
+        // Sum finalPrice of posters in collection, apply collection-level discount
+        const collectionSum = (item.posters || []).reduce((pSum, p) => pSum + (p.finalPrice || p.price || 0), 0);
+        return sum + collectionSum * (item.quantity || 1) * (1 - group.collectionDiscount / 100);
       }
-      return sum + (item.price || 0) * (item.quantity || 1);
+      // Use finalPrice for individual posters
+      return sum + (item.finalPrice || item.price || 0) * (item.quantity || 1);
     }, 0);
-    return acc + groupTotal * (1 - group.discount / 100);
-  }, 0).toFixed(2);
+    return acc + groupTotal;
+  }, 0);
+
+  const isFreeDelivery = totalPrice >= freeDeliveryThreshold;
+  const finalDeliveryCharge = isFreeDelivery ? 0 : deliveryCharge;
+  const totalWithDelivery = cartItems.length > 0 ? (totalPrice + finalDeliveryCharge).toFixed(2) : '0.00';
 
   const handleUpdateQuantity = (id, size, newQuantity, isCollection = false) => {
     if (newQuantity < 1) return;
@@ -48,6 +58,27 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
     }
     removeFromCart(id, size, isCollection);
   };
+
+  if (loading) {
+    return (
+      <Offcanvas
+        show={show}
+        onHide={onClose}
+        placement="end"
+        name="cart"
+        className={`cart-sidebar ${show ? 'open' : ''}`}
+        style={{ width: window.innerWidth <= 768 ? '320px' : '400px' }}
+      >
+        <Offcanvas.Header closeButton>
+          <Offcanvas.Title>Your Cart</Offcanvas.Title>
+        </Offcanvas.Header>
+        <Offcanvas.Body className="p-3 d-flex justify-content-center align-items-center">
+          <Spinner animation="border" variant="primary" />
+          <span className="ms-2">Loading cart...</span>
+        </Offcanvas.Body>
+      </Offcanvas>
+    );
+  }
 
   return (
     <>
@@ -76,7 +107,7 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
                   {group.type === 'collection' && (
                     <div className="mb-2">
                       <h6 className="fw-semibold">
-                        Collection Pack: {group.items[0]?.collectionId || 'Untitled'} (Discount: {group.discount}%)
+                        Collection Pack: {group.items[0]?.collectionId || 'Untitled'} (Discount: {group.collectionDiscount}%)
                       </h6>
                     </div>
                   )}
@@ -89,7 +120,8 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
                         <>
                           <Image
                             src={item.posters[0]?.image || 'https://via.placeholder.com/60'}
-                            alt="Collection"
+                            alt="Collection thumbnail"
+                            title="Collection image"
                             style={{ width: '60px', aspectRatio: '4/5', objectFit: 'cover' }}
                             className="me-3 rounded flex-shrink-0"
                           />
@@ -98,15 +130,18 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
                             <ul className="mb-2 ps-3">
                               {item.posters.map((poster, i) => (
                                 <li key={i} className="text-muted small">
-                                  {poster.title || 'Untitled'} ({poster.size || 'N/A'}) - ₹{(poster.price || 0).toLocaleString('en-IN')}
+                                  {poster.title || 'Untitled'} ({poster.size || 'N/A'}) - ₹{(poster.finalPrice || poster.price || 0).toLocaleString('en-IN')}
+                                  {poster.discount > 0 && (
+                                    <span className="text-success ms-1">({poster.discount}% off)</span>
+                                  )}
                                 </li>
                               ))}
                             </ul>
                             <p className="mb-2">
                               ₹{(
-                                item.posters.reduce((sum, p) => sum + (p.price || 0), 0) * (item.quantity || 1) * (1 - group.discount / 100)
+                                (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1) * (1 - group.collectionDiscount / 100)
                               ).toLocaleString('en-IN')}
-                              {group.discount > 0 && <span className="text-success ms-1">({group.discount}% off)</span>}
+                              {group.collectionDiscount > 0 && <span className="text-success ms-1">({group.collectionDiscount}% off)</span>}
                             </p>
                             <div className="d-flex align-items-center gap-2">
                               <Button
@@ -170,8 +205,8 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
                             </h6>
                             {item.seller && <p className="mb-1 text-muted small">By: {item.seller}</p>}
                             <p className="mb-2">
-                              ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
-                              {item.collectionDiscount > 0 && <span className="text-success ms-1">({item.collectionDiscount}% off)</span>}
+                              ₹{((item.finalPrice || item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
+                              {item.discount > 0 && <span className="text-success ms-1">({item.discount}% off)</span>}
                             </p>
                             <div className="d-flex align-items-center gap-2">
                               <Button
@@ -223,12 +258,51 @@ export default function CartSidebar({ cartItems = [], show, onClose, removeFromC
           )}
         </Offcanvas.Body>
         <div className="p-3 border-top">
-          <h6 className="fw-semibold mb-3">Total: ₹{totalPrice.toLocaleString('en-IN')}</h6>
+          <div className="mb-3">
+            {cartItems.length > 0 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span>Subtotal</span>
+                  <span>₹{totalPrice.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span className="d-flex align-items-center">
+                    <i className="bi bi-truck me-2 text-primary" style={{ fontSize: '1rem' }}></i>
+                    Delivery
+                  </span>
+                  {isFreeDelivery ? (
+                    <span>
+                      <span className="text-decoration-line-through text-muted me-1">
+                        ₹{deliveryCharge.toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-success">Free</span>
+                    </span>
+                  ) : (
+                    <span>₹{deliveryCharge.toLocaleString('en-IN')}</span>
+                  )}
+                </div>
+                {!isFreeDelivery && freeDeliveryThreshold > 0 && (
+                  <p className="text-muted small mt-1">
+                    Add ₹{(freeDeliveryThreshold - totalPrice).toLocaleString('en-IN')} more for free delivery!
+                  </p>
+                )}
+                <div className="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                  <strong>Total</strong>
+                  <strong>₹{totalWithDelivery.toLocaleString('en-IN')}</strong>
+                </div>
+              </>
+            ) : (
+              <div className="d-flex justify-content-between align-items-center">
+                <strong>Total</strong>
+                <strong>₹0.00</strong>
+              </div>
+            )}
+          </div>
           <Button
             onClick={handleGoToCheckout}
             variant="dark"
             className="w-100 d-flex align-items-center justify-content-center"
-            disabled={cartItems.length === 0}
+            disabled={cartItems.length === 0 || loading}
             style={{ height: '40px', lineHeight: '1' }}
           >
             <i className="bi bi-cart-check me-2 fs-6"></i> Go to Checkout

@@ -81,16 +81,13 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster }) => {
     return isCloudinary ? `Cloudinary image: ${path}` : `Firestore image: ${path}`;
   };
 
-  // Truncate keywords to 50 characters and add "..." if longer
-  const displayKeywords = keywords.length > 50 ? `${keywords.slice(0, 50)}...` : keywords;
-
   return (
     <div>
       {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
       <Form onSubmit={handleSubmit} ref={formRef}>
         <Form.Group className="mb-3">
           <Form.Label>Poster ID</Form.Label>
-          <div className="input-group">
+          <div className="d-flex gap-2 align-items-center">
             <Form.Control
               name="posterId"
               defaultValue={poster?.posterId || ""}
@@ -99,64 +96,31 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster }) => {
               isInvalid={!!idError}
               isValid={idChecked && !idError}
               aria-describedby="posterIdFeedback"
+              disabled={!!poster?.posterId}
+              className="flex-grow-1"
             />
-            <Button
-              variant="outline-secondary"
-              onClick={() => checkIdUniqueness(formRef.current?.posterId?.value?.trim().toLowerCase())}
-              aria-label="Check Poster ID"
-            >
-              Check
-            </Button>
-            <Button
-              variant="outline-secondary"
-              onClick={suggestId}
-              aria-label="Suggest Poster ID"
-            >
-              Suggest
-            </Button>
-            <Form.Control.Feedback type="invalid" id="posterIdFeedback">
-              {idError}
-            </Form.Control.Feedback>
+            {!poster?.posterId && (
+              <>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => checkIdUniqueness(formRef.current?.posterId?.value?.trim().toLowerCase())}
+                  aria-label="Check Poster ID"
+                >
+                  Check
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  onClick={suggestId}
+                  aria-label="Suggest Poster ID"
+                >
+                  Suggest
+                </Button>
+              </>
+            )}
           </div>
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Seller Username</Form.Label>
-          <div className="input-group">
-            <Form.Control
-              name="seller"
-              value={sellerUsername}
-              onChange={(e) => {
-                setSellerUsername(e.target.value);
-                setSellerChecked(false);
-                setIsSellerValid(false);
-                setSellerName("");
-              }}
-              placeholder="Enter Seller Username"
-              required
-              isInvalid={sellerChecked && !isSellerValid}
-              isValid={sellerChecked && isSellerValid}
-              aria-describedby="sellerUsernameFeedback"
-            />
-            <Button
-              variant="outline-secondary"
-              onClick={checkSellerUsername}
-              aria-label="Check Seller Username"
-            >
-              Check
-            </Button>
-            <Button
-              variant="outline-secondary"
-              onClick={insertUserId}
-              aria-label="Use Current User ID"
-            >
-              Use My ID
-            </Button>
-          </div>
-          {sellerChecked && (
-            <Form.Text className={isSellerValid ? "text-muted" : "text-danger"} id="sellerUsernameFeedback">
-              {isSellerValid ? `Seller: ${sellerName}` : sellerName}
-            </Form.Text>
-          )}
+          <Form.Control.Feedback type="invalid" id="posterIdFeedback">
+            {idError}
+          </Form.Control.Feedback>
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Title</Form.Label>
@@ -188,10 +152,10 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster }) => {
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Keywords (comma-separated)</Form.Label>
-          <div className="input-group">
+          <div className="d-flex gap-2 align-items-center">
             <Form.Control
               name="keywords"
-              value={displayKeywords}
+              value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="Enter keywords..."
             />
@@ -318,6 +282,45 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster }) => {
               onChange={handleImageChange}
               required
             />
+          )}
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Seller Username</Form.Label>
+          <div className="input-group">
+            <Form.Control
+              name="seller"
+              value={sellerUsername}
+              onChange={(e) => {
+                setSellerUsername(e.target.value);
+                setSellerChecked(false);
+                setIsSellerValid(false);
+                setSellerName("");
+              }}
+              placeholder="Enter Seller Username"
+              required
+              isInvalid={sellerChecked && !isSellerValid}
+              isValid={sellerChecked && isSellerValid}
+              aria-describedby="sellerUsernameFeedback"
+            />
+            <Button
+              variant="outline-secondary"
+              onClick={checkSellerUsername}
+              aria-label="Check Seller Username"
+            >
+              Check
+            </Button>
+            <Button
+              variant="outline-secondary"
+              onClick={insertUserId}
+              aria-label="Use Current User ID"
+            >
+              Use My ID
+            </Button>
+          </div>
+          {sellerChecked && (
+            <Form.Text className={isSellerValid ? "text-muted" : "text-danger"} id="sellerUsernameFeedback">
+              {isSellerValid ? `Seller: ${sellerName}` : sellerName}
+            </Form.Text>
           )}
         </Form.Group>
         <Form.Group className="mb-3">

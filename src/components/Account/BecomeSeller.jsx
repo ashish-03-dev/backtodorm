@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { httpsCallable } from 'firebase/functions';
 
 export default function BecomeSeller() {
-  const { functions, userData, checkUsernameAvailability } = useFirebase();
+  const { user, functions, userData, checkUsernameAvailability } = useFirebase();
   const navigate = useNavigate();
   const [sellerUsername, setSellerUsername] = useState("@");
   const [error, setError] = useState("");
@@ -52,6 +52,7 @@ export default function BecomeSeller() {
     setLoading(true);
     setError("");
     try {
+      console.log(user);
       const becomeSellerFunction = httpsCallable(functions, 'becomeSeller');
       await becomeSellerFunction({ sellerUsername });
       navigate("/seller");

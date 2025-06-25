@@ -27,7 +27,7 @@ export const FirebaseProvider = ({ children }) => {
   const firestore = getFirestore(app);
   const database = getDatabase(app);
   const storage = getStorage(app);
-  const functions = getFunctions(app, 'asia-south1');
+  const functions = getFunctions(app, 'us-central1');
 
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);

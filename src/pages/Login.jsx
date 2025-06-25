@@ -1,13 +1,13 @@
 import React, { useState } from "react";
-import {useNavigate} from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useFirebase } from "../context/FirebaseContext";
 
 export default function PhoneLogin() {
-  const navigate = useNavigate();
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1);
+  const navigate = useNavigate();
 
   const { setUpRecaptcha, verifyOtp, googleLogin } = useFirebase();
 
@@ -48,7 +48,6 @@ export default function PhoneLogin() {
     <div className="container d-flex align-items-center justify-content-center vh-100 bg-white">
       <div className="card shadow-lg p-4" style={{ maxWidth: "400px", width: "100%" }}>
         <div className="text-center mb-4">
-          {/* <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Pinterest-logo.png" alt="Logo" height="32" /> */}
           <h4 className="fw-bold mt-3">Welcome</h4>
           <p className="text-muted">Sign in with your phone number</p>
         </div>
@@ -94,7 +93,7 @@ export default function PhoneLogin() {
 
         <div className="text-center my-3">OR</div>
 
-        <button onClick={handleGoogleLogin} className="btn border w-100 mb-2">
+        <button onClick={handleGoogleLogin} className="btn border w-100 mb-4">
           <img
             src="https://developers.google.com/identity/images/g-logo.png"
             alt="Google"
@@ -102,9 +101,8 @@ export default function PhoneLogin() {
           />
           Continue with Google
         </button>
-
-        <p className="text-center text-muted mt-3" style={{ fontSize: "0.85rem" }}>
-          By continuing, you agree to our <a href="#">Terms</a> & <a href="#">Privacy</a>.
+        <p className="mb-0 text-center" style={{fontSize:".90em"}}>
+          By continuing, you agree to our <Link to="/terms">Terms & Conditions</Link> 
         </p>
       </div>
     </div>

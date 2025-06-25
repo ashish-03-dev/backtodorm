@@ -1,7 +1,8 @@
-import Orders from "./pages/AAdmin/Orders";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import HomeLayout from './pages/HomeLayout';
+import Terms from "./components/Terms";
+import Privacy from "./components/Privacy";
 import MainLanding from './components/Home/MainLanding';
 import CollectionDetail from './components/Collections/CollectionsDetail';
 import SingleCollection from './components/Collections/SingleCollection';
@@ -11,6 +12,7 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import AdminLayout from './pages/AAdmin/AdminLayout';
 import Dashboard from "./pages/AAdmin/Dashboard";
+import Orders from "./pages/AAdmin/Orders/index";
 import SectionManager from './pages/AAdmin/HomeContentManager/SectionManager';
 import Sellers from "./pages/AAdmin/Sellers";
 import Posters from "./pages/AAdmin/Posters/Posters";
@@ -32,13 +34,15 @@ import Payouts from "./components/Seller/Payouts";
 import SellerSettings from "./components/Seller/SellerSettings";
 import SearchPage from './components/SearchPage';
 import HelpCentre from "./components/Account/HelpCentre";
-import AdminSupport from './pages/AAdmin/AdminSupport';
+import Support from './pages/AAdmin/Support';
 
 function App() {
 
   return (
     <Router>
       <Routes>
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
         <Route path="/" element={<HomeLayout />}>
           <Route index element={<MainLanding />} />
           <Route path="collections/:collectionId" element={<CollectionDetail />} />
@@ -75,7 +79,7 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin-users" element={<AdminUsers />} />
-          <Route path="support" element={<AdminSupport />} />
+          <Route path="support" element={<Support />} />
         </Route>
       </Routes>
     </Router>

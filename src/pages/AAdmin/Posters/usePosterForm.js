@@ -33,7 +33,7 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster 
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [idError, setIdError] = useState(null);
-  const [idChecked, setIdChecked] = useState(!!poster);
+  const [idChecked, setIdChecked] = useState(poster?.posterId);
   const [collectionError, setCollectionError] = useState(null);
   const [availableCollections, setAvailableCollections] = useState([]);
   const [tags, setTags] = useState(poster?.tags?.join(", ") || "");
@@ -118,8 +118,8 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster 
           const userDoc = await getDoc(doc(firestore, "sellers", sellerUsername));
           if (userDoc.exists()) {
             const data = userDoc.data();
-            setSellerName(data.name || "Unknown User");
-            setIsSellerValid(data.isSeller || false);
+            setSellerName(data.sellerName || "Unknown User");
+            setIsSellerValid(true);
             setSellerChecked(true);
           } else {
             setIsSellerValid(false);

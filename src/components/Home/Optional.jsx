@@ -2,11 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
-import { useOutletContext } from 'react-router-dom';
+import { useCartContext } from '../../context/CartContext';
 
 export default function YouMayAlsoLike() {
   const { firestore } = useFirebase();
-  const { addToCart } = useOutletContext();
+  const { addToCart } = useCartContext();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

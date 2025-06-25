@@ -6,8 +6,10 @@ import MobileSidebar from './MobileSidebar';
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useFirebase } from "../../context/FirebaseContext";
 import { useNavigate } from "react-router-dom";
+import { useCartContext } from "../../context/CartContext";
 
-export default function NavbarComponent({ cartItems = [], removeFromCart, updateQuantity }) {
+export default function NavbarComponent() {
+  const { cartItems } = useCartContext();
   const { user, logout } = useFirebase();
   const isLoggedIn = !!user;
   const [showSidebar, setShowSidebar] = useState(false);
@@ -36,7 +38,7 @@ export default function NavbarComponent({ cartItems = [], removeFromCart, update
 
         <NavLinks />
 
-        <div className="col-md-3 h-100 d-flex align-items-center flex-grow-1 justify-content-end position-relative" style={{maxWidth:"50%"}}>
+        <div className="col-md-3 h-100 d-flex align-items-center flex-grow-1 justify-content-end position-relative" style={{ maxWidth: "50%" }}>
           <button
             className="btn px-3 mx-1 mx-md-2 align-items-center"
             type="button"
@@ -81,11 +83,8 @@ export default function NavbarComponent({ cartItems = [], removeFromCart, update
 
       <MobileSidebar show={showSidebar} onClose={() => setShowSidebar(false)} />
       <CartSidebar
-        cartItems={cartItems}
         show={showCart}
         onClose={() => setShowCart(false)}
-        removeFromCart={removeFromCart}
-        updateQuantity={updateQuantity}
       />
     </>
   );

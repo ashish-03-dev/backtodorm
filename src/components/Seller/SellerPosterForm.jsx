@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Form, Button, Alert, Modal, ProgressBar, Spinner } from "react-bootstrap";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { collection, getDocs, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytesResumable } from "firebase/storage";
 import Select from "react-select";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { useFirebase } from "../../context/FirebaseContext";
-import { addPoster } from "./sellerUtils";
 
 // Poster sizes (300 DPI)
 const POSTER_SIZES = {
@@ -23,14 +22,14 @@ function SellerPosterForm({ onSave }) {
     description: "",
     tags: "",
     collections: [],
-    sizes: ["A4"],
+    sizes: [{ size: "A4" }],
     imageFile: null,
   });
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [cropping, setCropping] = useState(false); // New state for crop button
+  const [cropping, setCropping] = useState(false);
   const [crop, setCrop] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
   const [originalImageSrc, setOriginalImageSrc] = useState(null);
@@ -163,7 +162,7 @@ function SellerPosterForm({ onSave }) {
       setShowCropModal(false);
       return;
     }
-    setCropping(true); // Set cropping state
+    setCropping(true);
     try {
       const { widthPx, heightPx } = POSTER_SIZES[selectedSize];
       const canvas = document.createElement("canvas");
@@ -204,14 +203,14 @@ function SellerPosterForm({ onSave }) {
     } catch (err) {
       setError("Failed to process crop: " + err.message);
     } finally {
-      setCropping(false); // Reset cropping state
+      setCropping(false);
     }
   };
 
   // Handle size change
   const handleSizeChange = (index, value) => {
     const updatedSizes = [...formData.sizes];
-    updatedSizes[index] = value in POSTER_SIZES ? value : "A4";
+    updatedSizes[index] = { size: value in POSTER_SIZES ? value : "A4" };
     setFormData((prev) => ({ ...prev, sizes: updatedSizes, imageFile: null }));
     setSelectedSize(value in POSTER_SIZES ? value : "A4");
     setImageSrc(null);
@@ -224,8 +223,8 @@ function SellerPosterForm({ onSave }) {
 
   // Add size
   const addSize = () => {
-    if (formData.sizes.every((s) => s in POSTER_SIZES)) {
-      setFormData((prev) => ({ ...prev, sizes: [...prev.sizes, "A4"] }));
+    if (formData.sizes.every((s) => s.size in POSTER_SIZES)) {
+      setFormData((prev) => ({ ...prev, sizes: [...prev.sizes, { size: "A4" }] }));
       setSelectedSize("A4");
     } else {
       setError("Please select a valid size.");
@@ -237,7 +236,7 @@ function SellerPosterForm({ onSave }) {
     if (formData.sizes.length > 1) {
       const newSizes = formData.sizes.filter((_, i) => i !== index);
       setFormData((prev) => ({ ...prev, sizes: newSizes }));
-      if (formData.sizes[index] === selectedSize) setSelectedSize(newSizes[0] || "A4");
+      if (formData.sizes[index].size === selectedSize) setSelectedSize(newSizes[0]?.size || "A4");
     }
   };
 
@@ -273,7 +272,7 @@ function SellerPosterForm({ onSave }) {
       setSubmitting(false);
       return;
     }
-    if (formData.sizes.some((s) => !(s in POSTER_SIZES))) {
+    if (formData.sizes.some((s) => !(s.size in POSTER_SIZES))) {
       setError("Invalid size selected.");
       setSubmitting(false);
       return;
@@ -297,7 +296,6 @@ function SellerPosterForm({ onSave }) {
       const imageRef = ref(storage, `posters/${sellerUsername}/${Date.now()}_${formData.imageFile.name}`);
       const uploadTask = uploadBytesResumable(imageRef, formData.imageFile);
 
-      // Track upload progress
       uploadTask.on(
         "state_changed",
         (snapshot) => {
@@ -310,7 +308,6 @@ function SellerPosterForm({ onSave }) {
           setProgress(0);
         },
         async () => {
-          // Upload complete, get download URL
           try {
             data.originalImageUrl = imageRef.fullPath;
             const result = await addPoster(firestore, data);
@@ -320,8 +317,7 @@ function SellerPosterForm({ onSave }) {
               setError(result.error || "Failed to save poster.");
             }
           } catch (err) {
-            setError("Failed to save poster: " + err.message);
-          } finally {
+            setError(err.message);
             setSubmitting(false);
             setProgress(0);
           }
@@ -347,7 +343,7 @@ function SellerPosterForm({ onSave }) {
             required
             placeholder="Poster title"
             disabled={submitting}
-            />
+          />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Description</Form.Label>
@@ -359,7 +355,7 @@ function SellerPosterForm({ onSave }) {
             placeholder="Describe your poster"
             rows={2}
             disabled={submitting}
-            />
+          />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Tags (comma-separated)</Form.Label>
@@ -369,7 +365,7 @@ function SellerPosterForm({ onSave }) {
             onChange={(e) => setFormData((prev) => ({ ...prev, tags: e.target.value }))}
             placeholder="e.g., k-pop, minimalist"
             disabled={submitting}
-            />
+          />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Collections</Form.Label>
@@ -380,18 +376,18 @@ function SellerPosterForm({ onSave }) {
             onChange={(selected) => setFormData((prev) => ({ ...prev, collections: selected }))}
             placeholder="Select collections"
             isDisabled={submitting}
-            />
+          />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Sizes</Form.Label>
-          {formData.sizes.map((size, index) => (
+          {formData.sizes.map((sizeObj, index) => (
             <div key={index} className="d-flex align-items-center gap-2 mb-2">
               <Form.Select
-                value={size}
+                value={sizeObj.size}
                 onChange={(e) => handleSizeChange(index, e.target.value)}
                 required
                 disabled={submitting}
-                >
+              >
                 <option value="">Select size</option>
                 {Object.keys(POSTER_SIZES).map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -419,19 +415,19 @@ function SellerPosterForm({ onSave }) {
               ref={fileInputRef}
               style={{ paddingRight: formData.imageFile ? "60px" : undefined }}
               disabled={submitting}
-              />
+            />
             {formData.imageFile && (
               <span
-              onClick={handleClearImage}
-              style={{
-                position: "absolute",
-                top: "50%",
-                right: "10px",
-                transform: "translateY(-50%)",
-                cursor: "pointer",
-                fontSize: "0.9rem",
-                color: "#007bff",
-              }}
+                onClick={handleClearImage}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: "10px",
+                  transform: "translateY(-50%)",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  color: "#007bff",
+                }}
               >
                 Clear
               </span>
@@ -453,14 +449,14 @@ function SellerPosterForm({ onSave }) {
             Cancel
           </Button>
         </div>
-      {progress > 0 && progress < 100 && (
-        <ProgressBar
-          now={progress}
-          label={`${Math.round(progress)}%`}
-          className="mt-3"
-          animated
-        />
-      )}
+        {progress > 0 && progress < 100 && (
+          <ProgressBar
+            now={progress}
+            label={`${Math.round(progress)}%`}
+            className="mt-3"
+            animated
+          />
+        )}
       </Form>
       <Modal
         show={showCropModal}
@@ -523,5 +519,82 @@ function SellerPosterForm({ onSave }) {
     </div>
   );
 }
+
+// Add a new poster to tempPosters with Firestore-generated ID
+export const addPoster = async (firestore, posterData) => {
+  try {
+    // Validate required fields
+    if (!posterData.title) throw new Error("Poster title is required");
+    if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0 || !posterData.sizes.every(s => s.size && s.size in POSTER_SIZES))
+      throw new Error("At least one valid size object is required");
+    if (!posterData.sellerUsername) throw new Error("Seller username is required");
+
+    // Create references
+    const posterRef = doc(collection(firestore, "tempPosters"));
+    const posterId = posterRef.id;
+    const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
+    const collectionRefs = (posterData.collections || []).map((col) =>
+      doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
+    );
+
+    // Run transaction
+    await runTransaction(firestore, async (transaction) => {
+      // Get seller and collection documents
+      const sellerDoc = await transaction.get(sellerRef);
+      const collectionDocs = await Promise.all(collectionRefs.map((ref) => transaction.get(ref)));
+
+      // Set poster document without posterId
+      transaction.set(posterRef, {
+        ...posterData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update collections
+      collectionRefs.forEach((colRef, index) => {
+        const colDoc = collectionDocs[index];
+        const colId = colRef.id;
+        if (!colDoc.exists()) {
+          transaction.set(colRef, {
+            name: colId,
+            posterIds: [posterId],
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          const posterIds = colDoc.data().posterIds || [];
+          if (!posterIds.includes(posterId)) {
+            transaction.update(colRef, {
+              posterIds: [...posterIds, posterId],
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+      });
+
+      // Update seller document
+      const existingTempPosters = sellerDoc.exists() ? sellerDoc.data().tempPosters || [] : [];
+      transaction.set(
+        sellerRef,
+        {
+          sellerUsername: posterData.sellerUsername,
+          tempPosters: [
+            ...existingTempPosters,
+            {
+              id: posterId,
+              status: posterData.approved || "Pending",
+              createdAt: new Date(),
+            },
+          ],
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+
+    return { success: true, id: posterId };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
 
 export default SellerPosterForm;
