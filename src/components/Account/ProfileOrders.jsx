@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
-import { collection, query, where, onSnapshot, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Alert, Spinner, Card, Badge, Button, Tabs, Tab, Container, Row, Col } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -81,7 +81,7 @@ export default function ProfileOrders() {
 
     const unsubscribeOrders = onSnapshot(ordersQuery, async (snapshot) => {
       try {
-        const confirmedOrders = await fetchOrders(snapshot);
+      const confirmedOrders = await fetchOrders(snapshot);
         const unsubscribePending = onSnapshot(pendingOrdersQuery, async (pendingSnapshot) => {
           try {
             const pendingOrders = await fetchOrders(pendingSnapshot, true, 'temporaryOrders');
@@ -127,7 +127,11 @@ export default function ProfileOrders() {
         name: 'Back to Dorm',
         description: tempOrderData.isBuyNow ? 'Buy Now Purchase' : 'Cart Purchase',
         order_id: razorpayOrderId,
-        prefill: { name: tempOrderData.shippingAddress.name, email: user.email || '', contact: tempOrderData.shippingAddress.phone },
+        prefill: {
+          name: tempOrderData.shippingAddress.name,
+          email: user.email || '',
+          contact: tempOrderData.shippingAddress.phone,
+        },
         notes: {
           address: `${tempOrderData.shippingAddress.address}, ${tempOrderData.shippingAddress.locality}, ${tempOrderData.shippingAddress.city}, ${tempOrderData.shippingAddress.state} - ${tempOrderData.shippingAddress.pincode}`,
           userId: user.uid,
@@ -158,69 +162,125 @@ export default function ProfileOrders() {
     }
   };
 
-  const handleCancelOrder = async (orderId) => {
-    try {
-      await deleteDoc(doc(firestore, 'temporaryOrders', orderId));
-      setError('Order cancelled successfully.');
-    } catch (err) {
-      setError(`Failed to cancel order: ${err.message}`);
-    }
-  };
-
   const renderOrders = (orderList) => (
-    <div className="d-flex flex-column gap-3">
+    <div className="d-flex flex-column gap-4">
       {orderList.length === 0 ? (
-        <p className="text-muted text-center">No orders found.</p>
+        <p className="text-muted text-center fs-5 my-4">No orders found.</p>
       ) : (
         orderList.map((order) => (
-          <Card key={order.id} className="shadow-sm border-0">
-            <Card.Body>
-              <Row>
-                <Col xs={8}>
-                  <strong>Order ID:</strong> {order.id}
-                </Col>
-                <Col xs={4} className="text-end">
-                  <Badge bg={order.paymentStatus === 'Completed' ? 'success' : 'warning'}>
-                    {order.paymentStatus === 'Completed' ? order.status : order.paymentStatus}
-                  </Badge>
+          <Card
+            key={order.id}
+            className="shadow-sm border-0 rounded-3 overflow-hidden"
+          >
+            <Card.Header className="bg-light d-flex justify-content-between align-items-center">
+              <div>
+                <strong className="fs-6">Order ID:</strong>{' '}
+                <span className="text-muted">{order.id}</span>
+              </div>
+              <Badge
+                bg={
+                  order.paymentStatus === 'Completed'
+                    ? order.status === 'Delivered'
+                      ? 'success'
+                      : order.status === 'Shipped'
+                      ? 'primary'
+                      : 'warning'
+                    : order.paymentStatus === 'Pending'
+                    ? 'warning'
+                    : 'danger'
+                }
+                className="px-3 py-2 fs-6"
+              >
+                {order.paymentStatus === 'Completed' ? order.status : order.paymentStatus}
+              </Badge>
+            </Card.Header>
+            <Card.Body className="p-4">
+              <Row className="mb-3">
+                <Col>
+                  <div className="text-muted fs-6">
+                    <i className="bi bi-calendar me-2"></i>Placed on {order.date}
+                  </div>
                 </Col>
               </Row>
-              <div className="text-muted">Placed on {order.date}</div>
-              {order.isPending && <Alert variant="warning">Awaiting payment confirmation.</Alert>}
-              <ul>
-                {order.items.map((item, idx) => (
-                  <li key={idx}>
-                    {item.type === 'poster' ? (
-                      `${item.name} (${item.size}) × ${item.quantity} - ₹${(item.price * item.quantity).toLocaleString('en-IN')}`
-                    ) : (
-                      <>
-                        Collection: {item.name} × {item.quantity} (Discount: {item.collectionDiscount}%)
-                        <ul>
-                          {item.posters.map((poster, i) => (
-                            <li key={i}>
-                              - {poster.name} ({poster.size}) - ₹{poster.price.toLocaleString('en-IN')}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <div><strong>Total:</strong> {order.total}</div>
-              {order.shippingAddress && (
-                <div>
-                  <strong>Shipping Address:</strong> {order.shippingAddress.name}, {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}
-                </div>
-              )}
-              <div><strong>Payment:</strong> {order.paymentStatus} via {order.paymentMethod}</div>
               {order.isPending && (
-                <div>
-                  {order.paymentStatus === 'Failed' && (
-                    <Button onClick={() => handleRetryPayment(order.id)}>Retry Payment</Button>
-                  )}
-                  <Button variant="outline-danger" onClick={() => handleCancelOrder(order.id)}>Cancel Order</Button>
-                </div>
+                <Alert variant="warning" className="mb-4 py-2">
+                  Awaiting payment confirmation.
+                </Alert>
+              )}
+              <div className="mb-4">
+                <h6 className="fw-bold mb-3">Items</h6>
+                <ul className="list-unstyled ps-3">
+                  {order.items.map((item, idx) => (
+                    <li key={idx} className="mb-3">
+                      {item.type === 'poster' ? (
+                        <div className="d-flex justify-content-between">
+                          <span>
+                            {item.name} ({item.size}) × {item.quantity}
+                          </span>
+                          <span>₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="d-flex justify-content-between">
+                            <span>
+                              Collection: {item.name} × {item.quantity} (Discount:{' '}
+                              {item.collectionDiscount}%)
+                            </span>
+                            <span></span>
+                          </div>
+                          <ul className="list-unstyled ps-4 mt-2">
+                            {item.posters.map((poster, i) => (
+                              <li key={i} className="text-muted">
+                                <div className="d-flex justify-content-between">
+                                  <span>
+                                    - {poster.name} ({poster.size})
+                                  </span>
+                                  <span>₹{poster.price.toLocaleString('en-IN')}</span>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <Row className="mb-3">
+                <Col>
+                  <strong>Total:</strong> {order.total}
+                </Col>
+              </Row>
+              {order.shippingAddress && (
+                <Row className="mb-3">
+                  <Col>
+                    <strong>Shipping Address:</strong>
+                    <p className="text-muted mb-0">
+                      {order.shippingAddress.name}, {order.shippingAddress.address},{' '}
+                      {order.shippingAddress.locality}, {order.shippingAddress.city},{' '}
+                      {order.shippingAddress.state} - {order.shippingAddress.pincode}
+                    </p>
+                  </Col>
+                </Row>
+              )}
+              <Row className="mb-3">
+                <Col>
+                  <strong>Payment:</strong> {order.paymentStatus} via {order.paymentMethod}
+                </Col>
+              </Row>
+              {order.isPending && order.paymentStatus === 'Failed' && (
+                <Row>
+                  <Col>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleRetryPayment(order.id)}
+                      className="px-4"
+                    >
+                      Retry Payment
+                    </Button>
+                  </Col>
+                </Row>
               )}
             </Card.Body>
           </Card>
@@ -229,18 +289,17 @@ export default function ProfileOrders() {
     </div>
   );
 
-  if (loading) return <Spinner animation="border" />;
-  if (error) return <Alert variant="danger">{error}</Alert>;
+  if (loading) return <Spinner animation="border" className="d-block mx-auto mt-5" />;
+  if (error) return <Alert variant="danger" className="w-75 mx-auto mt-5">{error}</Alert>;
 
   return (
-    <Container>
-      <Row>
-        <Col><h2>My Orders</h2></Col>
+    <Container className="my-5">
+      <Row className="align-items-center mb-4">
+        <Col><h2 className="fw-bold">My Orders</h2></Col>
         <Col className="text-end">
-          <Button onClick={() => setLoading(true)}>Refresh</Button>
         </Col>
       </Row>
-      <Tabs defaultActiveKey="all">
+      <Tabs defaultActiveKey="all" variant="pills" className="mb-4">
         <Tab eventKey="all" title="All Orders">{renderOrders(orders)}</Tab>
         <Tab eventKey="pending" title="Pending Payment">{renderOrders(orders.filter((order) => order.isPending))}</Tab>
         <Tab eventKey="confirmed" title="Confirmed Orders">{renderOrders(orders.filter((order) => !order.isPending))}</Tab>
