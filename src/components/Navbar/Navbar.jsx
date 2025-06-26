@@ -35,7 +35,13 @@ export default function NavbarComponent() {
             <img
               src="/android-chrome-192x192.png"
               alt="backtodorm logo"
-              style={{ width: "50px", marginRight: "10px" }}
+              style={{
+                width: "50px",
+                height: "50px",         // Ensure it's a square
+                marginRight: "10px",
+                borderRadius: "50%",    // Makes it round
+                objectFit: "cover"      // Keeps aspect ratio nicely
+              }}
             />
             B. T. D.
           </a>
