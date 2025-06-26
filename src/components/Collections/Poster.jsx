@@ -147,7 +147,7 @@ export default function ProductDetail() {
       <div className="row">
         <div
           className="col-md-6 py-4 overflow-auto"
-          style={{ height: 'calc(100svh - 65px)', paddingRight: '1rem' }}
+          style={{ maxHeight: 'calc(100svh - 65px)', paddingRight: '1rem' }}
         >
           <img
             src={poster.image}
