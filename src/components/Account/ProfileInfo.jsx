@@ -1,31 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Navigate } from 'react-router-dom';
-
 import { useFirebase } from "../../context/FirebaseContext";
 
 export default function ProfileInfo() {
-  const { user, userData, loadingUserData, getUserProfile, updateUserProfile, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
-  const [name, setName] = useState("");
-  const [tempName, setTempName] = useState(name);
-  const [editingName, setEditingName] = useState(null);
+  const { user, userData, loadingUserData, updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
+  const [tempName, setTempName] = useState(userData?.name || "");
+  const [editingName, setEditingName] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [editingPhone, setEditingPhone] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState(null);
 
-  useEffect(() => {
-    if (user?.uid) {
-      getUserProfile(user.uid).then(data => {
-        if (data?.name) setName(data.name);
-      });
-    }
-  }, [user]);
-
   const handleSave = async () => {
-    await updateUserProfile(user.uid, { name: tempName });
-    setName(tempName);
-    setEditingName(null);
+    try {
+      await updateUser({ name: tempName });
+      setEditingName(false);
+    } catch (err) {
+      alert("Failed to update profile: " + err.message);
+    }
   };
 
   if (!loadingUserData && !user) {
@@ -36,7 +29,6 @@ export default function ProfileInfo() {
     <div className="d-flex flex-column h-100">
       <h4 className="mb-4">Profile Info</h4>
 
-      {/* Profile Photo */}
       <div className="mb-4" style={{ width: 64, height: 64 }}>
         {user?.photoURL ? (
           <img
@@ -54,18 +46,16 @@ export default function ProfileInfo() {
         )}
       </div>
 
-      {/* Name */}
       <div className="mb-4">
         <label className="form-label fw-semibold mb-2">Full Name</label>
         {!editingName ? (
           <div className="input-group mt-2">
-
             <input className="form-control text-muted" value={userData?.name || ""} readOnly />
             <span
               className="input-group-text bg-white text-primary"
               style={{ cursor: "pointer" }}
               onClick={() => {
-                setTempName(name);
+                setTempName(userData?.name || "");
                 setEditingName(true);
               }}
             >
@@ -83,7 +73,6 @@ export default function ProfileInfo() {
         )}
       </div>
 
-      {/* Email */}
       <div className="mb-4">
         <label className="form-label fw-semibold mb-2">Email</label>
         <input type="email" className="form-control text-muted" value={user?.email || ""} readOnly />
@@ -94,22 +83,18 @@ export default function ProfileInfo() {
               try {
                 await linkGoogleAccount();
                 alert("Google account linked successfully!");
-                window.location.reload(); // refresh auth state
               } catch (err) {
-                alert("Failed to link Google account: " + err.message);
+                alert(err.message); // Use the specific error message from linkGoogleAccount
               }
             }}
           >
             Link Google Account
           </button>
         )}
-
       </div>
 
-      {/* Phone */}
       <div className="mb-4">
         <label className="form-label fw-semibold mb-0">Phone Number</label>
-
         {user?.phoneNumber ? (
           <input
             type="tel"
@@ -129,9 +114,7 @@ export default function ProfileInfo() {
                 onChange={(e) => setPhoneInput(e.target.value)}
               />
             </div>
-
             <div id="recaptcha-container" className="my-2" />
-
             {!otpSent ? (
               <div className="d-flex gap-2 mt-2">
                 <button
@@ -142,10 +125,9 @@ export default function ProfileInfo() {
                       setConfirmationResult(result);
                       setOtpSent(true);
                     } catch (err) {
-                      console.error("OTP send failed:", err); // check console
+                      console.error("OTP send failed:", err);
                       alert("Failed to send OTP: " + err.message);
                     }
-
                   }}
                 >
                   Send OTP
@@ -175,14 +157,12 @@ export default function ProfileInfo() {
                     onClick={async () => {
                       try {
                         const res = await linkPhoneNumber(confirmationResult.verificationId, otp);
-                        await updateUserProfile(user.uid, {
-                          phone: res.user.phoneNumber,
-                        });
+                        await updateUser({ phone: res.user.phoneNumber });
                         setEditingPhone(false);
                         setOtpSent(false);
-                        window.location.reload();
-                      } catch {
-                        alert("Invalid OTP");
+                        setOtp("");
+                      } catch (err) {
+                        alert("Invalid OTP: " + err.message);
                       }
                     }}
                   >
@@ -220,11 +200,9 @@ export default function ProfileInfo() {
               Add
             </span>
           </div>
-
         )}
       </div>
 
-      {/*Footer Info */}
       <div className="text-muted small mt-auto pt-3 border-top">
         <p className="mb-1">
           Signed in with:{" "}
@@ -238,6 +216,6 @@ export default function ProfileInfo() {
           </strong>
         </p>
       </div>
-    </div >
+    </div>
   );
-}
+};

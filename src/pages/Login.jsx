@@ -5,12 +5,12 @@ import { useFirebase } from "../context/FirebaseContext";
 export default function PhoneLogin() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [name, setName] = useState("");
+  const [tempName, setTempName] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const navigate = useNavigate();
 
-  const { setUpRecaptcha, verifyOtp, googleLogin, createUser, user } = useFirebase();
+  const { setUpRecaptcha, verifyOtp, googleLogin, updateUser } = useFirebase();
 
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
@@ -40,39 +40,30 @@ export default function PhoneLogin() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (!name.trim()) {
-        throw new Error("Name is required");
+      if (tempName.trim()) {
+        await updateUser({ name: tempName });
       }
-
-      await createUser({ name: name.trim() });
-      navigate("/");
+      navigate("/"); // Redirect after name submission or skip
     } catch (err) {
-      console.error("Create user failed:", err);
-
-      if (err.code === "already-exists") {
-        alert("User already exists. Try logging in.");
-      } else if (err.code === "permission-denied") {
-        alert("Permission denied. Please try again later.");
-      } else if (err.code === "unauthenticated") {
-        alert("You must be signed in to complete this action.");
-      } else {
-        alert("Failed to save name or create user: " + err.message);
-      }
-    } finally {
-      setLoading(false);
+      alert("Failed to update name: " + err.message);
     }
+    setLoading(false);
+  };
+
+  const handleSkipName = async () => {
+    setLoading(true);
+    try {
+      navigate("/"); // Redirect without updating name
+    } catch (err) {
+      alert("Error: " + err.message);
+    }
+    setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
     try {
-      const result = await googleLogin();
-      const nameToUse = result.user.displayName || "";
-      await createUser({ name: nameToUse });
-      if (!nameToUse) {
-        setStep(3); // Move to name entry if no displayName
-      } else {
-        navigate("/");
-      }
+      await googleLogin();
+      navigate("/"); // Redirect after Google login
     } catch (err) {
       alert("Google login failed: " + err.message);
     }
@@ -97,7 +88,7 @@ export default function PhoneLogin() {
           </a>
           <h4 className="fw-bold mt-3">Welcome</h4>
           <p className="text-muted">
-            {step === 3 ? "Enter your name" : "Sign in with your phone number"}
+            {step === 3 ? "Enter your name (optional)" : "Sign in with your phone number"}
           </p>
         </div>
 
@@ -143,19 +134,28 @@ export default function PhoneLogin() {
         {step === 3 && (
           <form onSubmit={handleNameSubmit}>
             <div className="mb-3">
-              <label className="form-label">Your Name</label>
+              <label className="form-label">Your Name (Optional)</label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Enter your full name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+                placeholder="Enter your name"
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
               />
             </div>
-            <button type="submit" className="btn btn-danger w-100" disabled={loading}>
-              {loading ? "Saving..." : "Save Name"}
-            </button>
+            <div className="d-flex gap-2">
+              <button type="submit" className="btn btn-danger w-50" disabled={loading}>
+                {loading ? "Saving..." : "Save Name"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary w-50"
+                onClick={handleSkipName}
+                disabled={loading}
+              >
+                Later
+              </button>
+            </div>
           </form>
         )}
 

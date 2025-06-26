@@ -7,6 +7,7 @@ const OrderTable = ({
   setShowDetailModal,
   setSupplierData,
   setShowSupplierModal,
+  handleVerifyPricing,
   submitting,
   isPendingTab = false,
 }) => {
@@ -20,6 +21,7 @@ const OrderTable = ({
             <th>Date</th>
             <th>Total (₹)</th>
             <th>Payment Status</th>
+            <th>Verified</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -47,6 +49,15 @@ const OrderTable = ({
                 </Badge>
               </td>
               <td>
+                {order.paymentStatus === 'Completed' && !isPendingTab ? (
+                  <Badge bg={order.verified ? 'success' : 'danger'}>
+                    {order.verified ? 'Verified' : 'Unverified'}
+                  </Badge>
+                ) : (
+                  <Badge bg="secondary">N/A</Badge>
+                )}
+              </td>
+              <td>
                 <Button
                   variant="outline-info"
                   size="sm"
@@ -71,6 +82,7 @@ const OrderTable = ({
                   <Button
                     variant="outline-success"
                     size="sm"
+                    className="me-2"
                     onClick={() => {
                       setSupplierData({
                         supplierName: '',
@@ -95,12 +107,22 @@ const OrderTable = ({
                     Send to Supplier
                   </Button>
                 )}
+                {!isPendingTab && order.paymentStatus === 'Completed' && (
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => handleVerifyPricing(order.id)}
+                    disabled={submitting}
+                  >
+                    Verify Pricing
+                  </Button>
+                )}
               </td>
             </tr>
           ))}
           {orders.length === 0 && (
             <tr>
-              <td colSpan="6" className="text-center text-muted">
+              <td colSpan="7" className="text-center text-muted">
                 No orders found.
               </td>
             </tr>

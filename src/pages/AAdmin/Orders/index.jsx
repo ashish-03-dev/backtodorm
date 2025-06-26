@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Tab, Form, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFirebase } from '../../../context/FirebaseContext';
-import { collection, query, onSnapshot, getDoc, doc, updateDoc,where } from 'firebase/firestore';
+import { collection, query, onSnapshot, getDoc, doc, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import OrderTable from './OrderTable';
 import OrderDetailModal from './OrderDetailModal';
@@ -116,6 +116,25 @@ const Orders = () => {
       );
     } catch (err) {
       setError(`Failed to check pending payments: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyPricing = async (orderId) => {
+    setSubmitting(true);
+    setError('');
+    try {
+      const verifyOrderPricing = httpsCallable(functions, 'verifyOrderPricing');
+      const result = await verifyOrderPricing({ orderId });
+      const { verified, issues } = result.data;
+      setError(
+        verified
+          ? `Order ${orderId} pricing verified successfully.`
+          : `Order ${orderId} pricing verification failed: ${issues.join(', ')}`
+      );
+    } catch (err) {
+      setError(`Failed to verify pricing for order ${orderId}: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -289,6 +308,7 @@ const Orders = () => {
             variant="primary"
             onClick={handleCheckPendingPayments}
             disabled={submitting}
+            className="me-2"
           >
             Check Pending Payments
           </Button>
@@ -303,6 +323,7 @@ const Orders = () => {
             setShowDetailModal={setShowDetailModal}
             setSupplierData={setSupplierData}
             setShowSupplierModal={setShowSupplierModal}
+            handleVerifyPricing={handleVerifyPricing}
             submitting={submitting}
             isPendingTab
           />
@@ -314,6 +335,7 @@ const Orders = () => {
             setShowDetailModal={setShowDetailModal}
             setSupplierData={setSupplierData}
             setShowSupplierModal={setShowSupplierModal}
+            handleVerifyPricing={handleVerifyPricing}
             submitting={submitting}
           />
         </Tab>
@@ -324,6 +346,7 @@ const Orders = () => {
             setShowDetailModal={setShowDetailModal}
             setSupplierData={setSupplierData}
             setShowSupplierModal={setShowSupplierModal}
+            handleVerifyPricing={handleVerifyPricing}
             submitting={submitting}
           />
         </Tab>

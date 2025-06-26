@@ -3,10 +3,11 @@ import {
   getAuth,
   signOut,
   onAuthStateChanged,
+  signInWithPopup,
   signInWithPhoneNumber,
   RecaptchaVerifier,
   GoogleAuthProvider,
-  signInWithPopup,
+  linkWithPopup, // Updated import
   PhoneAuthProvider,
   linkWithCredential,
 } from 'firebase/auth';
@@ -48,7 +49,16 @@ export const FirebaseProvider = ({ children }) => {
               isActive: data.isActive ?? true,
             });
           } else {
-            setUserData(null); // Wait for Cloud Function to create user document
+            const nameToUse = currentUser.displayName || 'Anonymous';
+            await httpsCallable(functions, 'updateUser')({ name: nameToUse });
+            const newSnapshot = await getDoc(userRef);
+            if (newSnapshot.exists()) {
+              setUserData({
+                ...newSnapshot.data(),
+                isAdmin: newSnapshot.data().isAdmin ?? false,
+                isActive: newSnapshot.data().isActive ?? true,
+              });
+            }
           }
         } else {
           setUser(null);
@@ -63,15 +73,10 @@ export const FirebaseProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, [auth, firestore]);
+  }, [auth, firestore, functions]);
 
-  const createUser = async (data) => {
-    const createUserFunction = httpsCallable(functions, 'createUser');
-    return createUserFunction(data);
-  };
-
-  const updateUserProfile = async (data) => {
-    const fn = httpsCallable(functions, "updateUserProfile");
+  const updateUser = async (data) => {
+    const fn = httpsCallable(functions, 'updateUser');
     return fn(data);
   };
 
@@ -120,17 +125,9 @@ export const FirebaseProvider = ({ children }) => {
     return signInWithPopup(auth, provider);
   };
 
-  const getUserProfile = async (uid) => {
-    if (!uid) return null;
-    const userRef = doc(firestore, 'users', uid);
-    const snapshot = await getDoc(userRef);
-    return snapshot.exists() ? snapshot.data() : null;
-  };
-
   const linkPhoneNumber = async (verificationId, otp) => {
     if (!auth.currentUser) throw new Error('User not signed in');
     const credential = PhoneAuthProvider.credential(verificationId, otp);
-
     try {
       return await linkWithCredential(auth.currentUser, credential);
     } catch (err) {
@@ -144,23 +141,29 @@ export const FirebaseProvider = ({ children }) => {
   const linkGoogleAccount = async () => {
     if (!auth.currentUser) throw new Error('User not signed in');
     const provider = new GoogleAuthProvider();
-
-    const result = await signInWithPopup(auth, provider);
     try {
-      return await linkWithCredential(auth.currentUser, result.credential);
+      const result = await linkWithPopup(auth.currentUser, provider);
+      // Update user data with Google profile info (e.g., name, email) if needed
+      const googleUser = result.user;
+      const updatedData = {
+        name: googleUser.displayName || userData?.name || 'Anonymous',
+        email: googleUser.email || userData?.email,
+      };
+      await updateUser(updatedData);
+      return result;
     } catch (err) {
       if (err.code === 'auth/credential-already-in-use') {
-        throw new Error("This Google account is already linked with another user.");
+        throw new Error("This Google account is already linked with another user. Please use a different Google account or sign in with that account.");
+      } else if (err.code === 'auth/provider-already-linked') {
+        throw new Error("Google account is already linked to this user.");
       }
-      throw err;
+      throw new Error(`Failed to link Google account: ${err.message}`);
     }
   };
-
 
   const deactivateUserAccount = async () => {
     if (!auth.currentUser) throw new Error('User not signed in');
     const user = auth.currentUser;
-
     try {
       const userRef = doc(firestore, 'users', user.uid);
       await setDoc(userRef, { isActive: false, deactivatedAt: new Date().toISOString() }, { merge: true });
@@ -174,8 +177,7 @@ export const FirebaseProvider = ({ children }) => {
     <FirebaseContext.Provider
       value={{
         logout,
-        createUser,
-        updateUserProfile,
+        updateUser,
         user,
         auth,
         userData,
@@ -188,7 +190,6 @@ export const FirebaseProvider = ({ children }) => {
         setUpRecaptcha,
         verifyOtp,
         googleLogin,
-        getUserProfile,
         linkPhoneNumber,
         linkGoogleAccount,
         deactivateUserAccount,

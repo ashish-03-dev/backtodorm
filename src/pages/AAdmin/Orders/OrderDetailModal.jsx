@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Button, ListGroup, Card } from 'react-bootstrap';
+import { Modal, Button, ListGroup, Card, Badge } from 'react-bootstrap';
 
 const OrderDetailModal = ({ show, onHide, order }) => {
   if (!order) return null;
@@ -66,7 +66,28 @@ const OrderDetailModal = ({ show, onHide, order }) => {
             <p><strong>Subtotal:</strong> ₹{order.subtotal.toLocaleString('en-IN')}</p>
             <p><strong>Delivery Charge:</strong> ₹{order.deliveryCharge.toLocaleString('en-IN')}</p>
             <p><strong>Total:</strong> ₹{order.totalPrice.toLocaleString('en-IN')}</p>
-            <p><strong>Payment Status:</strong> {order.paymentStatus}</p>
+            <p>
+              <strong>Payment Status:</strong>{' '}
+              <Badge bg={order.paymentStatus === 'Completed' ? 'success' : order.paymentStatus === 'Pending' ? 'warning' : 'danger'}>
+                {order.paymentStatus}
+              </Badge>
+            </p>
+            <p>
+              <strong>Pricing Verified:</strong>{' '}
+              <Badge bg={order.verified ? 'success' : 'danger'}>
+                {order.verified ? 'Verified' : 'Unverified'}
+              </Badge>
+            </p>
+            {order.issues && order.issues.length > 0 && (
+              <>
+                <h6>Pricing Issues:</h6>
+                <ul className="text-danger">
+                  {order.issues.map((issue, index) => (
+                    <li key={index}>{issue}</li>
+                  ))}
+                </ul>
+              </>
+            )}
             {order.razorpay_payment_id && <p><strong>Razorpay Payment ID:</strong> {order.razorpay_payment_id}</p>}
             {order.razorpay_order_id && <p><strong>Razorpay Order ID:</strong> {order.razorpay_order_id}</p>}
             {order.sentToSupplier && (

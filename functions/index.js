@@ -48,83 +48,77 @@ async function fetchDeliveryConfig() {
     };
   }
 }
-exports.createUser = onCall(
+
+
+
+exports.updateUser = onCall(
   {
-    region: "us-central1",
+    region: 'us-central1',
     timeoutSeconds: 60,
     concurrency: 80,
   },
-  async ({ data, auth }) => {
-    if (!auth) {
-      throw new HttpsError("unauthenticated", "User must be authenticated");
+  async ({ data: { name }, auth }) => {
+    if (!auth || !auth.uid) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
     }
 
     const userId = auth.uid;
 
-    if (!data.name || typeof data.name !== "string") {
-      throw new HttpsError("invalid-argument", "Name is required");
+    if (name && (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 100)) {
+      throw new HttpsError('invalid-argument', 'Name must be a string between 1 and 100 characters');
     }
 
     const userRef = db.doc(`users/${userId}`);
 
     try {
-      const userDoc = await userRef.get();
-      if (userDoc.exists) {
-        throw new HttpsError("already-exists", "User document already exists");
-      }
+      await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        const userData = {
+          uid: userId,
+          name: name ? name.trim() : (userDoc.exists ? userDoc.data().name : auth.token.name || 'Anonymous'),
+          email: auth.token.email || null,
+          phone: auth.token.phone_number || null,
+          photoURL: auth.token.picture || '',
+          createdAt: userDoc.exists ? userDoc.data().createdAt : admin.firestore.FieldValue.serverTimestamp(),
+          isSeller: userDoc.exists ? userDoc.data().isSeller : false,
+          isAdmin: userDoc.exists ? userDoc.data().isAdmin : false,
+          isActive: userDoc.exists ? userDoc.data().isActive : true,
+        };
 
-      const userData = {
-        uid: userId,
-        name: data.name.trim(),
-        email: auth.token.email || null,
-        phone: auth.token.phone_number || null,
-        photoURL: auth.token.picture || '',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        isSeller: false,
-        isAdmin: userId === 'xhJlJHvOxgSysxjQl8AJfvdhGPg1',
-        isActive: true,
-      };
-
-      await userRef.set(userData);
+        transaction.set(userRef, userData, { merge: true });
+      });
       return { success: true, userId };
     } catch (error) {
-      console.error("Failed to create user document:", error);
-      throw new HttpsError("internal", `Failed to create user document: ${error.message}`);
+      console.error('Failed to update user document:', error);
+      throw new HttpsError('internal', 'Failed to update user document');
     }
   }
 );
 
-
-exports.updateUserProfile = onCall(
+exports.setAdminStatus = onCall(
   {
-    region: "us-central1",
+    region: 'us-central1',
     timeoutSeconds: 60,
   },
-  async ({ data, auth }) => {
-    if (!auth) {
-      throw new HttpsError("unauthenticated", "User must be signed in.");
+  async ({ data: { userId, isAdmin, isSeller }, auth }) => {
+    if (!auth || !auth.token.isAdmin) {
+      throw new HttpsError('permission-denied', 'Admin access required.');
     }
 
-    const uid = auth.uid;
-    const { name } = data;
-
-    if (name && typeof name !== "string") {
-      throw new HttpsError("invalid-argument", "Name must be a string.");
+    if (!userId || typeof isAdmin !== 'boolean' || typeof isSeller !== 'boolean') {
+      throw new HttpsError('invalid-argument', 'Invalid userId, isAdmin, or isSeller value.');
     }
 
     try {
-      await admin.firestore().doc(`users/${uid}`).set(
-        {
-          ...(name && { name: name.trim() }),
-          // Never allow client to set isAdmin, isActive, etc.
-        },
+      await admin.firestore().doc(`users/${userId}`).set(
+        { isAdmin, isSeller },
         { merge: true }
       );
-
       return { success: true };
+
     } catch (error) {
-      console.error("Update failed:", error);
-      throw new HttpsError("internal", "Profile update failed.");
+      console.error('Set admin/seller status failed:', error);
+      throw new HttpsError('internal', 'Failed to set admin/seller status.');
     }
   }
 );
@@ -235,6 +229,7 @@ exports.approvePoster = onCall(
   }
 );
 
+
 exports.createRazorpayOrder = onCall(
   {
     secrets: RAZORPAY_SECRETS,
@@ -280,92 +275,9 @@ exports.createRazorpayOrder = onCall(
       throw new HttpsError("failed-precondition", "Razorpay secrets not configured");
     }
 
-    const { standardDeliveryCharge, freeDeliveryThreshold } = await fetchDeliveryConfig();
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
     try {
-      // Verify items and calculate subtotal (unchanged validation logic)
-      let calculatedSubtotal = 0;
-      for (const item of items) {
-        if (item.type === 'collection') {
-          if (!item.collectionId || !item.posters || !Array.isArray(item.posters)) {
-            throw new HttpsError("invalid-argument", `Invalid collection item: ${JSON.stringify(item)}`);
-          }
-          const collectionRef = db.collection("standaloneCollections").doc(item.collectionId);
-          const collectionDoc = await collectionRef.get();
-          if (!collectionDoc.exists) {
-            throw new HttpsError("not-found", `Collection ${item.collectionId} not found`);
-          }
-          const collectionData = collectionDoc.data();
-          const submittedCollectionDiscount = item.collectionDiscount || 0;
-          const actualCollectionDiscount = collectionData.discount || 0;
-          if (submittedCollectionDiscount !== actualCollectionDiscount) {
-            throw new HttpsError("invalid-argument", `Collection discount mismatch for ${item.collectionId}`);
-          }
-          let collectionPrice = 0;
-          for (const poster of item.posters) {
-            const posterRef = db.collection("posters").doc(poster.posterId);
-            const posterDoc = await posterRef.get();
-            if (!posterDoc.exists) {
-              throw new HttpsError("not-found", `Poster ${poster.posterId} not found`);
-            }
-            const posterData = posterDoc.data();
-            const sizeData = posterData.sizes?.find(s => s.size === poster.size);
-            if (!sizeData) {
-              throw new HttpsError("invalid-argument", `Invalid size ${poster.size} for poster ${poster.posterId}`);
-            }
-            if (poster.price !== sizeData.price || poster.finalPrice !== sizeData.finalPrice) {
-              throw new HttpsError("invalid-argument", `Price mismatch for poster ${poster.posterId}`);
-            }
-            const expectedDiscount = posterData.discount || 0;
-            if (poster.discount !== expectedDiscount) {
-              throw new HttpsError("invalid-argument", `Discount mismatch for poster ${poster.posterId}`);
-            }
-            collectionPrice += sizeData.finalPrice;
-          }
-          const quantity = item.quantity || 1;
-          calculatedSubtotal += collectionPrice * quantity * (1 - actualCollectionDiscount / 100);
-        } else {
-          if (!item.posterId || !item.size) {
-            throw new HttpsError("invalid-argument", `Invalid poster item: ${JSON.stringify(item)}`);
-          }
-          const posterRef = db.collection("posters").doc(item.posterId);
-          const posterDoc = await posterRef.get();
-          if (!posterDoc.exists) {
-            throw new HttpsError("not-found", `Poster ${item.posterId} not found`);
-          }
-          const posterData = posterDoc.data();
-          const sizeData = posterData.sizes?.find(s => s.size === item.size);
-          if (!sizeData) {
-            throw new HttpsError("invalid-argument", `Invalid size ${item.size} for poster ${item.posterId}`);
-          }
-          if (item.price !== sizeData.price || item.finalPrice !== sizeData.finalPrice) {
-            throw new HttpsError("invalid-argument", `Price mismatch for poster ${item.posterId}`);
-          }
-          const expectedDiscount = posterData.discount || 0;
-          if (item.discount !== expectedDiscount) {
-            throw new HttpsError("invalid-argument", `Discount mismatch for poster ${item.posterId}`);
-          }
-          const quantity = item.quantity || 1;
-          calculatedSubtotal += sizeData.finalPrice * quantity;
-        }
-      }
-
-      calculatedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
-      if (Math.abs(calculatedSubtotal - subtotal) > 0.01) {
-        throw new HttpsError("invalid-argument", `Subtotal mismatch: submitted ₹${subtotal}, calculated ₹${calculatedSubtotal}`);
-      }
-
-      const expectedDeliveryCharge = calculatedSubtotal >= freeDeliveryThreshold ? 0 : standardDeliveryCharge;
-      if (deliveryCharge !== expectedDeliveryCharge) {
-        throw new HttpsError("invalid-argument", `Delivery charge mismatch: submitted ₹${deliveryCharge}, expected ₹${expectedDeliveryCharge}`);
-      }
-
-      const calculatedTotal = parseFloat((calculatedSubtotal + expectedDeliveryCharge).toFixed(2));
-      if (Math.abs(calculatedTotal - total) > 0.01) {
-        throw new HttpsError("invalid-argument", `Total mismatch: submitted ₹${total}, calculated ₹${calculatedTotal}`);
-      }
-
       const order = await razorpay.orders.create({
         amount: Math.round(total * 100),
         currency: "INR",
@@ -373,7 +285,7 @@ exports.createRazorpayOrder = onCall(
         notes: { userId: auth.uid },
       });
 
-      // Store temporary order with Pending status
+      // Store temporary order with Pending status and verified: false
       await db.collection("temporaryOrders").doc(order.id).set({
         orderId: order.id,
         userId: auth.uid,
@@ -384,6 +296,7 @@ exports.createRazorpayOrder = onCall(
         total,
         isBuyNow: !!isBuyNow,
         paymentStatus: "Pending",
+        verified: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -445,7 +358,7 @@ exports.verifyRazorpayPayment = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Move to orders collection
+      // Move to orders collection with verified: false
       const tempOrderData = tempOrder.data();
       const orderData = {
         customerId: tempOrderData.userId,
@@ -462,6 +375,8 @@ exports.verifyRazorpayPayment = onCall(
         razorpay_payment_id: paymentId,
         razorpay_order_id: orderId,
         razorpay_signature: signature,
+        verified: false,
+        issues: [],
       };
 
       const orderRef = await db.collection("orders").add(orderData);
@@ -490,6 +405,157 @@ exports.verifyRazorpayPayment = onCall(
     } catch (error) {
       console.error("Razorpay payment verification failed:", error);
       throw new HttpsError("internal", `Failed to verify payment: ${error.message}`);
+    }
+  }
+);
+
+exports.verifyOrderPricing = onCall(
+  {
+    secrets: RAZORPAY_SECRETS,
+    region: "us-central1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+  },
+  async ({ data: { orderId }, auth }) => {
+    console.log('verifyOrderPricing called with:', { orderId });
+    if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
+
+    const user = await db.collection("users").doc(auth.uid).get();
+    if (!user.exists || !user.data().isAdmin) {
+      throw new HttpsError("permission-denied", "Admin access required");
+    }
+
+    const orderRef = db.collection("orders").doc(orderId);
+    const order = await orderRef.get();
+    if (!order.exists) {
+      throw new HttpsError("not-found", `Order ${orderId} not found`);
+    }
+
+    const orderData = order.data();
+    if (orderData.paymentStatus !== "Completed") {
+      throw new HttpsError("invalid-argument", "Order must have Completed payment status");
+    }
+
+    try {
+      const { standardDeliveryCharge, freeDeliveryThreshold } = await fetchDeliveryConfig();
+      let calculatedSubtotal = 0;
+      const issues = [];
+
+      for (const item of orderData.items) {
+        if (item.type === 'collection') {
+          if (!item.collectionId || !item.posters || !Array.isArray(item.posters)) {
+            issues.push(`Invalid collection item: ${JSON.stringify(item)}`);
+            continue;
+          }
+          const collectionRef = db.collection("standaloneCollections").doc(item.collectionId);
+          const collectionDoc = await collectionRef.get();
+          if (!collectionDoc.exists) {
+            issues.push(`Collection ${item.collectionId} not found`);
+            continue;
+          }
+          const collectionData = collectionDoc.data();
+          const submittedCollectionDiscount = item.collectionDiscount || 0;
+          const actualCollectionDiscount = collectionData.discount || 0;
+          if (submittedCollectionDiscount !== actualCollectionDiscount) {
+            issues.push(`Collection discount mismatch for ${item.collectionId}: submitted ${submittedCollectionDiscount}%, expected ${actualCollectionDiscount}%`);
+          }
+          let collectionPrice = 0;
+          for (const poster of item.posters) {
+            const posterRef = db.collection("posters").doc(poster.posterId);
+            const posterDoc = await posterRef.get();
+            if (!posterDoc.exists) {
+              issues.push(`Poster ${poster.posterId} not found`);
+              continue;
+            }
+            const posterData = posterDoc.data();
+            const sizeData = posterData.sizes?.find(s => s.size === poster.size);
+            if (!sizeData) {
+              issues.push(`Invalid size ${poster.size} for poster ${poster.posterId}`);
+              continue;
+            }
+            if (poster.price !== sizeData.price) {
+              issues.push(`Price mismatch for poster ${poster.posterId}: submitted ₹${poster.price}, expected ₹${sizeData.price}`);
+            }
+            if (poster.finalPrice !== sizeData.finalPrice) {
+              issues.push(`Final price mismatch for poster ${poster.posterId}: submitted ₹${poster.finalPrice}, expected ₹${sizeData.finalPrice}`);
+            }
+            const expectedDiscount = posterData.discount || 0;
+            if (poster.discount !== expectedDiscount) {
+              issues.push(`Discount mismatch for poster ${poster.posterId}: submitted ${poster.discount}%, expected ${expectedDiscount}%`);
+            }
+            collectionPrice += sizeData.finalPrice;
+          }
+          const quantity = item.quantity || 1;
+          calculatedSubtotal += collectionPrice * quantity * (1 - actualCollectionDiscount / 100);
+        } else {
+          if (!item.posterId || !item.size) {
+            issues.push(`Invalid poster item: ${JSON.stringify(item)}`);
+            continue;
+          }
+          const posterRef = db.collection("posters").doc(item.posterId);
+          const posterDoc = await posterRef.get();
+          if (!posterDoc.exists) {
+            issues.push(`Poster ${item.posterId} not found`);
+            continue;
+          }
+          const posterData = posterDoc.data();
+          const sizeData = posterData.sizes?.find(s => s.size === item.size);
+          if (!sizeData) {
+            issues.push(`Invalid size ${item.size} for poster ${item.posterId}`);
+            continue;
+          }
+          if (item.price !== sizeData.price) {
+            issues.push(`Price mismatch for poster ${item.posterId}: submitted ₹${item.price}, expected ₹${sizeData.price}`);
+          }
+          if (item.finalPrice !== sizeData.finalPrice) {
+            issues.push(`Final price mismatch for poster ${item.posterId}: submitted ₹${item.finalPrice}, expected ₹${sizeData.finalPrice}`);
+          }
+          const expectedDiscount = posterData.discount || 0;
+          if (item.discount !== expectedDiscount) {
+            issues.push(`Discount mismatch for poster ${item.posterId}: submitted ${item.discount}%, expected ${expectedDiscount}%`);
+          }
+          const quantity = item.quantity || 1;
+          calculatedSubtotal += sizeData.finalPrice * quantity;
+        }
+      }
+
+      calculatedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
+      if (Math.abs(calculatedSubtotal - orderData.subtotal) > 0.01) {
+        issues.push(`Subtotal mismatch: submitted ₹${orderData.subtotal}, calculated ₹${calculatedSubtotal}`);
+      }
+
+      const expectedDeliveryCharge = calculatedSubtotal >= freeDeliveryThreshold ? 0 : standardDeliveryCharge;
+      if (orderData.deliveryCharge !== expectedDeliveryCharge) {
+        issues.push(`Delivery charge mismatch: submitted ₹${orderData.deliveryCharge}, expected ₹${expectedDeliveryCharge}`);
+      }
+
+      const calculatedTotal = parseFloat((calculatedSubtotal + expectedDeliveryCharge).toFixed(2));
+      if (Math.abs(calculatedTotal - orderData.totalPrice) > 0.01) {
+        issues.push(`Total mismatch: submitted ₹${orderData.totalPrice}, calculated ₹${calculatedTotal}`);
+      }
+
+      const razorpayAmount = orderData.razorpay_payment_id ? (await new Razorpay({ key_id: RAZORPAY_SECRETS[0].value(), key_secret: RAZORPAY_SECRETS[1].value() }).payments.fetch(orderData.razorpay_payment_id)).amount / 100 : orderData.totalPrice;
+      if (Math.abs(razorpayAmount - calculatedTotal) > 0.01) {
+        issues.push(`Razorpay amount mismatch: submitted ₹${razorpayAmount}, expected ₹${calculatedTotal}`);
+      }
+
+      await orderRef.update({
+        verified: issues.length === 0,
+        issues,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`Order ${orderId} verification completed:`, { verified: issues.length === 0, issues });
+      return { success: true, verified: issues.length === 0, issues };
+    } catch (error) {
+      console.error(`Failed to verify order ${orderId}:`, error);
+      await db.collection("errorLogs").add({
+        function: "verifyOrderPricing",
+        orderId,
+        error: error.message,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      throw new HttpsError("internal", `Failed to verify order: ${error.message}`);
     }
   }
 );
@@ -524,15 +590,11 @@ exports.checkPendingPayments = onCall(
         try {
           let payment = null;
           if (tempOrderData.razorpay_payment_id) {
-            // If payment ID exists, fetch payment status
             payment = await razorpay.payments.fetch(tempOrderData.razorpay_payment_id);
           } else {
-            // If no payment ID, fetch order and check for payments
             const razorpayOrder = await razorpay.orders.fetch(orderId);
             if (razorpayOrder.payments && razorpayOrder.payments.items.length > 0) {
-              // Use the first payment (assuming one payment per order)
               payment = await razorpay.payments.fetch(razorpayOrder.payments.items[0].id);
-              // Update temporary order with payment ID for consistency
               await tempOrder.ref.update({
                 razorpay_payment_id: payment.id,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -551,16 +613,17 @@ exports.checkPendingPayments = onCall(
             totalPrice: tempOrderData.total,
             orderDate: new Date().toISOString(),
             status: "Pending",
-            paymentStatus: payment.status === "captured" ? "Completed" : "Failed",
+            paymentStatus: payment.status === "captured" ? "Completed" : payment.status === "failed" ? "Failed" : "Pending",
             paymentMethod: "Razorpay",
             shippingAddress: tempOrderData.shippingAddress,
             sentToSupplier: false,
             razorpay_payment_id: payment.id,
             razorpay_order_id: orderId,
+            verified: false,
+            issues: [],
           };
 
           if (payment.status === "captured" || payment.status === "failed") {
-            // Move completed or failed payments to orders collection
             const orderRef = await db.collection("orders").add(orderData);
             await db.collection("userOrders").doc(tempOrderData.userId).collection("orders").add({
               orderId: orderRef.id,
@@ -572,25 +635,21 @@ exports.checkPendingPayments = onCall(
             });
 
             if (payment.status === "captured" && !tempOrderData.isBuyNow) {
-              // Clear cart for completed non-Buy Now orders
               const cartItems = await db.collection(`users/${tempOrderData.userId}/cart`).get();
               const batch = db.batch();
               cartItems.forEach((doc) => batch.delete(doc.ref));
               await batch.commit();
             }
 
-            // Delete temporary order
             await tempOrder.ref.delete();
             console.log(`Order ${orderId} moved to orders with status: ${orderData.paymentStatus}`);
             return { orderId, status: orderData.paymentStatus, orderRef: orderRef.id };
           } else {
-            // Keep pending payments in temporaryOrders
             console.log(`Order ${orderId} remains Pending`);
             return { orderId, status: "Pending" };
           }
         } catch (error) {
           console.error(`Failed to check payment for order ${orderId}:`, error);
-          // Log error to a dedicated collection for debugging
           await db.collection("errorLogs").add({
             function: "checkPendingPayments",
             orderId,
@@ -680,88 +739,6 @@ exports.razorpayWebhook = onRequest(
             return res.status(200).json({ success: true, message: "Order already processed" });
           }
 
-          const { standardDeliveryCharge, freeDeliveryThreshold } = await fetchDeliveryConfig();
-          let calculatedSubtotal = 0;
-
-          for (const item of tempOrderData.items) {
-            if (item.type === 'collection') {
-              const collectionRef = db.collection("standaloneCollections").doc(item.collectionId);
-              const collectionDoc = await collectionRef.get();
-              if (!collectionDoc.exists) {
-                throw new Error(`Collection ${item.collectionId} not found`);
-              }
-              const collectionData = collectionDoc.data();
-              const submittedCollectionDiscount = item.collectionDiscount || 0;
-              const actualCollectionDiscount = collectionData.discount || 0;
-              if (submittedCollectionDiscount !== actualCollectionDiscount) {
-                throw new Error(`Collection discount mismatch for ${item.collectionId}`);
-              }
-              let collectionPrice = 0;
-              for (const poster of item.posters) {
-                const posterRef = db.collection("posters").doc(poster.posterId);
-                const posterDoc = await posterRef.get();
-                if (!posterDoc.exists) {
-                  throw new Error(`Poster ${poster.posterId} not found`);
-                }
-                const posterData = posterDoc.data();
-                const sizeData = posterData.sizes?.find(s => s.size === poster.size);
-                if (!sizeData) {
-                  throw new Error(`Invalid size ${poster.size} for poster ${poster.posterId}`);
-                }
-                if (poster.price !== sizeData.price || poster.finalPrice !== sizeData.finalPrice) {
-                  throw new Error(`Price mismatch for poster ${poster.posterId}`);
-                }
-                const expectedDiscount = posterData.discount || 0;
-                if (poster.discount !== expectedDiscount) {
-                  throw new Error(`Discount mismatch for poster ${poster.posterId}`);
-                }
-                collectionPrice += sizeData.finalPrice;
-              }
-              const quantity = item.quantity || 1;
-              calculatedSubtotal += collectionPrice * quantity * (1 - actualCollectionDiscount / 100);
-            } else {
-              const posterRef = db.collection("posters").doc(item.posterId);
-              const posterDoc = await posterRef.get();
-              if (!posterDoc.exists) {
-                throw new Error(`Poster ${item.posterId} not found`);
-              }
-              const posterData = posterDoc.data();
-              const sizeData = posterData.sizes?.find(s => s.size === item.size);
-              if (!sizeData) {
-                throw new Error(`Invalid size ${item.size} for poster ${item.posterId}`);
-              }
-              if (item.price !== sizeData.price || item.finalPrice !== sizeData.finalPrice) {
-                throw new Error(`Price mismatch for poster ${item.posterId}`);
-              }
-              const expectedDiscount = posterData.discount || 0;
-              if (item.discount !== expectedDiscount) {
-                throw new Error(`Discount mismatch for poster ${item.posterId}`);
-              }
-              const quantity = item.quantity || 1;
-              calculatedSubtotal += sizeData.finalPrice * quantity;
-            }
-          }
-
-          calculatedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
-          if (Math.abs(calculatedSubtotal - tempOrderData.subtotal) > 0.01) {
-            throw new Error(`Subtotal mismatch: submitted ₹${tempOrderData.subtotal}, calculated ₹${calculatedSubtotal}`);
-          }
-
-          const expectedDeliveryCharge = calculatedSubtotal >= freeDeliveryThreshold ? 0 : standardDeliveryCharge;
-          if (tempOrderData.deliveryCharge !== expectedDeliveryCharge) {
-            throw new Error(`Delivery charge mismatch: submitted ₹${tempOrderData.deliveryCharge}, expected ₹${expectedDeliveryCharge}`);
-          }
-
-          const calculatedTotal = parseFloat((calculatedSubtotal + expectedDeliveryCharge).toFixed(2));
-          if (Math.abs(calculatedTotal - tempOrderData.total) > 0.01) {
-            throw new Error(`Total mismatch: submitted ₹${tempOrderData.total}, calculated ₹${calculatedTotal}`);
-          }
-
-          const razorpayAmount = amount / 100;
-          if (Math.abs(razorpayAmount - calculatedTotal) > 0.01) {
-            throw new Error(`Razorpay amount mismatch: submitted ₹${razorpayAmount}, expected ₹${calculatedTotal}`);
-          }
-
           const orderData = {
             customerId: userId,
             items: tempOrderData.items,
@@ -776,6 +753,8 @@ exports.razorpayWebhook = onRequest(
             sentToSupplier: false,
             razorpay_payment_id: payment_id,
             razorpay_order_id: order_id,
+            verified: false,
+            issues: [],
           };
 
           const orderRef = await db.collection("orders").add(orderData);
