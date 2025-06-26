@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import HomeLayout from './pages/HomeLayout';
@@ -9,36 +10,41 @@ import Poster from './components/Collections/Poster';
 import Checkout from './components/Checkout';
 import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
-import AdminLayout from './pages/AAdmin/AdminLayout';
-import Dashboard from "./pages/AAdmin/Dashboard";
-import Orders from "./pages/AAdmin/Orders/index";
-import SectionManager from './pages/AAdmin/HomeContentManager/SectionManager';
-import Sellers from "./pages/AAdmin/Sellers";
-import Posters from "./pages/AAdmin/Posters/Posters";
-import PosterApprovals from "./pages/AAdmin/PosterApprovals";
-import Users from "./pages/AAdmin/Users";
-import Settings from "./pages/AAdmin/SiteSettings";
-import AdminUsers from "./pages/AAdmin/AdminUsers";
+import SearchPage from './components/SearchPage';
+import HelpCentre from "./components/Account/HelpCentre";
+
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
 import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
-import SellerLayout from './components/Seller/SellerLayout';
-import SellerDashboard from './components/Seller/SellerDashboard';
-import MyProducts from './components/Seller/MyProducts';
-import SalesHistory from './components/Seller/SalesHistory';
-import Payouts from "./components/Seller/Payouts";
-import SellerSettings from "./components/Seller/SellerSettings";
-import SearchPage from './components/SearchPage';
-import HelpCentre from "./components/Account/HelpCentre";
-import Support from './pages/AAdmin/Support';
+
+
+const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
+const Dashboard = lazy(() => import('./pages/AAdmin/Dashboard'));
+const Orders = lazy(() => import('./pages/AAdmin/Orders/index'));
+const SectionManager = lazy(() => import('./pages/AAdmin/HomeContentManager/SectionManager'));
+const Sellers = lazy(() => import('./pages/AAdmin/Sellers'));
+const Posters = lazy(() => import('./pages/AAdmin/Posters/Posters'));
+const PosterApprovals = lazy(() => import('./pages/AAdmin/PosterApprovals'));
+const Users = lazy(() => import('./pages/AAdmin/Users'));
+const Settings = lazy(() => import('./pages/AAdmin/SiteSettings'));
+const AdminUsers = lazy(() => import('./pages/AAdmin/AdminUsers'));
+const Support = lazy(() => import('./pages/AAdmin/Support'));
+
+const SellerLayout = lazy(() => import('./components/Seller/SellerLayout'));
+const SellerDashboard = lazy(() => import('./components/Seller/SellerDashboard'));
+const MyProducts = lazy(() => import('./components/Seller/MyProducts'));
+const SalesHistory = lazy(() => import('./components/Seller/SalesHistory'));
+const Payouts = lazy(() => import('./components/Seller/Payouts'));
+const SellerSettings = lazy(() => import('./components/Seller/SellerSettings'));
 
 function App() {
 
   return (
     <Router>
+      <Suspense fallback={<div>Loading...</div>}>
       <Routes>
         <Route path="/privacy-policy" element={<Policies />} />
         <Route path="/terms-and-conditions" element={<Policies />} />
@@ -82,6 +88,7 @@ function App() {
           <Route path="support" element={<Support />} />
         </Route>
       </Routes>
+      </Suspense>
     </Router>
   );
 }
