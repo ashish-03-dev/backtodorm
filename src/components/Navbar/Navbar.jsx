@@ -32,7 +32,12 @@ export default function NavbarComponent() {
             <i className="fas fa-bars fs-6"></i>
           </button>
           <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">
-            BackToDorm
+            <img
+              src="/android-chrome-192x192.png"
+              alt="backtodorm logo"
+              style={{ width: "50px", marginRight: "10px" }}
+            />
+            B. T. D.
           </a>
         </nav>
 

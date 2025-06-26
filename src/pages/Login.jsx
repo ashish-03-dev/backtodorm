@@ -47,7 +47,12 @@ export default function PhoneLogin() {
   return (
     <div className="container d-flex align-items-center justify-content-center vh-100 bg-white">
       <div className="card shadow-lg p-4" style={{ maxWidth: "400px", width: "100%" }}>
-        <div className="text-center mb-4">
+        <div className="text-center mb-2">
+          <img
+            src="/android-chrome-192x192.png"
+            alt="backtodorm logo"
+            style={{ width: "50px", marginRight: "10px" }}
+          />
           <h4 className="fw-bold mt-3">Welcome</h4>
           <p className="text-muted">Sign in with your phone number</p>
         </div>
