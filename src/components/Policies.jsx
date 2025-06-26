@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 // Default Terms and Conditions
 const defaultTerms = `
 # Acceptance of Terms
-Welcome to PosterPal ("Service"), a platform for purchasing and customizing posters. By accessing or signing in to our Service via phone number or Google account, you agree to these Terms and Conditions ("Terms") and our Privacy Policy. If you do not agree, please do not use the Service.
+Welcome to BackToDorm ("Service"), a platform for purchasing and customizing posters. By accessing or signing in to our Service via phone number or Google account, you agree to these Terms and Conditions ("Terms") and our Privacy Policy. If you do not agree, please do not use the Service.
 
 # Eligibility
 - You must be at least 13 years old to use the Service. Users under 18 require parental consent.
@@ -16,15 +16,15 @@ Welcome to PosterPal ("Service"), a platform for purchasing and customizing post
 # User Accounts
 - **Sign-In**: Sign in using a phone number (via OTP) or Google account, powered by Firebase Authentication.
 - **Profile Creation**: Upon first sign-in, we create a user profile in our database with your unique ID, name, email, phone, and account status (e.g., admin or seller flags).
-- **Security**: You are responsible for keeping your account credentials secure and for all activities under your account. Contact support@posterpal.com for unauthorized access issues.
+- **Security**: You are responsible for keeping your account credentials secure and for all activities under your account. Contact ashish03.dev@gmail.com for unauthorized access issues.
 - **Admin Role**: A designated administrator (set server-side) has elevated access to manage users and orders. Admin status cannot be modified by users.
 
 # Poster Purchases
-- **Browsing and Buying**: Browse and purchase posters (e.g., art prints, canvas) via our platform. Prices and shipping costs are shown at checkout.
+- **Browsing and Buying**: Browse and purchase posters via our platform. Prices and shipping costs are shown at checkout.
 - **Custom Posters**: Upload images for personalized posters, subject to our content guidelines.
-- **Payment**: Payments are processed securely via Stripe. You agree to pay all fees, taxes, and shipping costs.
+- **Payment**: Payments are processed securely via RazorPay. You agree to pay all fees, taxes, and shipping costs.
 - **Delivery**: Standard posters ship in 3–6 business days; custom posters take 5–7 days. Tracking is provided via email.
-- **Returns**: Return defective or damaged posters within 14 days for a refund or replacement. Custom posters are non-returnable unless defective. Contact support@posterpal.com.
+- **Returns**: Return defective or damaged posters within 7 days for a replacement. Custom posters are non-returnable unless defective. Contact ashish03.dev@gmail.com.
 
 # User Content
 - You may upload images for custom posters. You warrant that you own or have rights to use the content, and it is not illegal or offensive.
@@ -33,25 +33,24 @@ Welcome to PosterPal ("Service"), a platform for purchasing and customizing post
 
 # Prohibited Conduct
 - Do not use the Service for unlawful purposes or to harm others.
-- Do not attempt to modify restricted data (e.g., admin status) or disrupt the Service.
+- Do not attempt to modify restricted data (e.g., user status) or disrupt the Service.
 - Do not post false reviews or engage in fraudulent transactions.
 
 # Intellectual Property
 - Our posters, designs, and logos are protected by copyright and trademark laws.
-- Report infringement claims to support@posterpal.com.
+- Report infringement claims to ashish03.dev@gmail.com.
 
 # Limitation of Liability
-To the fullest extent permitted by law, PosterPal is not liable for indirect, incidental, or consequential damages (e.g., printing errors, delivery delays). Our liability is limited to the amount paid for the affected order.
+To the fullest extent permitted by law, BackToDorm is not liable for indirect, incidental, or consequential damages (e.g., printing errors, delivery delays). Our liability is limited to the amount paid for the affected order.
 
 # Termination
-You may stop using the Service at any time. We may suspend or terminate your access for violating these Terms. To delete your account, contact support@posterpal.com.
+You may stop using the Service at any time. We may suspend or terminate your access for violating these Terms. To delete your account, contact ashish03.dev@gmail.com.
 
 # Governing Law
-These Terms are governed by the laws of California, USA. Disputes will be resolved through negotiation or arbitration per American Arbitration Association rules.
+These Terms are governed by the laws of India. Disputes will be resolved through negotiation or arbitration per Indian Arbitration Association rules.
 
 # Contact Us
-Email: support@posterpal.com
-Address: Your Business Address
+Email: ashish03.dev@gmail.com
 `;
 
 // Default Privacy Policy
@@ -60,14 +59,14 @@ const defaultPrivacy = `
 
 **Last Updated: June 25, 2025**
 
-PosterPal ("we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services ("Service") at PosterPal, including browsing, purchasing posters, and uploading custom designs. By using our Service, you agree to the terms of this Privacy Policy.
+BackToDorm ("we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services ("Service") at BackToDorm, including browsing, purchasing posters, and uploading custom designs. By using our Service, you agree to the terms of this Privacy Policy.
 
 ## 1. Information We Collect
 
 ### Personal Information
 We collect personal information you provide directly, such as:
 - **Name, email, and phone number**: When you sign in via phone number (OTP) or Google account using Firebase Authentication.
-- **Payment information**: Processed securely via Stripe for poster purchases (we do not store payment details).
+- **Payment information**: Processed securely via RazorPay for poster purchases (we do not store payment details).
 - **User-uploaded content**: Images you upload for custom posters.
 
 ### Non-Personal Information
@@ -80,14 +79,14 @@ We may collect non-personal information automatically, including:
 We use your information to:
 - Provide and improve the Service (e.g., process orders, create user profiles).
 - Personalize your experience (e.g., recommend posters).
-- Communicate with you (e.g., order confirmations, support at support@posterpal.com).
+- Communicate with you (e.g., order confirmations, support at ashish03.dev@gmail.com).
 - Ensure security and prevent fraud.
 - Comply with legal obligations.
 
 ## 3. How We Share Your Information
 
 We do not sell your personal information. We may share it with:
-- **Service providers**: Stripe for payments, Firebase for authentication, and shipping partners for order fulfillment.
+- **Service providers**: RazorPay for payments, Firebase for authentication, and shipping partners for order fulfillment.
 - **Legal authorities**: When required by law or to protect our rights.
 - **Business transfers**: In case of a merger or acquisition.
 
@@ -95,7 +94,7 @@ We do not sell your personal information. We may share it with:
 
 You may:
 - **Access or update** your account information by contacting support@posterpal.com.
-- **Delete your account** by emailing support@posterpal.com (subject to legal retention requirements).
+- **Delete your account** by emailing ashish03.dev@gmail.com (subject to legal retention requirements).
 - **Opt-out** of promotional emails via the unsubscribe link.
 
 ## 5. Data Security
@@ -112,7 +111,7 @@ Our Service is not intended for users under 13. Users under 18 require parental 
 
 ## 8. International Users
 
-Our Service is operated from California, USA. By using the Service, you consent to your data being processed in this jurisdiction.
+Our Service is operated from UttarPradesh, India. By using the Service, you consent to your data being processed in this jurisdiction.
 
 ## 9. Changes to This Policy
 
@@ -121,8 +120,7 @@ We may update this Privacy Policy periodically. Changes will be posted on this p
 ## 10. Contact Us
 
 For questions or concerns, contact us at:
-- **Email**: support@posterpal.com
-- **Address**: Your Business Address
+- **Email**: ashish03.dev@gmail.com
 `;
 
 // Default Return Policy
@@ -131,7 +129,7 @@ const defaultReturn = `
 
 **Last Updated: June 25, 2025**
 
-PosterPal ("we," "us," or "our") is committed to ensuring your satisfaction with our products. This Return Policy outlines the conditions under which you may return defective products purchased through our website and services ("Service") at PosterPal. Please review this policy carefully before making a purchase.
+PosterPal ("we," "us," or "our") is committed to ensuring your satisfaction with our products. This Return Policy outlines the conditions under which you may return defective products purchased through our website and services ("Service") at BackToDorm. Please review this policy carefully before making a purchase.
 
 ## 1. Eligibility for Returns
 
@@ -143,7 +141,7 @@ You may return products under the following conditions:
 ## 2. Return Process
 
 To initiate a return:
-- **Contact Us**: Email support@posterpal.com with your order number, a description of the issue, and photos of the defective or damaged product.
+- **Contact Us**: Email ashish03.dev@gmail.com with your order number, a description of the issue, and photos of the defective or damaged product.
 - **Return Approval**: We will review your request and provide a return authorization within 2–3 business days.
 - **Shipping**: You may be required to ship the defective product back to us using a provided prepaid shipping label. Do not return products without prior authorization.
 
@@ -159,14 +157,13 @@ We do not accept returns for non-defective products due to change of mind, incor
 
 ## 5. Shipping Issues
 
-- **Lost or Undelivered Orders**: If your order is lost or not delivered within the estimated delivery window (3–6 business days for standard posters, 5–7 days for custom posters), contact support@posterpal.com. We will investigate and provide a resolution, which may include a refund or replacement.
+- **Lost or Undelivered Orders**: If your order is lost or not delivered within the estimated delivery window (3–6 business days for standard posters, 5–7 days for custom posters), contact ashish03.dev@gmail.com. We will investigate and provide a resolution, which may include a refund or replacement.
 - **Damaged During Shipping**: If a product arrives damaged, follow the return process outlined above.
 
 ## 6. Contact Us
 
 For questions or to initiate a return, contact us at:
-- **Email**: support@posterpal.com
-- **Address**: Your Business Address
+- **Email**: ashish03.dev@gmail.com
 `;
 
 const Policies = () => {

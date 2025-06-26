@@ -45,49 +45,49 @@ function App() {
   return (
     <Router>
       <Suspense fallback={<div>Loading...</div>}>
-      <Routes>
-        <Route path="/privacy-policy" element={<Policies />} />
-        <Route path="/terms-and-conditions" element={<Policies />} />
-        <Route path="/return-policy" element={<Policies />} />
-        <Route path="/" element={<HomeLayout />}>
-          <Route index element={<MainLanding />} />
-          <Route path="collections/:collectionId" element={<CollectionDetail />} />
-          <Route path="collection/:collectionId" element={<SingleCollection />} />
-          <Route path="poster/:id" element={<Poster />} />
-          <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
-          <Route path="account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
-            <Route index element={<ProfileInfo />} />
-            <Route path="profile" element={<ProfileInfo />} />
-            <Route path="orders" element={<ProfileOrders />} />
-            <Route path="addresses" element={<ProfileAddresses />} />
-            <Route path="security" element={<SecuritySettings />} />
-            <Route path="become-seller" element={<BecomeSeller />} />
-            <Route path="help-centre" element={<HelpCentre />} />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/privacy-policy" element={<Policies />} />
+          <Route path="/terms-and-conditions" element={<Policies />} />
+          <Route path="/return-policy" element={<Policies />} />
+          <Route path="/" element={<HomeLayout />}>
+            <Route index element={<MainLanding />} />
+            <Route path="collections/:collectionId" element={<CollectionDetail />} />
+            <Route path="collection/:collectionId" element={<SingleCollection />} />
+            <Route path="poster/:id" element={<Poster />} />
+            <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+            <Route path="account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
+              <Route index element={<ProfileInfo />} />
+              <Route path="profile" element={<ProfileInfo />} />
+              <Route path="orders" element={<ProfileOrders />} />
+              <Route path="addresses" element={<ProfileAddresses />} />
+              <Route path="security" element={<SecuritySettings />} />
+              <Route path="become-seller" element={<BecomeSeller />} />
+              <Route path="help-centre" element={<HelpCentre />} />
+            </Route>
+            <Route path="seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
+              <Route index element={<SellerDashboard />} />
+              <Route path="dashboard" element={<SellerDashboard />} />
+              <Route path="products" element={<MyProducts />} />
+              <Route path="sales" element={<SalesHistory />} />
+              <Route path="payouts" element={<Payouts />} />
+              <Route path="settings" element={<SellerSettings />} />
+            </Route>
+            <Route path="/search" element={<SearchPage />} />
           </Route>
-          <Route path="seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
-            <Route index element={<SellerDashboard />} />
-            <Route path="dashboard" element={<SellerDashboard />} />
-            <Route path="products" element={<MyProducts />} />
-            <Route path="sales" element={<SalesHistory />} />
-            <Route path="payouts" element={<Payouts />} />
-            <Route path="settings" element={<SellerSettings />} />
+          <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
+            <Route index element={<Dashboard />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="home-content" element={<SectionManager />} />
+            <Route path="sellers" element={<Sellers />} />
+            <Route path="posters" element={<Posters />} />
+            <Route path="poster-approvals" element={<PosterApprovals />} />
+            <Route path="users" element={<Users />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="admin-users" element={<AdminUsers />} />
+            <Route path="support" element={<Support />} />
           </Route>
-          <Route path="/search" element={<SearchPage />} />
-        </Route>
-        <Route path="/login" element={<Login />} />
-        <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
-          <Route index element={<Dashboard />} />
-          <Route path="orders" element={<Orders />} />
-          <Route path="home-content" element={<SectionManager />} />
-          <Route path="sellers" element={<Sellers />} />
-          <Route path="posters" element={<Posters />} />
-          <Route path="poster-approvals" element={<PosterApprovals />} />
-          <Route path="users" element={<Users />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="admin-users" element={<AdminUsers />} />
-          <Route path="support" element={<Support />} />
-        </Route>
-      </Routes>
+        </Routes>
       </Suspense>
     </Router>
   );
