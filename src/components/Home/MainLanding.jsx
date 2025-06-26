@@ -11,6 +11,7 @@ import AboutSection from './AboutSection';
 import '../../styles/MainLanding.css';
 import PromoPanel from './PromoPanel';
 import { useCartContext } from '../../context/CartContext';
+import Footer from './Footer';
 
 export default function MainLanding() {
   const { addToCart, buyNow } = useCartContext();
@@ -28,6 +29,7 @@ export default function MainLanding() {
       <CustomerReviews />
       <AboutSection />
       <PromoPanel />
+      <Footer/>
     </>
   );
 }
