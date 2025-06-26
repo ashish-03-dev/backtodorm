@@ -48,6 +48,86 @@ async function fetchDeliveryConfig() {
     };
   }
 }
+exports.createUser = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+  },
+  async ({ data, auth }) => {
+    if (!auth) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+
+    const userId = auth.uid;
+
+    if (!data.name || typeof data.name !== "string") {
+      throw new HttpsError("invalid-argument", "Name is required");
+    }
+
+    const userRef = db.doc(`users/${userId}`);
+
+    try {
+      const userDoc = await userRef.get();
+      if (userDoc.exists) {
+        throw new HttpsError("already-exists", "User document already exists");
+      }
+
+      const userData = {
+        uid: userId,
+        name: data.name.trim(),
+        email: auth.token.email || null,
+        phone: auth.token.phone_number || null,
+        photoURL: auth.token.picture || '',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        isSeller: false,
+        isAdmin: userId === 'xhJlJHvOxgSysxjQl8AJfvdhGPg1',
+        isActive: true,
+      };
+
+      await userRef.set(userData);
+      return { success: true, userId };
+    } catch (error) {
+      console.error("Failed to create user document:", error);
+      throw new HttpsError("internal", `Failed to create user document: ${error.message}`);
+    }
+  }
+);
+
+
+exports.updateUserProfile = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+  },
+  async ({ data, auth }) => {
+    if (!auth) {
+      throw new HttpsError("unauthenticated", "User must be signed in.");
+    }
+
+    const uid = auth.uid;
+    const { name } = data;
+
+    if (name && typeof name !== "string") {
+      throw new HttpsError("invalid-argument", "Name must be a string.");
+    }
+
+    try {
+      await admin.firestore().doc(`users/${uid}`).set(
+        {
+          ...(name && { name: name.trim() }),
+          // Never allow client to set isAdmin, isActive, etc.
+        },
+        { merge: true }
+      );
+
+      return { success: true };
+    } catch (error) {
+      console.error("Update failed:", error);
+      throw new HttpsError("internal", "Profile update failed.");
+    }
+  }
+);
 
 exports.approvePoster = onCall(
   {

@@ -9,14 +9,11 @@ import {
   signInWithPopup,
   PhoneAuthProvider,
   linkWithCredential,
-  deleteUser,
-  reauthenticateWithCredential,
-  reauthenticateWithPopup,
 } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../firebase';
 
 const FirebaseContext = createContext(null);
@@ -43,26 +40,15 @@ export const FirebaseProvider = ({ children }) => {
           setUser(currentUser);
           const userRef = doc(firestore, 'users', currentUser.uid);
           const snapshot = await getDoc(userRef);
-
-          if (!snapshot.exists()) {
-            const userObj = {
-              uid: currentUser.uid,
-              name: currentUser.displayName || '',
-              email: currentUser.email || '',
-              phone: currentUser.phoneNumber || '',
-              photoURL: currentUser.photoURL || '',
-              createdAt: new Date().toISOString(),
-              isSeller: false,
-              isAdmin: currentUser.uid === 'xhJlJHvOxgSysxjQl8AJfvdhGPg1',
-            };
-            await setDoc(userRef, userObj);
-            setUserData(userObj);
-          } else {
+          if (snapshot.exists()) {
             const data = snapshot.data();
             setUserData({
               ...data,
               isAdmin: data.isAdmin ?? false,
+              isActive: data.isActive ?? true,
             });
+          } else {
+            setUserData(null); // Wait for Cloud Function to create user document
           }
         } else {
           setUser(null);
@@ -78,6 +64,16 @@ export const FirebaseProvider = ({ children }) => {
 
     return () => unsubscribe();
   }, [auth, firestore]);
+
+  const createUser = async (data) => {
+    const createUserFunction = httpsCallable(functions, 'createUser');
+    return createUserFunction(data);
+  };
+
+  const updateUserProfile = async (data) => {
+    const fn = httpsCallable(functions, "updateUserProfile");
+    return fn(data);
+  };
 
   const checkUsernameAvailability = async (username) => {
     if (!username.startsWith('@') || username.length < 2) {
@@ -131,54 +127,46 @@ export const FirebaseProvider = ({ children }) => {
     return snapshot.exists() ? snapshot.data() : null;
   };
 
-  const updateUserProfile = async (uid, data) => {
-    if (!uid) throw new Error('No UID provided');
-    const userRef = doc(firestore, 'users', uid);
-    await setDoc(userRef, data, { merge: true });
-  };
-
   const linkPhoneNumber = async (verificationId, otp) => {
     if (!auth.currentUser) throw new Error('User not signed in');
     const credential = PhoneAuthProvider.credential(verificationId, otp);
-    return linkWithCredential(auth.currentUser, credential);
+
+    try {
+      return await linkWithCredential(auth.currentUser, credential);
+    } catch (err) {
+      if (err.code === 'auth/credential-already-in-use') {
+        throw new Error("This phone number is already linked with another account.");
+      }
+      throw err;
+    }
   };
 
   const linkGoogleAccount = async () => {
     if (!auth.currentUser) throw new Error('User not signed in');
     const provider = new GoogleAuthProvider();
+
     const result = await signInWithPopup(auth, provider);
-    return linkWithCredential(auth.currentUser, result.credential);
+    try {
+      return await linkWithCredential(auth.currentUser, result.credential);
+    } catch (err) {
+      if (err.code === 'auth/credential-already-in-use') {
+        throw new Error("This Google account is already linked with another user.");
+      }
+      throw err;
+    }
   };
 
-  const deleteUserAccount = async (setUpRecaptcha) => {
+
+  const deactivateUserAccount = async () => {
     if (!auth.currentUser) throw new Error('User not signed in');
     const user = auth.currentUser;
 
     try {
-      await deleteUser(user);
+      const userRef = doc(firestore, 'users', user.uid);
+      await setDoc(userRef, { isActive: false, deactivatedAt: new Date().toISOString() }, { merge: true });
+      await signOut(auth);
     } catch (err) {
-      if (err.code === 'auth/requires-recent-login') {
-        const providerId = user.providerData[0]?.providerId;
-        try {
-          if (providerId === 'google.com') {
-            const provider = new GoogleAuthProvider();
-            await reauthenticateWithPopup(user, provider);
-          } else if (providerId === 'phone') {
-            const phoneNumber = user.phoneNumber?.replace('+91', '');
-            const result = await setUpRecaptcha('recaptcha-container', phoneNumber);
-            const otp = prompt('Enter the OTP sent to your phone:');
-            const credential = PhoneAuthProvider.credential(result.verificationId, otp);
-            await reauthenticateWithCredential(user, credential);
-          } else {
-            throw new Error('Unsupported provider for re-authentication');
-          }
-          await deleteUser(user);
-        } catch (reauthErr) {
-          throw new Error(`Re-authentication failed: ${reauthErr.message}`);
-        }
-      } else {
-        throw new Error(`Delete failed: ${err.message}`);
-      }
+      throw new Error(`Deactivation failed: ${err.message}`);
     }
   };
 
@@ -186,6 +174,8 @@ export const FirebaseProvider = ({ children }) => {
     <FirebaseContext.Provider
       value={{
         logout,
+        createUser,
+        updateUserProfile,
         user,
         auth,
         userData,
@@ -199,10 +189,9 @@ export const FirebaseProvider = ({ children }) => {
         verifyOtp,
         googleLogin,
         getUserProfile,
-        updateUserProfile,
         linkPhoneNumber,
         linkGoogleAccount,
-        deleteUserAccount,
+        deactivateUserAccount,
         checkUsernameAvailability,
         error,
         app,

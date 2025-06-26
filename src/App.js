@@ -39,7 +39,6 @@ const SellerDashboard = lazy(() => import('./components/Seller/SellerDashboard')
 const MyProducts = lazy(() => import('./components/Seller/MyProducts'));
 const SalesHistory = lazy(() => import('./components/Seller/SalesHistory'));
 const Payouts = lazy(() => import('./components/Seller/Payouts'));
-const SellerSettings = lazy(() => import('./components/Seller/SellerSettings'));
 
 function App() {
 
@@ -74,7 +73,6 @@ function App() {
               <Route path="products" element={<MyProducts />} />
               <Route path="sales" element={<SalesHistory />} />
               <Route path="payouts" element={<Payouts />} />
-              <Route path="settings" element={<SellerSettings />} />
             </Route>
             <Route path="/search" element={<SearchPage />} />
           </Route>
