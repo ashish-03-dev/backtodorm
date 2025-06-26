@@ -161,7 +161,7 @@ export default function ProductDetail() {
           />
         </div>
 
-        <div className="col-md-6 px-4 pt-5 pb-4 d-flex flex-column justify-content-between">
+        <div className="col-md-6 px-4 pt-4 pt-md-5 pb-4 d-flex flex-column justify-content-between">
           <div>
             <h3>{poster.title}</h3>
             <p className="mb-4">{poster.description}</p>
