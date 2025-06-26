@@ -53,6 +53,10 @@ const PosterView = ({ poster }) => {
         </div>
         <Card.Title className="mb-3">{poster.title || "Untitled"}</Card.Title>
         <Card.Text>{poster.description || "No description available."}</Card.Text>
+        <ListGroup.Item>
+            <strong>PosterId: </strong>{" "}
+            {poster.id }
+          </ListGroup.Item>
         <ListGroup variant="flush">
           <ListGroup.Item>
             <strong>Sizes and Prices:</strong>{" "}

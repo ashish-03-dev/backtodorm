@@ -117,7 +117,7 @@ const Posters = () => {
       return;
     }
     try {
-      const result = await updatePoster(firestore, data, posterId, user);
+      const result = await updatePoster(firestore, data, posterId);
       if (result.success) {
         setShowEditModal(false);
         setEditing(null);

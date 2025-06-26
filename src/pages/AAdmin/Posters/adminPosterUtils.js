@@ -27,31 +27,6 @@ const normalizeCollection = (text) => {
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 };
 
-// Helper function to generate keywords
-const generateKeywords = (title, description, tags, collections = []) => {
-  const stopWords = new Set([
-    "a",
-    "an",
-    "the",
-    "and",
-    "or",
-    "but",
-    "in",
-    "on",
-    "at",
-    "to",
-  ]);
-  const words = [
-    ...(title?.toLowerCase().split(/\s+/) || []),
-    ...(description?.toLowerCase().split(/\s+/) || []),
-    ...(tags?.flatMap(normalizeText) || []),
-    ...(collections?.flatMap(normalizeText) || []),
-  ];
-  return [...new Set(words)]
-    .filter((word) => !stopWords.has(word) && word.length > 2)
-    .slice(0, 50);
-};
-
 // Submit a new poster for admin panel
 export const submitPoster = async (
   firestore,
@@ -67,7 +42,6 @@ export const submitPoster = async (
       throw new Error("At least one valid size is required");
     if (!posterId) throw new Error("Poster ID is required");
     if (!posterData.sellerUsername) throw new Error("Seller username is required");
-    if (!adminUser?.isAdmin) throw new Error("Admin access required");
     if (!posterData.imageFile) throw new Error("An image is required for new posters");
 
     // Upload image
@@ -80,12 +54,6 @@ export const submitPoster = async (
     const poster = {
       ...posterData,
       posterId,
-      keywords: generateKeywords(
-        posterData.title,
-        posterData.description,
-        posterData.tags,
-        posterData.collections
-      ),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       approved: "pending",
@@ -152,7 +120,6 @@ export const updatePoster = async (
   firestore,
   posterData,
   posterId,
-  adminUser
 ) => {
   try {
     // Validate inputs
@@ -161,17 +128,10 @@ export const updatePoster = async (
       throw new Error("At least one valid size is required");
     if (!posterId) throw new Error("Poster ID is required for update");
     if (!posterData.sellerUsername) throw new Error("Seller username is required");
-    if (!adminUser?.isAdmin) throw new Error("Admin access required");
 
     // Prepare poster data with keywords
     const poster = {
       ...posterData,
-      keywords: generateKeywords(
-        posterData.title,
-        posterData.description,
-        posterData.tags,
-        posterData.collections
-      ),
       updatedAt: serverTimestamp(),
       approved: "approved",
     };
@@ -213,7 +173,7 @@ export const updatePoster = async (
         const colId = normalizeCollection(col);
         if (!colDoc.exists()) {
           transaction.set(doc(firestore, "collections", colId), {
-            name: colId,
+            name: col,
             posterIds: [posterId],
             createdAt: serverTimestamp(),
           });
@@ -246,6 +206,7 @@ export const updatePoster = async (
     return { success: false, error: error.message };
   }
 };
+
 export const updateTempPoster = async (firestore, storage, posterData, posterId) => {
   try {
     // Validate inputs
@@ -267,12 +228,6 @@ export const updateTempPoster = async (firestore, storage, posterData, posterId)
     // Prepare poster data with keywords
     const poster = {
       ...posterData,
-      keywords: generateKeywords(
-        posterData.title,
-        posterData.description,
-        posterData.tags,
-        posterData.collections
-      ),
       updatedAt: serverTimestamp(),
       approved: posterData.approved || "pending",
       originalImageUrl: imageUrl,

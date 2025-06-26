@@ -12,7 +12,7 @@ const POSTER_SIZES = {
   "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7 },
 };
 
-const PosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster }) => {
+const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster,onUpdateTempPoster }) => {
   const {
     state: {
       uploading,
@@ -72,7 +72,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdateTempPoster }) => {
       setIsSellerValid,
       setSellerName,
     },
-  } = usePosterForm({ poster, onSubmit, onApprove, onUpdateTempPoster });
+  } = usePosterForm({ poster, onSubmit, onApprove,onUpdatePoster, onUpdateTempPoster });
 
   const getImageName = (url) => {
     if (!url) return "No image";

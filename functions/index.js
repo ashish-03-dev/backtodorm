@@ -35,7 +35,7 @@ async function fetchDeliveryConfig() {
     }
     const data = settingsDoc.data();
     const config = {
-      standardDeliveryCharge: data.standardDeliveryCharge || 50,
+      standardDeliveryCharge: data.deliveryCharge || 50,
       freeDeliveryThreshold: data.freeDeliveryThreshold || 1000,
     };
     console.log("Fetched delivery config:", config);
