@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Tab, Form, Alert, Spinner, Button } from 'react-bootstrap';
 import { useFirebase } from '../../../context/FirebaseContext';
-import { collection, query, onSnapshot, getDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, getDoc, doc, updateDoc,where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import OrderTable from './OrderTable';
 import OrderDetailModal from './OrderDetailModal';
@@ -41,7 +41,7 @@ const Orders = () => {
     } else {
       filtered = orders.filter((order) => {
         const matchesTab = tab === 'unforwarded' ? !order.sentToSupplier : order.sentToSupplier;
-        return matchesTab && order.paymentStatus === 'Completed';
+        return matchesTab; // Include both Completed and Failed orders
       });
     }
     return filtered.filter((order) => {
@@ -104,9 +104,16 @@ const Orders = () => {
     try {
       const checkPendingPayments = httpsCallable(functions, 'checkPendingPayments');
       const result = await checkPendingPayments();
-      setError(result.data.results.length > 0
-        ? `Checked ${result.data.results.length} pending payments.`
-        : 'No pending payments to check.');
+      const { results } = result.data;
+      const completed = results.filter(r => r.status === 'Completed').length;
+      const failed = results.filter(r => r.status === 'Failed').length;
+      const pending = results.filter(r => r.status === 'Pending').length;
+      const errors = results.filter(r => r.status === 'Error').length;
+      setError(
+        results.length > 0
+          ? `Checked ${results.length} pending payments: ${completed} completed, ${failed} failed, ${pending} pending, ${errors} errors.`
+          : 'No pending payments to check.'
+      );
     } catch (err) {
       setError(`Failed to check pending payments: ${err.message}`);
     } finally {
@@ -115,9 +122,9 @@ const Orders = () => {
   };
 
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !userData?.isAdmin) return;
 
-    // Fetch confirmed orders
+    // Fetch confirmed orders (Completed and Failed)
     const ordersQuery = query(collection(firestore, 'orders'));
     const unsubscribeOrders = onSnapshot(
       ordersQuery,
@@ -168,8 +175,11 @@ const Orders = () => {
       }
     );
 
-    // Fetch pending orders
-    const pendingOrdersQuery = query(collection(firestore, 'temporaryOrders'));
+    // Fetch pending orders (only paymentStatus: Pending)
+    const pendingOrdersQuery = query(
+      collection(firestore, 'temporaryOrders'),
+      where('paymentStatus', '==', 'Pending')
+    );
     const unsubscribePendingOrders = onSnapshot(
       pendingOrdersQuery,
       async (snapshot) => {
@@ -232,6 +242,14 @@ const Orders = () => {
       unsubscribePendingOrders();
     };
   }, [firestore, userData]);
+
+  if (!userData?.isAdmin) {
+    return (
+      <div className="container mt-4">
+        <Alert variant="danger">Access Denied: Admin privileges required.</Alert>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

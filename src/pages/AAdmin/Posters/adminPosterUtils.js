@@ -1,11 +1,8 @@
 import {
   doc,
-  setDoc,
-  updateDoc,
   getDoc,
   runTransaction,
   serverTimestamp,
-  deleteDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 

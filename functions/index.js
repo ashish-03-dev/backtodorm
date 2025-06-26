@@ -442,24 +442,45 @@ exports.checkPendingPayments = onCall(
         const orderId = tempOrderData.orderId;
 
         try {
-          const payment = await razorpay.payments.fetch(tempOrderData.razorpay_payment_id);
-          if (payment.status === "captured") {
-            const orderData = {
-              customerId: tempOrderData.userId,
-              items: tempOrderData.items,
-              subtotal: tempOrderData.subtotal,
-              deliveryCharge: tempOrderData.deliveryCharge,
-              totalPrice: tempOrderData.total,
-              orderDate: new Date().toISOString(),
-              status: "Pending",
-              paymentStatus: "Completed",
-              paymentMethod: "Razorpay",
-              shippingAddress: tempOrderData.shippingAddress,
-              sentToSupplier: false,
-              razorpay_payment_id: payment.id,
-              razorpay_order_id: orderId,
-            };
+          let payment = null;
+          if (tempOrderData.razorpay_payment_id) {
+            // If payment ID exists, fetch payment status
+            payment = await razorpay.payments.fetch(tempOrderData.razorpay_payment_id);
+          } else {
+            // If no payment ID, fetch order and check for payments
+            const razorpayOrder = await razorpay.orders.fetch(orderId);
+            if (razorpayOrder.payments && razorpayOrder.payments.items.length > 0) {
+              // Use the first payment (assuming one payment per order)
+              payment = await razorpay.payments.fetch(razorpayOrder.payments.items[0].id);
+              // Update temporary order with payment ID for consistency
+              await tempOrder.ref.update({
+                razorpay_payment_id: payment.id,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            } else {
+              console.log(`No payment found for order ${orderId}, keeping as Pending`);
+              return { orderId, status: "Pending" };
+            }
+          }
 
+          const orderData = {
+            customerId: tempOrderData.userId,
+            items: tempOrderData.items,
+            subtotal: tempOrderData.subtotal,
+            deliveryCharge: tempOrderData.deliveryCharge,
+            totalPrice: tempOrderData.total,
+            orderDate: new Date().toISOString(),
+            status: "Pending",
+            paymentStatus: payment.status === "captured" ? "Completed" : "Failed",
+            paymentMethod: "Razorpay",
+            shippingAddress: tempOrderData.shippingAddress,
+            sentToSupplier: false,
+            razorpay_payment_id: payment.id,
+            razorpay_order_id: orderId,
+          };
+
+          if (payment.status === "captured" || payment.status === "failed") {
+            // Move completed or failed payments to orders collection
             const orderRef = await db.collection("orders").add(orderData);
             await db.collection("userOrders").doc(tempOrderData.userId).collection("orders").add({
               orderId: orderRef.id,
@@ -470,28 +491,38 @@ exports.checkPendingPayments = onCall(
               totalPrice: orderData.totalPrice,
             });
 
-            if (!tempOrderData.isBuyNow) {
+            if (payment.status === "captured" && !tempOrderData.isBuyNow) {
+              // Clear cart for completed non-Buy Now orders
               const cartItems = await db.collection(`users/${tempOrderData.userId}/cart`).get();
               const batch = db.batch();
               cartItems.forEach((doc) => batch.delete(doc.ref));
               await batch.commit();
             }
 
+            // Delete temporary order
             await tempOrder.ref.delete();
-            return { orderId, status: "Completed", orderRef: orderRef.id };
-          } else if (payment.status === "failed") {
-            await tempOrder.ref.update({ paymentStatus: "Failed" });
-            return { orderId, status: "Failed" };
+            console.log(`Order ${orderId} moved to orders with status: ${orderData.paymentStatus}`);
+            return { orderId, status: orderData.paymentStatus, orderRef: orderRef.id };
           } else {
+            // Keep pending payments in temporaryOrders
+            console.log(`Order ${orderId} remains Pending`);
             return { orderId, status: "Pending" };
           }
         } catch (error) {
           console.error(`Failed to check payment for order ${orderId}:`, error);
+          // Log error to a dedicated collection for debugging
+          await db.collection("errorLogs").add({
+            function: "checkPendingPayments",
+            orderId,
+            error: error.message,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          });
           return { orderId, status: "Error", error: error.message };
         }
       })
     );
 
+    console.log('checkPendingPayments results:', results);
     return { success: true, results };
   }
 );

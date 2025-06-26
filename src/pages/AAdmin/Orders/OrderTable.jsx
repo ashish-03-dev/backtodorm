@@ -32,9 +32,17 @@ const OrderTable = ({
               </td>
               <td>{order.customerName}</td>
               <td>{new Date(order.orderDate).toLocaleDateString('en-IN')}</td>
-              <td>{order.totalPrice}</td>
+              <td>{order.totalPrice.toLocaleString('en-IN')}</td>
               <td>
-                <Badge bg={order.paymentStatus === 'Completed' ? 'success' : order.paymentStatus === 'Pending' ? 'warning' : 'danger'}>
+                <Badge
+                  bg={
+                    order.paymentStatus === 'Completed'
+                      ? 'success'
+                      : order.paymentStatus === 'Pending'
+                      ? 'warning'
+                      : 'danger'
+                  }
+                >
                   {order.paymentStatus}
                 </Badge>
               </td>

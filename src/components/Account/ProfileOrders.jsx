@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
 import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { Alert, Spinner, Card, Badge, Button, Tabs, Tab, Container, Row, Col } from 'react-bootstrap';
+import { Alert, Spinner, Card, Badge, Tabs, Tab, Container, Row, Col } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 export default function ProfileOrders() {
-  const { user, firestore, functions } = useFirebase();
+  const { user, firestore } = useFirebase();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,30 +28,30 @@ export default function ProfileOrders() {
           const fullOrderData = isPending ? orderData : orderSnap.data();
           const items = await Promise.all(
             (fullOrderData.items || []).map(async (item) => {
-              const ref = item.type === 'poster' 
+              const ref = item.type === 'poster'
                 ? doc(firestore, 'posters', item.posterId)
                 : doc(firestore, 'standaloneCollections', item.collectionId);
               const snap = await getDoc(ref);
 
               return item.type === 'poster'
                 ? {
-                    type: 'poster',
-                    name: item.title || (snap.exists() ? snap.data().title : 'Unknown Poster'),
-                    quantity: item.quantity || 1,
-                    size: item.size || 'N/A',
-                    price: item.finalPrice || item.price || 0,
-                  }
+                  type: 'poster',
+                  name: item.title || (snap.exists() ? snap.data().title : 'Unknown Poster'),
+                  quantity: item.quantity || 1,
+                  size: item.size || 'N/A',
+                  price: item.finalPrice || item.price || 0,
+                }
                 : {
-                    type: 'collection',
-                    name: snap.exists() ? snap.data().title : 'Unknown Collection',
-                    quantity: item.quantity || 1,
-                    collectionDiscount: item.collectionDiscount || 0,
-                    posters: (item.posters || []).map((poster) => ({
-                      name: poster.title || 'Unknown Poster',
-                      size: poster.size || 'N/A',
-                      price: poster.finalPrice || poster.price || 0,
-                    })),
-                  };
+                  type: 'collection',
+                  name: snap.exists() ? snap.data().title : 'Unknown Collection',
+                  quantity: item.quantity || 1,
+                  collectionDiscount: item.collectionDiscount || 0,
+                  posters: (item.posters || []).map((poster) => ({
+                    name: poster.title || 'Unknown Poster',
+                    size: poster.size || 'N/A',
+                    price: poster.finalPrice || poster.price || 0,
+                  })),
+                };
             })
           );
 
@@ -60,8 +59,8 @@ export default function ProfileOrders() {
             id: orderData.orderId,
             date: (isPending ? orderData.createdAt?.toDate() : orderData.orderDate)
               ? new Date(isPending ? orderData.createdAt.toDate() : orderData.orderDate).toLocaleDateString('en-US', {
-                  year: 'numeric', month: 'short', day: 'numeric',
-                })
+                year: 'numeric', month: 'short', day: 'numeric',
+              })
               : 'N/A',
             items: items.filter(Boolean),
             total: `₹${(fullOrderData.total || fullOrderData.totalPrice || 0).toLocaleString('en-IN')}`,
@@ -81,7 +80,7 @@ export default function ProfileOrders() {
 
     const unsubscribeOrders = onSnapshot(ordersQuery, async (snapshot) => {
       try {
-      const confirmedOrders = await fetchOrders(snapshot);
+        const confirmedOrders = await fetchOrders(snapshot);
         const unsubscribePending = onSnapshot(pendingOrdersQuery, async (pendingSnapshot) => {
           try {
             const pendingOrders = await fetchOrders(pendingSnapshot, true, 'temporaryOrders');
@@ -101,66 +100,6 @@ export default function ProfileOrders() {
 
     return () => unsubscribeOrders();
   }, [user, firestore]);
-
-  const handleRetryPayment = async (orderId) => {
-    try {
-      const createRazorpayOrder = httpsCallable(functions, 'createRazorpayOrder');
-      const tempOrderRef = doc(firestore, 'temporaryOrders', orderId);
-      const tempOrderSnap = await getDoc(tempOrderRef);
-      if (!tempOrderSnap.exists()) throw new Error('Order not found.');
-
-      const tempOrderData = tempOrderSnap.data();
-      const result = await createRazorpayOrder({
-        subtotal: tempOrderData.subtotal,
-        deliveryCharge: tempOrderData.deliveryCharge,
-        total: tempOrderData.total,
-        items: tempOrderData.items,
-        shippingAddress: tempOrderData.shippingAddress,
-        isBuyNow: tempOrderData.isBuyNow,
-      });
-
-      const { orderId: razorpayOrderId, amount, currency } = result.data;
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: amount.toString(),
-        currency: currency || 'INR',
-        name: 'Back to Dorm',
-        description: tempOrderData.isBuyNow ? 'Buy Now Purchase' : 'Cart Purchase',
-        order_id: razorpayOrderId,
-        prefill: {
-          name: tempOrderData.shippingAddress.name,
-          email: user.email || '',
-          contact: tempOrderData.shippingAddress.phone,
-        },
-        notes: {
-          address: `${tempOrderData.shippingAddress.address}, ${tempOrderData.shippingAddress.locality}, ${tempOrderData.shippingAddress.city}, ${tempOrderData.shippingAddress.state} - ${tempOrderData.shippingAddress.pincode}`,
-          userId: user.uid,
-          subtotal: tempOrderData.subtotal,
-          deliveryCharge: tempOrderData.deliveryCharge,
-          total: tempOrderData.total,
-        },
-        theme: { color: '#0d6efd' },
-        handler: async (response) => {
-          try {
-            const verifyRazorpayPayment = httpsCallable(functions, 'verifyRazorpayPayment');
-            const verifyResult = await verifyRazorpayPayment({
-              orderId: response.razorpay_order_id,
-              paymentId: response.razorpay_payment_id,
-              signature: response.razorpay_signature,
-            });
-            if (verifyResult.data.success) setError('Payment successful!');
-          } catch (err) {
-            setError(`Payment verification failed: ${err.message}`);
-          }
-        },
-        modal: { ondismiss: () => setError('Payment not completed.') },
-      };
-
-      new window.Razorpay(options).open();
-    } catch (err) {
-      setError(`Failed to retry payment: ${err.message}`);
-    }
-  };
 
   const renderOrders = (orderList) => (
     <div className="d-flex flex-column gap-4">
@@ -183,11 +122,11 @@ export default function ProfileOrders() {
                     ? order.status === 'Delivered'
                       ? 'success'
                       : order.status === 'Shipped'
-                      ? 'primary'
-                      : 'warning'
+                        ? 'primary'
+                        : 'warning'
                     : order.paymentStatus === 'Pending'
-                    ? 'warning'
-                    : 'danger'
+                      ? 'warning'
+                      : 'danger'
                 }
                 className="px-3 py-2 fs-6"
               >
@@ -205,6 +144,11 @@ export default function ProfileOrders() {
               {order.isPending && (
                 <Alert variant="warning" className="mb-4 py-2">
                   Awaiting payment confirmation.
+                </Alert>
+              )}
+              {!order.isPending && order.paymentStatus === 'Failed' && (
+                <Alert variant="danger" className="mb-4 py-2 fw-bold text-center">
+                  Payment Failed. Please place a new order or contact support.
                 </Alert>
               )}
               <div className="mb-4">
@@ -268,20 +212,6 @@ export default function ProfileOrders() {
                   <strong>Payment:</strong> {order.paymentStatus} via {order.paymentMethod}
                 </Col>
               </Row>
-              {order.isPending && order.paymentStatus === 'Failed' && (
-                <Row>
-                  <Col>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleRetryPayment(order.id)}
-                      className="px-4"
-                    >
-                      Retry Payment
-                    </Button>
-                  </Col>
-                </Row>
-              )}
             </Card.Body>
           </Card>
         ))

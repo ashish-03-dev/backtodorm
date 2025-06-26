@@ -161,7 +161,7 @@ const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowF
               <p className="mb-0 text-muted">{addr.state} - {addr.pincode}</p>
             </ListGroup.Item>
           ))}
-          <ListGroup.Item action onClick={() => setShowForm(true)}>
+          <ListGroup.Item action onClick={() => { setShowForm(true); onHide(); }}>
             <strong>+ Add New Address</strong>
           </ListGroup.Item>
         </ListGroup>
@@ -187,7 +187,6 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
-  const [pendingOrderId, setPendingOrderId] = useState(null);
 
   const items = buyNowItem ? [buyNowItem] : cartItems || [];
   const subtotal = items.length > 0
@@ -292,7 +291,6 @@ const Checkout = () => {
       });
 
       const { orderId, amount, currency } = result.data;
-      setPendingOrderId(orderId);
 
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
@@ -329,18 +327,17 @@ const Checkout = () => {
               navigate('/account/orders', { state: { orderSuccess: true, orderId: verifyResult.data.orderId } });
             }
           } catch (err) {
-            setError(`Payment verification failed: ${err.message}. Your order is pending confirmation.`);
-            navigate('/account/orders', { state: { orderPending: true, orderId } });
+            setError(`Payment verification failed: ${err.message}. Please check your order status.`);
           } finally {
             setPaymentProcessing(false);
+            setShowPayment(false);
           }
         },
         modal: {
           ondismiss: () => {
             setPaymentProcessing(false);
             setShowPayment(false);
-            setError('Payment was not completed. Your order is pending confirmation.');
-            navigate('/account/orders', { state: { orderPending: true, orderId } });
+            setError('Payment was not completed. Please check your order status.');
           },
         },
       };
@@ -370,11 +367,6 @@ const Checkout = () => {
     <div className="container my-4" style={{ minHeight: "calc(100svh - 65px)" }}>
       <h2 className="mb-3">Checkout</h2>
       {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
-      {pendingOrderId && (
-        <Alert variant="warning" onClose={() => setPendingOrderId(null)} dismissible>
-          Your order (ID: {pendingOrderId}) is pending payment confirmation. Please check your order status later.
-        </Alert>
-      )}
       <div className="row g-3">
         <div className="col-md-6">
           <Card>
@@ -432,19 +424,21 @@ const Checkout = () => {
                       <i className="bi bi-truck me-2 text-primary" style={{ fontSize: '1rem' }}></i>
                       Delivery
                     </span>
-                    {isFreeDelivery ? (
-                      <span>
-                        <span className="text-decoration-line-through text-muted me-1">
-                          ₹{deliveryCharge.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-success">Free</span>
-                      </span>
-                    ) : (
-                      <span>₹{finalDeliveryCharge.toLocaleString('en-IN')}</span>
-                    )}
+                    <span>
+                      {isFreeDelivery ? (
+                        <>
+                          <span className="text-decoration-line-through text-muted me-1">
+                            ₹{deliveryCharge.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-success">Free</span>
+                        </>
+                      ) : (
+                        `₹${finalDeliveryCharge.toLocaleString('en-IN')}`
+                      )}
+                    </span>
                   </div>
                   {!isFreeDelivery && freeDeliveryThreshold > 0 && (
-                    <p className="text-muted small mt-1">
+                    <p className="text-muted small mt-1 text-start">
                       Add ₹{(freeDeliveryThreshold - subtotal).toLocaleString('en-IN')} more for free delivery!
                     </p>
                   )}
@@ -501,21 +495,30 @@ const Checkout = () => {
               <Card.Body className="p-3">
                 <h4 className="mb-2">Payment Options</h4>
                 <Card className="p-2 mb-2">
-                  <p className="mb-1">Subtotal: ₹{subtotal.toLocaleString('en-IN')}</p>
-                  <p className="mb-1">
-                    Delivery: {isFreeDelivery ? (
-                      <span>
-                        <span className="text-decoration-line-through text-muted me-1">
-                          ₹{deliveryCharge.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-success">Free</span>
-                      </span>
-                    ) : (
-                      `₹${finalDeliveryCharge.toLocaleString('en-IN')}`
-                    )}
-                  </p>
-                  <p className="mb-0">Total: ₹{totalPrice.toLocaleString('en-IN')}</p>
-                  <p className="text-muted mt-1">Pay via Razorpay</p>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>Subtotal</span>
+                    <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>Delivery</span>
+                    <span>
+                      {isFreeDelivery ? (
+                        <>
+                          <span className="text-decoration-line-through text-muted me-1">
+                            ₹{deliveryCharge.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-success">Free</span>
+                        </>
+                      ) : (
+                        `₹${finalDeliveryCharge.toLocaleString('en-IN')}`
+                      )}
+                    </span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>Total</span>
+                    <span>₹{totalPrice.toLocaleString('en-IN')}</span>
+                  </div>
+                  <p className="text-muted mt-1 mb-0">Pay via Razorpay</p>
                 </Card>
                 <Button
                   variant="success"
@@ -523,7 +526,14 @@ const Checkout = () => {
                   onClick={handlePayNow}
                   disabled={paymentProcessing || items.length === 0 || cartLoading}
                 >
-                  {paymentProcessing ? 'Processing...' : 'Pay Now'}
+                  {paymentProcessing ? (
+                    <>
+                      <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Pay Now'
+                  )}
                 </Button>
               </Card.Body>
             </Card>
