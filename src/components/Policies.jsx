@@ -129,13 +129,13 @@ const defaultReturn = `
 
 **Last Updated: June 25, 2025**
 
-PosterPal ("we," "us," or "our") is committed to ensuring your satisfaction with our products. This Return Policy outlines the conditions under which you may return defective products purchased through our website and services ("Service") at BackToDorm. Please review this policy carefully before making a purchase.
+BackToDorm ("we," "us," or "our") is committed to ensuring your satisfaction with our products. This Return Policy outlines the conditions under which you may return defective products purchased through our website and services ("Service") at BackToDorm. Please review this policy carefully before making a purchase.
 
 ## 1. Eligibility for Returns
 
 You may return products under the following conditions:
 - **Defective or Damaged Products**: Standard or custom posters that arrive damaged, misprinted, or otherwise defective are eligible for a refund or replacement.
-- **Timeframe**: Returns must be initiated within 14 days of receiving your order.
+- **Timeframe**: Returns must be initiated within 7 days of receiving your order.
 - **Non-Returnable Items**: Custom posters are non-returnable unless defective, damaged, or misprinted. Non-defective standard posters are not eligible for return due to change of mind.
 
 ## 2. Return Process

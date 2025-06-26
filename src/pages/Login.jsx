@@ -115,7 +115,7 @@ export default function PhoneLogin() {
           Continue with Google
         </button>
         <p className="mb-0 text-center" style={{ fontSize: ".90em" }}>
-          By continuing, you agree to our <Link to="/terms">Terms & Conditions</Link>
+          By continuing, you agree to our <Link to="/terms-and-conditions">Terms & Conditions</Link>
         </p>
       </div>
     </div>
