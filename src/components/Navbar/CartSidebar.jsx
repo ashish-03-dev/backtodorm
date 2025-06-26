@@ -130,19 +130,55 @@ export default function CartSidebar({ show, onClose }) {
                             <ul className="mb-2 ps-3">
                               {item.posters.map((poster, i) => (
                                 <li key={i} className="text-muted small">
-                                  {poster.title || 'Untitled'} ({poster.size || 'N/A'}) - ₹{(poster.finalPrice || poster.price || 0).toLocaleString('en-IN')}
-                                  {poster.discount > 0 && (
-                                    <span className="text-success ms-1">({poster.discount}% off)</span>
+                                  {poster.title || 'Untitled'} ({poster.size || 'N/A'}) -{' '}
+                                  {poster.discount > 0 ? (
+                                    <>
+                                      <span className="text-decoration-line-through me-1">
+                                        ₹{(poster.price || 0).toLocaleString('en-IN')}
+                                      </span>
+                                      <span className="text-success me-1">
+                                        ₹{(poster.finalPrice || 0).toLocaleString('en-IN')}
+                                      </span>
+                                      <span className="text-danger">↓ {poster.discount}% OFF</span>
+                                    </>
+                                  ) : (
+                                    <span>
+                                      ₹{(poster.price || 0).toLocaleString('en-IN')}
+                                    </span>
                                   )}
                                 </li>
                               ))}
                             </ul>
-                            <p className="mb-2">
-                              ₹{(
-                                (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1) * (1 - group.collectionDiscount / 100)
-                              ).toLocaleString('en-IN')}
-                              {group.collectionDiscount > 0 && <span className="text-success ms-1">({group.collectionDiscount}% off)</span>}
+                            <p className="mb-2 d-flex align-items-center flex-wrap">
+                              {group.collectionDiscount > 0 ? (
+                                <>
+                                  <span className="text-muted text-decoration-line-through me-2">
+                                    ₹{(
+                                      (item.posters || []).reduce((sum, p) => sum + (p.price || 0), 0) *
+                                      (item.quantity || 1)
+                                    ).toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-success fw-semibold me-2">
+                                    ₹{(
+                                      (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) *
+                                      (item.quantity || 1) *
+                                      (1 - group.collectionDiscount / 100)
+                                    ).toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-danger fw-semibold">
+                                    ↓ {group.collectionDiscount}% OFF
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-muted fw-semibold">
+                                  ₹{(
+                                    (item.posters || []).reduce((sum, p) => sum + (p.price || 0), 0) *
+                                    (item.quantity || 1)
+                                  ).toLocaleString('en-IN')}
+                                </span>
+                              )}
                             </p>
+
                             <div className="d-flex align-items-center gap-2">
                               <Button
                                 variant="outline-secondary"
@@ -204,10 +240,26 @@ export default function CartSidebar({ show, onClose }) {
                               {item.title || 'Untitled'} ({item.size || 'N/A'})
                             </h6>
                             {item.seller && <p className="mb-1 text-muted small">By: {item.seller}</p>}
-                            <p className="mb-2">
-                              ₹{((item.finalPrice || item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
-                              {item.discount > 0 && <span className="text-success ms-1">({item.discount}% off)</span>}
+                            <p className="mb-2 d-flex align-items-center">
+                              {item.discount > 0 && (
+                                <>
+                                  <span className="text-muted text-decoration-line-through me-2">
+                                    ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-success fw-semibold me-2">
+                                    ₹{(item.finalPrice * item.quantity).toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-danger fw-semibold">↓ {item.discount}% OFF</span>
+                                </>
+                              )}
+
+                              {item.discount <= 0 && (
+                                <span className="text-muted fw-semibold">
+                                  ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                                </span>
+                              )}
                             </p>
+
                             <div className="d-flex align-items-center gap-2">
                               <Button
                                 variant="outline-secondary"

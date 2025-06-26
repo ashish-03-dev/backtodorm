@@ -143,24 +143,55 @@ export default function ProductDetail() {
   const isDiscounted = selectedSizeObj.discount > 0 && selectedSizeObj.finalPrice < selectedSizeObj.price;
 
   return (
-    <div className="container py-5">
+    <div className="container" style={{ height: "calc(100svh - 65px)" }}>
       <div className="row">
-        <div className="col-md-6 mb-4">
-          <img src={poster.image} className="img-fluid rounded shadow-sm" alt={poster.title} />
+        <div
+          className="col-md-6 py-4 overflow-auto"
+          style={{ height: 'calc(100svh - 65px)', paddingRight: '1rem' }}
+        >
+          <img
+            src={poster.image}
+            alt={poster.title}
+            style={{
+              width: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+            }}
+            className="rounded"
+          />
         </div>
 
-        <div className="col-md-6 d-flex flex-column justify-content-between" style={{ height: "calc(100svh - 65px - 4rem)" }}>
+        <div className="col-md-6 px-4 pt-5 pb-4 d-flex flex-column justify-content-between">
           <div>
             <h3>{poster.title}</h3>
             <p className="mb-4">{poster.description}</p>
 
+            <div className="mb-4">
+              {isDiscounted ? (
+                <div className="d-flex align-items-center">
+                  <span className="text-danger fw-semibold me-2">
+                    ↓ {selectedSizeObj.discount}% OFF
+                  </span>
+                  <h5 className="text-muted text-decoration-line-through mb-0 me-2">
+                    ₹{originalPrice.toLocaleString('en-IN')}
+                  </h5>
+                  <h5 className="text-success fw-semibold mb-0">
+                    ₹{displayPrice.toLocaleString('en-IN')}
+                  </h5>
+                </div>
+              ) : (
+                <h5 className="text-muted fw-semibold mb-0">
+                  ₹{displayPrice.toLocaleString('en-IN')}
+                </h5>
+              )}
+            </div>
             <div className="mb-4">
               <h6 className="fw-semibold mb-2">Select Size</h6>
               <div className="d-flex gap-2">
                 {poster.sizes.map(({ size }) => (
                   <button
                     key={size}
-                    className={`btn btn-outline-dark ${selectedSize === size ? 'active' : ''}`}
+                    className={`btn border  ${selectedSize === size ? 'border-primary text-primary' : ''}`}
                     onClick={() => handleSizeChange(size)}
                     aria-label={`Select size ${size}`}
                   >
@@ -170,16 +201,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            <div className="mb-4">
-              {isDiscounted ? (
-                <div>
-                  <h5 className="text-muted text-decoration-line-through">₹{originalPrice.toLocaleString('en-IN')}</h5>
-                  <h5 className="text-success">₹{displayPrice.toLocaleString('en-IN')} ({selectedSizeObj.discount}% off)</h5>
-                </div>
-              ) : (
-                <h5 className="text-muted">₹{displayPrice.toLocaleString('en-IN')}</h5>
-              )}
-            </div>
           </div>
 
           <div>

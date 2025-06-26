@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useFirebase } from '../../context/FirebaseContext';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
@@ -94,18 +94,20 @@ export default function CollectionDetail({ addToCart }) {
         ) : (
           posters.map((poster) => (
             <div key={poster.id} className="col-6 col-md-4 col-lg-3 mb-4">
-              <div className="card h-100 shadow-sm border-0">
-                <img
-                  src={poster.img}
-                  alt={poster.title}
-                  className="card-img-top"
-                  style={{ aspectRatio: '20/23', objectFit: 'cover' }}
-                />
-                <div className="card-body text-center">
-                  <h6 className="fw-semibold text-truncate mb-2">{poster.title}</h6>
-                  <p className="text-muted fw-semibold mb-0">₹{poster.finalPrice || poster.price}</p>
+              <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
+                <div className="card h-100 shadow-sm border-0">
+                  <img
+                    src={poster.img}
+                    alt={poster.title}
+                    className="card-img-top"
+                    style={{ aspectRatio: '20/23', objectFit: 'cover' }}
+                  />
+                  <div className="card-body text-center">
+                    <h6 className="fw-semibold text-truncate mb-2">{poster.title}</h6>
+                    <p className="text-muted fw-semibold mb-0">₹{poster.finalPrice || poster.price}</p>
+                  </div>
                 </div>
-              </div>
+              </Link>
             </div>
           ))
         )}
