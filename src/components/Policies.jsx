@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import { Spinner, Alert, Nav } from "react-bootstrap";
+import { useLocation,NavLink} from "react-router-dom";
+import { Spinner, Nav } from "react-bootstrap";
 import ReactMarkdown from "react-markdown";
 
 // Default Terms and Conditions
@@ -169,34 +169,17 @@ For questions or to initiate a return, contact us at:
 const Policies = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("terms");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Determine active tab based on URL path
-    const path = location.pathname.toLowerCase();
-    if (path.includes("/privacy-policy")) {
-      setActiveTab("privacy");
-    } else if (path.includes("/return-policy")) {
-      setActiveTab("return");
-    } else {
-      setActiveTab("terms"); // Default to terms
-    }
-    setLoading(false);
-  }, [location]);
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    // Update URL without reloading
-    window.history.pushState(null, "", `/${tab.replace(" ", "-")}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
-        <Spinner animation="border" variant="primary" />
-      </div>
-    );
+useEffect(() => {
+  const path = location.pathname.toLowerCase();
+  if (path.includes("/privacy-policy")) {
+    setActiveTab("privacy");
+  } else if (path.includes("/return-policy")) {
+    setActiveTab("return");
+  } else {
+    setActiveTab("terms"); // Default to terms
   }
+}, [location.pathname]);
 
   const policyContent = {
     terms: { title: "Terms and Conditions", content: defaultTerms },
@@ -207,20 +190,21 @@ const Policies = () => {
   return (
     <div className="d-flex align-items-center justify-content-center min-vh-100 py-5 bg-light">
       <div className="card shadow-sm p-4" style={{ maxWidth: "800px", width: "100%" }}>
-        <Nav
-          variant="tabs"
-          activeKey={activeTab}
-          onSelect={(selectedKey) => handleTabChange(selectedKey)}
-          className="mb-4"
-        >
+        <Nav variant="tabs" className="mb-4">
           <Nav.Item>
-            <Nav.Link eventKey="terms">Terms and Conditions</Nav.Link>
+            <Nav.Link as={NavLink} to="/terms-and-conditions" eventKey="terms">
+              Terms and Conditions
+            </Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="privacy">Privacy Policy</Nav.Link>
+            <Nav.Link as={NavLink} to="/privacy-policy" eventKey="privacy">
+              Privacy Policy
+            </Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="return">Return Policy</Nav.Link>
+            <Nav.Link as={NavLink} to="/return-policy" eventKey="return">
+              Return Policy
+            </Nav.Link>
           </Nav.Item>
         </Nav>
         <div className="card-body">

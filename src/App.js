@@ -12,6 +12,7 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import SearchPage from './components/SearchPage';
 import HelpCentre from "./components/Account/HelpCentre";
+import ScrollManager from './components/ScrollManager';
 
 import AccountLayout from './components/Account/AccountLayout';
 import ProfileInfo from './components/Account/ProfileInfo';
@@ -44,7 +45,9 @@ function App() {
 
   return (
     <Router>
+      <ScrollManager />
       <Suspense fallback={<div>Loading...</div>}>
+
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/privacy-policy" element={<Policies />} />

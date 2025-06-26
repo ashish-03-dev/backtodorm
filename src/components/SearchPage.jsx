@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useFirebase } from "../context/FirebaseContext";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useSearch } from "../context/SearchContext";
 
 export default function SearchPage() {
@@ -144,11 +144,24 @@ export default function SearchPage() {
               console.warn(`Error fetching seller name for poster ${posterId}:`, err.message);
             }
 
-            const cheapestPrice = posterData.sizes.reduce((min, size) => {
-              return Math.min(min, size.finalPrice || size.price);
-            }, Infinity);
+            const cheapestSize = posterData.sizes.reduce((best, size) => {
+              const final = size.finalPrice ?? size.price ?? Infinity;
+              return final < (best.finalPrice ?? Infinity) ? size : best;
+            }, {});
 
-            searchResults.push({ ...poster, sellerName, cheapestPrice });
+            const cheapestPrice = cheapestSize.finalPrice ?? cheapestSize.price ?? 0;
+            const originalPrice = cheapestSize.price ?? 0;
+            const discount = cheapestSize.discount ?? posterData.discount ?? 0;
+
+
+            searchResults.push({
+              ...poster,
+              sellerName,
+              cheapestPrice,
+              originalPrice,
+              discount
+            });
+
             console.log(`Poster ${posterId} included:`, {
               approved: posterData.approved,
               isActive: posterData.isActive,
@@ -257,30 +270,43 @@ export default function SearchPage() {
         <div className="row">
           {results.map((poster) => (
             <div key={poster.id} className="col-6 col-md-3 mb-4">
-              <div className="card h-100 shadow-sm">
-                <img
-                  src={poster.imageUrl}
-                  className="card-img-top"
-                  alt={poster.title}
-                  style={{ height: "300px", objectFit: "cover" }}
-                />
-                <div className="card-body d-flex flex-column">
-                  <h6 className="card-title">{poster.title}</h6>
-                  <p className="card-text text-muted">By {poster.sellerName}</p>
-                  <p className="card-text fw-semibold">
-                    ${poster.cheapestPrice.toFixed(2)}
-                    {poster.discount > 0 && (
-                      <span className="text-success ms-2">({poster.discount}% off)</span>
+              <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
+                <div className="card h-100 shadow-sm">
+                  <img
+                    src={poster.imageUrl}
+                    className="card-img-top"
+                    alt={poster.title}
+                    style={{ height: "300px", objectFit: "cover" }}
+                  />
+                  <div className="card-body d-flex flex-column">
+                    <h6
+                      className="card-title text-truncate mb-1"
+                      style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
+                      title={poster.title}
+                    >
+                      {poster.title}
+                    </h6>
+                    <p className="card-text text-muted mb-2">By {poster.sellerName}</p>
+                    {poster.discount > 0 && poster.originalPrice > poster.cheapestPrice ? (
+                      <div className="d-flex align-items-center">
+                        <span className="text-danger fw-semibold me-2">
+                          ↓ {poster.discount}% OFF
+                        </span>
+                        <h6 className="text-muted text-decoration-line-through mb-0 me-2">
+                          ₹{poster.originalPrice.toLocaleString('en-IN')}
+                        </h6>
+                        <h6 className="text-success fw-semibold mb-0">
+                          ₹{poster.cheapestPrice.toLocaleString('en-IN')}
+                        </h6>
+                      </div>
+                    ) : (
+                      <h6 className="text-muted fw-semibold mb-0">
+                        ₹{poster.cheapestPrice.toLocaleString('en-IN')}
+                      </h6>
                     )}
-                  </p>
-                  <button
-                    className="btn btn-outline-primary mt-auto"
-                    onClick={() => handleViewPoster(poster.id)}
-                  >
-                    View Poster
-                  </button>
+                  </div>
                 </div>
-              </div>
+              </Link>
             </div>
           ))}
         </div>
