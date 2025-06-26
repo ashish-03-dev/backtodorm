@@ -48,11 +48,19 @@ export default function PhoneLogin() {
     <div className="container d-flex align-items-center justify-content-center vh-100 bg-white">
       <div className="card shadow-lg p-4" style={{ maxWidth: "400px", width: "100%" }}>
         <div className="text-center mb-2">
-          <img
-            src="/android-chrome-192x192.png"
-            alt="backtodorm logo"
-            style={{ width: "50px", marginRight: "10px" }}
-          />
+          <a href="/">
+            <img
+              src="/android-chrome-192x192.png"
+              alt="backtodorm logo"
+              style={{
+                width: "50px",
+                height: "50px",         // Ensure it's a square
+                marginRight: "10px",
+                borderRadius: "50%",    // Makes it round
+                objectFit: "cover"
+              }}
+            />
+          </a>
           <h4 className="fw-bold mt-3">Welcome</h4>
           <p className="text-muted">Sign in with your phone number</p>
         </div>
@@ -106,8 +114,8 @@ export default function PhoneLogin() {
           />
           Continue with Google
         </button>
-        <p className="mb-0 text-center" style={{fontSize:".90em"}}>
-          By continuing, you agree to our <Link to="/terms">Terms & Conditions</Link> 
+        <p className="mb-0 text-center" style={{ fontSize: ".90em" }}>
+          By continuing, you agree to our <Link to="/terms">Terms & Conditions</Link>
         </p>
       </div>
     </div>

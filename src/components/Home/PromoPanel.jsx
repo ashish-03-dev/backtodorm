@@ -83,7 +83,7 @@ const PromoPanel = () => {
         </section>
 
         {/* Section 4: Support */}
-        <section>
+       <section id="contact">
           <Row className="justify-content-center">
             <Col md={10} lg={6}>
               <h3 className="h4 fw-bold text-center mb-4">📩 Support & Assistance</h3>

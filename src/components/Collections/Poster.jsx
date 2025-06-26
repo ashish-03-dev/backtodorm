@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc } from "firebase/firestore";
 import { useFirebase } from '../../context/FirebaseContext';
 import { useCartContext } from '../../context/CartContext';
@@ -201,7 +201,10 @@ export default function ProductDetail() {
                 <div className="d-flex align-items-center">
                   <i className="bi bi-box-arrow-left me-2 text-muted" style={{ fontSize: '1.2rem' }}></i>
                   <p className="mb-0 text-muted small">
-                    Ships in 2–4 business days. Easy returns within 7 days.
+                    Ships in 2–4 days. 7-day return for damaged posters.{' '} View {' '}
+                    <Link to="/return-policy" className="text-primary text-decoration-underline">
+                      Return Policy
+                    </Link>
                   </p>
                 </div>
               </div>

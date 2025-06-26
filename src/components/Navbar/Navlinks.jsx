@@ -109,7 +109,7 @@ export default function NavLinks() {
           );
         })}
          <li className="nav-item">
-          <a className="nav-link text-dark h-100 d-flex align-items-center" href="/contact">
+          <a className="nav-link text-dark h-100 d-flex align-items-center" href="/#contact">
             Contact
           </a>
         </li>

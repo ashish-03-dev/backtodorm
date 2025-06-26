@@ -1,8 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import HomeLayout from './pages/HomeLayout';
-import Terms from "./components/Terms";
-import Privacy from "./components/Privacy";
+import Policies from "./components/Policies";
 import MainLanding from './components/Home/MainLanding';
 import CollectionDetail from './components/Collections/CollectionsDetail';
 import SingleCollection from './components/Collections/SingleCollection';
@@ -41,8 +40,9 @@ function App() {
   return (
     <Router>
       <Routes>
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
+        <Route path="/privacy-policy" element={<Policies />} />
+        <Route path="/terms-and-conditions" element={<Policies />} />
+        <Route path="/return-policy" element={<Policies />} />
         <Route path="/" element={<HomeLayout />}>
           <Route index element={<MainLanding />} />
           <Route path="collections/:collectionId" element={<CollectionDetail />} />

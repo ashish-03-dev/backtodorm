@@ -6,13 +6,13 @@ export default function Footer() {
     <footer className="bg-light py-4 text-center">
       <div className="container text-muted small">
         <div className="mb-2">
-          <Link to="/terms" className="text-dark mx-2">Terms and Conditions</Link>
+          <Link to="/terms-and-conditions" className="text-dark mx-2">Terms and Conditions</Link>
           <span>|</span>
-          <Link to="/privacy" className="text-dark mx-2">Privacy Policy</Link>
+          <Link to="/privacy-policy" className="text-dark mx-2">Privacy Policy</Link>
           <span>|</span>
           <a href="mailto:ashish03.dev@gmail.com" className="text-dark mx-2">Contact Us</a>
         </div>
-        <div>© 2025 PosterPal. All rights reserved.</div>
+        <div>© 2025 Back To Dorm. All rights reserved.</div>
       </div>
     </footer>
   );
