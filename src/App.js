@@ -20,6 +20,8 @@ import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
+import PosterFrameTest from "./PosterFrameTest";
+import FramesAdmin from "./pages/AAdmin/FramesAdmin";
 
 
 const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
@@ -28,7 +30,7 @@ const Orders = lazy(() => import('./pages/AAdmin/Orders/index'));
 const SectionManager = lazy(() => import('./pages/AAdmin/HomeContentManager/SectionManager'));
 const Sellers = lazy(() => import('./pages/AAdmin/Sellers'));
 const Posters = lazy(() => import('./pages/AAdmin/Posters/Posters'));
-const PosterApprovals = lazy(() => import('./pages/AAdmin/PosterApprovals'));
+const PosterApprovals = lazy(() => import('./pages/AAdmin/PosterApprovals/PosterApprovals'));
 const Users = lazy(() => import('./pages/AAdmin/Users'));
 const Settings = lazy(() => import('./pages/AAdmin/SiteSettings'));
 const AdminUsers = lazy(() => import('./pages/AAdmin/AdminUsers'));
@@ -48,6 +50,7 @@ function App() {
       <Suspense fallback={<div>Loading...</div>}>
 
         <Routes>
+          <Route path="/frame" element={<PosterFrameTest />} />
           <Route path="/login" element={<Login />} />
           <Route path="/privacy-policy" element={<Policies />} />
           <Route path="/terms-and-conditions" element={<Policies />} />
@@ -78,11 +81,13 @@ function App() {
           </Route>
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
             <Route index element={<Dashboard />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="orders" element={<Orders />} />
             <Route path="home-content" element={<SectionManager />} />
             <Route path="sellers" element={<Sellers />} />
             <Route path="posters" element={<Posters />} />
             <Route path="poster-approvals" element={<PosterApprovals />} />
+            <Route path="frames" element={<FramesAdmin />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin-users" element={<AdminUsers />} />

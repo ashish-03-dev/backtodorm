@@ -23,30 +23,31 @@ export default function AdminLayout() {
   // Highlight Dashboard on /admin only when not mobile
   const isActive = (path) => {
     if (path === "/admin") {
-      return !isMobile && location.pathname === "/admin";
+      return !isMobile && location.pathname === "/admin" || location.pathname === "./admin/dashboard";
     }
     return location.pathname === path;
   };
 
   const navItems = [
-    { path: "/", label: "Home", icon: "bi-house-door" },
-    { path: "/admin", label: "Dashboard", icon: "bi-house" },
+    { path: "/admin/dashboard", label: "Dashboard", icon: "bi-house" },
     { path: "/admin/orders", label: "Orders", icon: "bi-cart-check" },
     { path: "/admin/home-content", label: "Home Content", icon: "bi-file-text" },
     { path: "/admin/posters", label: "Posters", icon: "bi-image" },
     { path: "/admin/poster-approvals", label: "Poster Approvals", icon: "bi-check-circle" },
+    { path: "/admin/frames", label: "Frames", icon: "bi-collection" },
     { path: "/admin/sellers", label: "Sellers", icon: "bi-person-badge" },
     { path: "/admin/users", label: "Users", icon: "bi-people" },
     { path: "/admin/settings", label: "Site Settings", icon: "bi-gear" },
     { path: "/admin/admin-users", label: "Admin Users", icon: "bi-person-gear" },
-    { path: "/admin/support", label: "Support", icon: "bi-question-circle" }
+    { path: "/admin/support", label: "Support", icon: "bi-question-circle" },
+    { path: "/", label: "Home", icon: "bi-house-door" },
   ];
 
   return (
     <div className="bg-light p-3">
       <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 2rem)" }}>
         {!showContentOnMobile && (
-          <div className="bg-light d-flex flex-column gap-3" style={{ minWidth: "300px", flexShrink: 0 }}>
+          <div className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`} style={{ minWidth: "300px", flexShrink: 0 }}>
             <div className="text-center p-4 bg-white shadow-sm">
               <h5 className="mb-0">🛠️ Admin Dashboard</h5>
             </div>
@@ -56,11 +57,10 @@ export default function AdminLayout() {
                 {navItems.map((item) => (
                   <li key={item.path} className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${
-                        isActive(item.path)
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(item.path)
                           ? "text-primary bg-light"
                           : "text-dark"
-                      }`}
+                        }`}
                       onClick={() => handleSectionClick(item.path)}
                     >
                       <span>
@@ -77,9 +77,8 @@ export default function AdminLayout() {
         )}
 
         <div
-          className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${
-            showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
-          }`}
+          className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+            }`}
           style={{ maxWidth: "100%", overflow: "auto" }}
         >
           <Outlet />

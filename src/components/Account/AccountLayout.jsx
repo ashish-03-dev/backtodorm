@@ -58,11 +58,11 @@ export default function AccountLayout() {
 
   return (
     <div className="bg-light p-3">
-      <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
+      <div className="d-flex gap-3" style={{ height: "calc(100svh - 97px)" }}>
         {/* Sidebar */}
         {!showContentOnMobile && (
           <div
-            className="bg-light d-flex flex-column gap-3"
+            className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`}
             style={{ minWidth: "300px", flexShrink: 0 }}
           >
             <div className="text-center p-4 bg-white shadow-sm">
@@ -74,11 +74,10 @@ export default function AccountLayout() {
                 {menuItems.map(({ label, path }, index) => (
                   <li className="nav-item" key={index}>
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${
-                        isActive(path)
-                          ? "text-primary bg-light"
-                          : "text-dark"
-                      }`}
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(path)
+                        ? "text-primary bg-light"
+                        : "text-dark"
+                        }`}
                       onClick={() => handleSectionClick(path)}
                     >
                       {label}
@@ -101,9 +100,8 @@ export default function AccountLayout() {
 
         {/* Main Content */}
         <div
-          className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 ${
-            showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
-          }`}
+          className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+            }`}
           style={{ maxWidth: "100%", overflow: "auto" }}
         >
           {error && <div className="alert alert-danger">{error}</div>}

@@ -1,83 +1,151 @@
-import React, { useState, useEffect } from 'react';
-import { useFirebase } from '../../context/FirebaseContext';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import React, { useState } from 'react';
 import NavDropdown from './NavDropdown';
 
-const fetchImages = async (ids, firestore) => {
-  const uniqueIds = [...new Set(ids.filter(id => id))];
-  const chunks = [];
-  for (let i = 0; i < uniqueIds.length; i += 10) {
-    chunks.push(uniqueIds.slice(i, i + 10));
-  }
-
-  const imageResults = [];
-  for (const chunk of chunks) {
-    const q = query(collection(firestore, "posters"), where("__name__", "in", chunk));
-    const querySnap = await getDocs(q);
-    querySnap.forEach(doc => imageResults.push([doc.id, doc.data().imageUrl || ""]));
-  }
-  return imageResults;
+const menusData = {
+  menuList: [
+    {
+      id: 'shop',
+      sections: [
+        {
+          title: 'All Posters',
+          items: [
+            { link: '/collections/new-arrivals', name: 'New Arrivals', title: 'New Posters' },
+            { link: '/collections/best-selling', name: 'Best Selling', title: 'Popular Posters' },
+            { link: '/collections/devotional', name: 'Devotional', title: 'Devotional Posters' },
+            { link: '/collections/motivational', name: 'Motivational', title: 'Motivational Posters' }
+          ]
+        },
+        {
+          title: 'Cars & Bikes',
+          items: [
+            { link: '/collections/bikes', name: 'Bikes', title: 'Bike Posters' },
+            { link: '/collections/concept-cars', name: 'Concept Cars', title: 'Concept Car Posters' },
+            { link: '/collections/solid-cars', name: 'Solid Cars', title: 'Realistic Car Posters' },
+            { link: '/collections/vector-cars', name: 'Vector Cars', title: 'Vector Car Posters' }
+          ]
+        },
+        {
+          title: 'Sports',
+          items: [
+            { link: '/collections/football', name: 'Football', title: 'Football Posters' },
+            { link: '/collections/cricket', name: 'Cricket', title: 'Cricket Posters' },
+            { link: '/collections/ufc', name: 'UFC', title: 'UFC Posters' },
+            { link: '/collections/f1', name: 'F1', title: 'Formula 1 Posters' }
+          ]
+        },
+        {
+          title: 'Pop Culture',
+          items: [
+            { link: '/collections/marvel', name: 'Marvel', title: 'Marvel Posters' },
+            { link: '/collections/dc', name: 'DC', title: 'DC Posters' },
+            { link: '/collections/movies', name: 'Movies', title: 'Movie Posters' },
+            { link: '/collections/tv-series', name: 'TV Series', title: 'TV Series Posters' },
+            { link: '/collections/music', name: 'Music', title: 'Music Posters' },
+            { link: '/collections/games', name: 'Games', title: 'Gaming Posters' }
+          ]
+        },
+        {
+          title: 'Make Your Own Poster',
+          items: [
+            { link: '/custom-poster', name: 'Create Now', title: 'Design Your Own Poster' }
+          ]
+        }
+      ],
+      images: []
+    },
+    {
+      id: 'collections',
+      sections: [
+        {
+          title: 'Collage Kit',
+          items: [
+            { link: '/collections/50-piece-collage-kit', name: '50-Piece Collage Kit', title: '50 Poster Set' },
+            { link: '/collections/30-piece-combo-set', name: '30-Piece Combo Set', title: '30 Poster Set' }
+          ]
+        },
+        {
+          title: 'Explore ALL',
+          items: [
+            { link: '/collections/new-arrivals', name: 'New Arrivals', title: 'New Poster Splits' },
+            { link: '/collections/best-selling', name: 'Best Selling', title: 'Top Selling Splits' },
+            { link: '/collections/fighter-jets', name: 'Fighter Jet Posters', title: 'Jet Poster Splits' },
+            { link: '/collections/car-splits', name: 'Car Split Posters', title: 'Car Poster Splits' },
+            { link: '/collections/motivational-splits', name: 'Motivational Split Posters', title: 'Motivational Splits' },
+            { link: '/collections/spiritual-splits', name: 'Spiritual Split Posters', title: 'Spiritual Splits' },
+            { link: '/collections/bike-splits', name: 'Bike Split Posters', title: 'Bike Poster Splits' }
+          ]
+        },
+        {
+          title: 'Sports Split Posters',
+          items: [
+            { link: '/collections/sports-cricket', name: 'Cricket', title: 'Cricket Splits' },
+            { link: '/collections/sports-football', name: 'Football', title: 'Football Splits' },
+            { link: '/collections/sports-f1', name: 'F1', title: 'F1 Splits' },
+            { link: '/collections/sports-wrestling', name: 'Wrestling', title: 'Wrestling Posters' },
+            { link: '/collections/sports-top-picks', name: 'Sport Top-Picks', title: 'Top Sports Posters' }
+          ]
+        },
+        {
+          title: 'Entertainment Split Posters',
+          items: [
+            { link: '/collections/marvel', name: 'Marvel', title: 'Marvel Poster Splits' },
+            { link: '/collections/dc', name: 'DC', title: 'DC Poster Splits' },
+            { link: '/collections/movies', name: 'Movies', title: 'Movie Poster Splits' },
+            { link: '/collections/tv-series', name: 'TV Series', title: 'TV Series Splits' },
+            { link: '/collections/music', name: 'Music', title: 'Music Poster Splits' },
+            { link: '/collections/gaming', name: 'Game Split Posters', title: 'Gaming Poster Splits' }
+          ]
+        },
+        {
+          title: 'Split by Pieces',
+          items: [
+            { link: '/collections/2-piece', name: '2-Piece Split Posters', title: '2-Part Posters' },
+            { link: '/collections/3-piece', name: '3-Piece Split Posters', title: '3-Part Posters' },
+            { link: '/collections/5-panel', name: '5-Panel Split Posters', title: '5 Panel Poster Set' },
+            { link: '/collections/6-panel', name: '6-Panel Wall Art Set', title: '6 Panel Wall Set' },
+            { link: '/collections/7-piece', name: '7-Piece Poster Layout', title: '7-Part Poster Layout' },
+            { link: '/collections/9-piece', name: '9-Piece Epic Poster Split', title: '9-Part Epic Set' }
+          ]
+        }
+      ],
+      images: []
+    }
+  ]
 };
 
+
 export default function NavLinks() {
-  const { firestore } = useFirebase();
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [menus, setMenus] = useState([]);
   const [posterImages, setPosterImages] = useState({});
-  const [loading, setLoading] = useState(true);
 
   const handleMouseEnter = (type) => setActiveDropdown(type);
   const handleMouseLeave = () => setActiveDropdown(null);
 
-  useEffect(() => {
-    const fetchMenus = async () => {
-      if (!firestore) {
-        console.error('Firestore instance is not available');
-        setLoading(false);
-        return;
-      }
-      try {
-        const menusDoc = await getDocs(collection(firestore, 'homeSections'));
-        const menusData = menusDoc.docs.find((d) => d.id === 'menus')?.data();
-        const menuList = menusData?.menuList || [];
+  React.useEffect(() => {
+    const menuList = menusData.menuList || [];
 
-        if (!Array.isArray(menuList)) {
-          console.error('menuList is not an array:', menuList);
-          setMenus([]);
-          setLoading(false);
-          return;
-        }
+    if (!Array.isArray(menuList)) {
+      console.error('menuList is not an array:', menuList);
+      setMenus([]);
+      return;
+    }
 
-        const sanitizedMenus = menuList.map((menu) => ({
-          id: menu.id || '',
-          sections: Array.isArray(menu.sections) ? menu.sections : [],
-          images: Array.isArray(menu.images) ? menu.images : [],
-        }));
+    const sanitizedMenus = menuList.map((menu) => ({
+      id: menu.id || '',
+      sections: Array.isArray(menu.sections) ? menu.sections : [],
+      images: Array.isArray(menu.images) ? menu.images : [],
+    }));
 
-        setMenus(sanitizedMenus);
+    setMenus(sanitizedMenus);
 
-        const imageIds = sanitizedMenus.flatMap((menu) =>
-          menu.images.map((img) => img.src).filter((id) => id && typeof id === 'string')
-        );
+    // Map image URLs directly from the static data
+    const imageResults = sanitizedMenus
+      .flatMap((menu) => menu.images.map((img) => [img.src, img.src]))
+      .filter(([id]) => id && typeof id === 'string');
 
-        if (imageIds.length) {
-          const imageResults = await fetchImages(imageIds, firestore);
-          setPosterImages(Object.fromEntries(imageResults));
-        }
-      } catch (err) {
-        console.error('Failed to fetch menus:', err);
-        setMenus([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMenus();
-  }, [firestore]);
-
-  if (loading) {
-    return null;
-  }
+    setPosterImages(Object.fromEntries(imageResults));
+  }, []);
 
   return (
     <nav className="col-md-5 d-none d-lg-flex flex-grow-1 justify-content-center h-100">
@@ -108,7 +176,7 @@ export default function NavLinks() {
             />
           );
         })}
-         <li className="nav-item">
+        <li className="nav-item">
           <a className="nav-link text-dark h-100 d-flex align-items-center" href="/#contact">
             Contact
           </a>

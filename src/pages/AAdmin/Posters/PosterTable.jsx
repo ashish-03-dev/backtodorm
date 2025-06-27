@@ -8,6 +8,8 @@ const PosterTable = ({
   onEdit,
   onView,
   onReject,
+  onUploadToCDN,
+  onSetFrame,
 }) => {
   if (!posters || posters.length === 0) {
     return <p>No posters found.</p>;
@@ -58,7 +60,7 @@ const PosterTable = ({
                 >
                   View
                 </Button>
-                {poster.approved === "pending" ? (
+                {poster.approved === "pending" && (
                   <Button
                     variant="outline-success"
                     size="sm"
@@ -67,7 +69,8 @@ const PosterTable = ({
                   >
                     Approve
                   </Button>
-                ) : (
+                )}
+                {poster.approved === "approved" && poster.source === "posters" && (
                   <Button
                     variant="outline-secondary"
                     size="sm"
@@ -77,6 +80,7 @@ const PosterTable = ({
                     Edit
                   </Button>
                 )}
+
                 {onReject && poster.approved === "pending" && (
                   <Button
                     variant="outline-warning"
@@ -85,6 +89,28 @@ const PosterTable = ({
                     title="Reject poster"
                   >
                     Reject
+                  </Button>
+                )}
+                {onUploadToCDN && poster.approved === "approved" && (
+                  <Button
+                    variant="outline-info"
+                    size="sm"
+                    onClick={() => onUploadToCDN(poster.id)}
+                    title="Upload to CDN"
+                    disabled={poster.cdnUploaded}
+                  >
+                    {poster.cdnUploaded ? "Uploaded" : "Upload to CDN"}
+                  </Button>
+                )}
+                {onSetFrame && poster.approved === "approved" && (
+                  <Button
+                    variant="outline-info"
+                    size="sm"
+                    onClick={() => onSetFrame(poster)}
+                    title="Upload to CDN"
+                    disabled={poster.framedImageUrl}
+                  >
+                    {poster.framedImageUrl ? "Framed" : "Set Frame"}
                   </Button>
                 )}
               </div>

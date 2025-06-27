@@ -44,9 +44,9 @@ export default function SellerLayout() {
 
   return (
     <div className="bg-light p-3">
-      <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
+      <div className="d-flex gap-3" style={{ height: "calc(100svh - 97px)" }}>
         {!showContentOnMobile && (
-          <div className="bg-light d-flex flex-column gap-3" style={{ minWidth: "300px", flexShrink: 0 }}>
+          <div className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`} style={{ minWidth: "300px", flexShrink: 0 }}>
             <div className="text-center p-4 bg-white shadow-sm">
               <h5 className="mb-0">Seller Dashboard</h5>
             </div>
@@ -55,11 +55,10 @@ export default function SellerLayout() {
                 {navItems.map(({ path, label, icon }) => (
                   <li className="nav-item" key={path}>
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${
-                        isActive(path)
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(path)
                           ? "text-primary bg-light"
                           : "text-dark"
-                      }`}
+                        }`}
                       onClick={() => handleSectionClick(path)}
                     >
                       <span><i className={`bi ${icon} me-2`}></i>{label}</span>
@@ -72,9 +71,8 @@ export default function SellerLayout() {
           </div>
         )}
         <div
-          className={`bg-white shadow-sm flex-grow-1 ${
-            showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
-          }`}
+          className={`bg-white shadow-sm flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+            }`}
           style={{ maxWidth: "100%", overflow: "auto" }}
         >
           <Outlet />

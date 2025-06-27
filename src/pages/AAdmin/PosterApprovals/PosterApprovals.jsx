@@ -1,26 +1,30 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Spinner, Alert } from "react-bootstrap";
-import PosterTable from "./Posters/PosterTable";
-import PosterFilter from "./Posters/PosterFilter";
-import PosterForm from "./Posters/PosterForm";
-import PosterView from "./Posters/PosterView";
-import { useFirebase } from "../../context/FirebaseContext";
+import { Modal, Spinner, Alert, Tabs, Tab } from "react-bootstrap";
+import PosterTable from "../Posters/PosterTable";
+import PosterFilter from "../Posters/PosterFilter";
+import PosterForm from "../Posters/PosterForm";
+import PosterView from "../Posters/PosterView";
+import PosterFrameForm from '../PosterApprovals/PosterFrameForm';
+import { useFirebase } from "../../../context/FirebaseContext";
 import { collection, onSnapshot } from "firebase/firestore";
-import { submitPoster, updateTempPoster, rejectPoster } from "./Posters/adminPosterUtils";
+import { submitPoster, approveTempPoster, rejectPoster } from "../Posters/adminPosterUtils";
 import { ref, getDownloadURL } from "firebase/storage";
-import "bootstrap/dist/css/bootstrap.min.css";
 import { httpsCallable } from "firebase/functions";
+import "bootstrap/dist/css/bootstrap.min.css";
 
 const PosterApprovals = () => {
-  const { firestore,functions, storage, user } = useFirebase();
+  const { firestore, functions, storage, user } = useFirebase();
   const [tempPosters, setTempPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ search: "" });
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showFrameModal, setShowFrameModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [framing, setFraming] = useState(null);
+  const [activeTab, setActiveTab] = useState("pending");
 
   // Fetch tempPosters with image URLs
   useEffect(() => {
@@ -38,6 +42,7 @@ const PosterApprovals = () => {
           id: doc.id,
           ...doc.data(),
           source: "tempPosters",
+          cdnUploaded: doc.data().cdnUploaded || false, // Track CDN upload status
         }));
 
         // Fetch download URLs for tempPosters
@@ -81,6 +86,11 @@ const PosterApprovals = () => {
     setShowViewModal(true);
   };
 
+  const openFrame = (poster) => {
+    setFraming(poster);
+    setShowFrameModal(true);
+  };
+
   const submitPosterHandler = async (data, posterId) => {
     if (!data) {
       setShowEditModal(false);
@@ -101,65 +111,25 @@ const PosterApprovals = () => {
     }
   };
 
-  const updateTempPosterHandler = async (data, posterId) => {
+  const approveTempPosterHandler = async (data, posterId) => {
     if (!data || !editing) {
       setError("No poster selected for update.");
       return;
     }
     try {
-      const result = await updateTempPoster(firestore, storage, data, posterId, user);
+      const result = await approveTempPoster(firestore, storage, data, posterId, user);
       if (result.success) {
+        setTempPosters((prev) =>
+          prev.map((p) => (p.id === posterId ? { ...p, ...data, approved: "approved" } : p))
+        );
         setShowEditModal(false);
         setEditing(null);
       } else {
-        setError("Failed to update poster: " + result.error);
+        setError("Failed to approve poster: " + result.error);
       }
     } catch (error) {
-      console.error("Error updating temp poster:", error);
-      setError("Failed to update temp poster: " + error.message);
-    }
-  };
-
-  // const approvePosterHandler = async (data, posterId) => {
-  //   if (!data || !editing) {
-  //     setError("No poster selected for approval.");
-  //     return;
-  //   }
-  //   try {
-  //     const result = await approvePoster(firestore, storage, data, posterId, user);
-  //     if (result.success) {
-  //       setShowEditModal(false);
-  //       setEditing(null);
-  //     } else {
-  //       setError("Failed to approve poster: " + result.error);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error approving poster:", error);
-  //     setError("Failed to approve poster: " + error.message);
-  //   }
-  // };
-
-  const approvePosterHandler = async (id) => {
-    console.log(id);
-    try {
-      if (!user) {
-        console.error("No authenticated user", { user });
-        setError("User not authenticated");
-        return;
-      }
-      const approvePosterFn = httpsCallable(functions, "approvePoster");
-      const result = await approvePosterFn({ posterId: id });
-
-      if (result.data.success) {
-        setTempPosters((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, approved: "approved" } : p))
-        );
-      } else {
-        setError("Approval failed: " + (result.data.error || "Unknown error"));
-      }
-    } catch (error) {
-      console.error("Approval error", { code: error.code, message: error.message, details: error.details });
-      setError(`Approval failed: ${error.message} (Code: ${error.code})`);
+      console.error("Error approving temp poster:", error);
+      setError("Failed to approve temp poster: " + error.message);
     }
   };
 
@@ -167,6 +137,7 @@ const PosterApprovals = () => {
     try {
       const result = await rejectPoster(firestore, storage, posterId);
       if (result.success) {
+        setTempPosters((prev) => prev.filter((p) => p.id !== posterId));
         setShowEditModal(false);
         setEditing(null);
       } else {
@@ -176,6 +147,38 @@ const PosterApprovals = () => {
       console.error("Error rejecting poster:", error);
       setError("Failed to reject poster: " + error.message);
     }
+  };
+
+
+  const uploadToCDNHandler = async (posterId) => {
+    try {
+      if (!user) {
+        setError("User not authenticated");
+        return;
+      }
+      const uploadToCDN = httpsCallable(functions, "uploadToCDN");
+      const result = await uploadToCDN({ posterId });
+      if (result.data.success) {
+        setTempPosters((prev) =>
+          prev.map((p) =>
+            p.id === posterId ? { ...p, cdnUploaded: true, cdnUrl: result.data.cdnUrl || p.cdnUrl } : p
+          )
+        );
+      } else {
+        setError("Failed to upload to CDN: " + (result.data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("CDN upload error", { code: error.code, message: error.message, details: error.details });
+      setError(`CDN upload failed: ${error.message} (Code: ${error.code})`);
+    }
+  };
+
+  const handleFrameSave = (posterId, framedImageUrl) => {
+    setTempPosters((prev) =>
+      prev.map((p) => (p.id === posterId ? { ...p, framedImageUrl } : p))
+    );
+    setShowFrameModal(false);
+    setFraming(null);
   };
 
   const applySearchFilter = (posterList, search) => {
@@ -189,6 +192,11 @@ const PosterApprovals = () => {
 
   const pendingList = applySearchFilter(
     tempPosters.filter((p) => p.approved === "pending"),
+    filter.search
+  );
+
+  const approvedList = applySearchFilter(
+    tempPosters.filter((p) => p.approved === "approved"),
     filter.search
   );
 
@@ -213,18 +221,41 @@ const PosterApprovals = () => {
           {error}
         </Alert>
       )}
-      <PosterFilter
-        filter={filter}
-        onFilterChange={setFilter}
-        onAdd={() => openEdit(null)}
-        hideApprovedFilter
-      />
-      <PosterTable
-        posters={pendingList}
-        onEdit={openEdit}
-        onView={openView}
-        onReject={rejectPosterHandler}
-      />
+      <Tabs
+        activeKey={activeTab}
+        onSelect={(k) => setActiveTab(k)}
+        id="poster-approvals-tabs"
+        className="mb-3"
+      >
+        <Tab eventKey="pending" title="Pending Posters">
+          <PosterFilter
+            filter={filter}
+            onFilterChange={setFilter}
+            onAdd={() => openEdit(null)}
+            hideApprovedFilter
+          />
+          <PosterTable
+            posters={pendingList}
+            onEdit={openEdit}
+            onView={openView}
+            onReject={rejectPosterHandler}
+          />
+        </Tab>
+        <Tab eventKey="approved" title="Approved Posters">
+          <PosterFilter
+            filter={filter}
+            onFilterChange={setFilter}
+            hideApprovedFilter
+          />
+          <PosterTable
+            posters={approvedList}
+            onEdit={openEdit}
+            onView={openView}
+            onUploadToCDN={uploadToCDNHandler}
+            onSetFrame={openFrame}
+          />
+        </Tab>
+      </Tabs>
 
       <Modal
         show={showEditModal}
@@ -239,11 +270,10 @@ const PosterApprovals = () => {
           <Modal.Title>{editing ? "Edit Poster" : "Add New Poster"}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <PosterForm
+          < rm
             poster={editing}
             onSubmit={submitPosterHandler}
-            onApprove={approvePosterHandler}
-            onUpdateTempPoster={updateTempPosterHandler}
+            onUpdateTempPoster={approveTempPosterHandler}
           />
         </Modal.Body>
       </Modal>
@@ -258,6 +288,31 @@ const PosterApprovals = () => {
         </Modal.Header>
         <Modal.Body>
           {viewing ? <PosterView poster={viewing} /> : <p>No poster selected</p>}
+        </Modal.Body>
+      </Modal>
+
+      <Modal
+        show={showFrameModal}
+        onHide={() => {
+          setShowFrameModal(false);
+          setFraming(null);
+        }}
+        size="lg"
+        backdrop="static"
+      >
+        <Modal.Body>
+          {framing ? (
+            <PosterFrameForm
+              poster={framing}
+              onClose={() => {
+                setShowFrameModal(false);
+                setFraming(null);
+              }}
+              onSave={handleFrameSave}
+            />
+          ) : (
+            <p>No poster selected</p>
+          )}
         </Modal.Body>
       </Modal>
     </div>

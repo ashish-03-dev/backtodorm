@@ -12,7 +12,7 @@ const POSTER_SIZES = {
   "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7 },
 };
 
-const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster,onUpdateTempPoster }) => {
+const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster }) => {
   const {
     state: {
       uploading,
@@ -72,7 +72,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster,onUpdateTempPo
       setIsSellerValid,
       setSellerName,
     },
-  } = usePosterForm({ poster, onSubmit, onApprove,onUpdatePoster, onUpdateTempPoster });
+  } = usePosterForm({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster });
 
   const getImageName = (url) => {
     if (!url) return "No image";
@@ -330,15 +330,26 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster,onUpdateTempPo
             defaultChecked={poster?.isActive !== false}
           />
         </Form.Group>
-        <div className="d-flex justify-content-between">
-          <div className="d-flex gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
-            >
-              {uploading ? "Uploading..." : poster?.approved === "pending" ? "Update Poster" : poster ? "Update Poster" : "Submit Poster"}
-            </Button>
+        <div className="d-flex gap-2">
+            {(!poster || poster.source === "posters") && (
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
+              >
+                {uploading ? "Uploading..." : poster ? "Update Poster" : "Submit Poster"}
+              </Button>
+            )}
+              {/* Show Approve button only for pending tempPosters */}
+              {poster?.approved === "pending" && poster.source === "tempPosters" && (
+                <Button
+                  type="submit"
+                  variant="success"
+                  disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
+                >
+                  Approve
+                </Button>
+              )}
             <Button
               type="button"
               variant="secondary"
@@ -348,17 +359,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster,onUpdateTempPo
               Cancel
             </Button>
           </div>
-          {poster?.approved === "pending" && (
-            <Button
-              type="button"
-              variant="success"
-              onClick={handleApprove}
-              disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
-            >
-              Approve
-            </Button>
-          )}
-        </div>
       </Form>
 
       <Modal show={showCropModal} onHide={() => setShowCropModal(false)}>

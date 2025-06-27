@@ -1,6 +1,10 @@
 import {
   doc,
   getDoc,
+  addDoc,
+  setDoc,
+  collection,
+  deleteDoc,
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
@@ -204,7 +208,7 @@ export const updatePoster = async (
   }
 };
 
-export const updateTempPoster = async (firestore, storage, posterData, posterId) => {
+export const approveTempPoster = async (firestore, storage, posterData, posterId) => {
   try {
     // Validate inputs
     if (!posterData.title) throw new Error("Poster title is required");
@@ -226,7 +230,7 @@ export const updateTempPoster = async (firestore, storage, posterData, posterId)
     const poster = {
       ...posterData,
       updatedAt: serverTimestamp(),
-      approved: posterData.approved || "pending",
+      approved: "approved",
       originalImageUrl: imageUrl,
     };
 
@@ -399,6 +403,94 @@ export const rejectPoster = async (firestore, storage, posterId) => {
     return { success: true };
   } catch (error) {
     console.error("Error rejecting poster:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const saveFramedImage = async (firestore, storage, posterId, imageData, user) => {
+  // try {
+  //   if (!user) throw new Error("User not authenticated");
+  //   const posterRef = doc(firestore, "tempPosters", posterId);
+  //   const framedImageRef = ref(storage, `framedImages/${posterId}_${Date.now()}.png`);
+
+  //   // Upload base64 image to Firebase Storage
+  //   await uploadString(framedImageRef, imageData, "data_url");
+  //   const framedImageUrl = await getDownloadURL(framedImageRef);
+
+  //   // Update tempPosters document with framedImageUrl
+  //   await setDoc(posterRef, { framedImageUrl }, { merge: true });
+
+  //   return { success: true, framedImageUrl };
+  // } catch (error) {
+  //   console.error("Error saving framed image:", error);
+  //   return { success: false, error: error.message };
+  // }
+};
+
+
+
+export const saveFrame = async (firestore, storage, frameData, file, user) => {
+  try {
+    if (!user) throw new Error("User not authenticated");
+    if (!file) throw new Error("No file selected");
+
+    const frameRef = await addDoc(collection(firestore, "frames"), {
+      ...frameData,
+      createdBy: user.uid,
+      createdAt: new Date(),
+    });
+
+    const imageRef = ref(storage, `frames/frame_${frameRef.id}_${Date.now()}.png`);
+    await uploadBytes(imageRef, file);
+    const imageUrl = await getDownloadURL(imageRef);
+
+    await setDoc(frameRef, { imageUrl }, { merge: true });
+
+    return { success: true, id: frameRef.id, imageUrl };
+  } catch (error) {
+    console.error("Error saving frame:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const updateFrame = async (firestore, storage, frameId, frameData, file, user) => {
+  try {
+    if (!user) throw new Error("User not authenticated");
+    const frameRef = doc(firestore, "frames", frameId);
+
+    let imageUrl = frameData.imageUrl;
+    if (file) {
+      const imageRef = ref(storage, `frames/frame_${frameId}_${Date.now()}.png`);
+      await uploadBytes(imageRef, file);
+      imageUrl = await getDownloadURL(imageRef);
+    }
+
+    await setDoc(frameRef, {
+      ...frameData,
+      imageUrl,
+      updatedBy: user.uid,
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    return { success: true, imageUrl };
+  } catch (error) {
+    console.error("Error updating frame:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteFrame = async (firestore, storage, frameId) => {
+  try {
+    const frameRef = doc(firestore, "frames", frameId);
+    const frameSnap = await getDoc(frameRef);
+    if (frameSnap.exists() && frameSnap.data().imageUrl) {
+      const imageRef = ref(storage, frameSnap.data().imageUrl);
+      await deleteObject(imageRef).catch((err) => console.warn("Failed to delete image:", err));
+    }
+    await deleteDoc(frameRef);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting frame:", error);
     return { success: false, error: error.message };
   }
 };

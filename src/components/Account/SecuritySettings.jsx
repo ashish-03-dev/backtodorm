@@ -47,7 +47,7 @@ export default function SecuritySettings() {
         </div>
       )}
 
-      <div style={{ minHeight: "22rem" }}></div>
+      <div style={{ minHeight: "1rem" }}></div>
 
       {user?.metadata?.lastSignInTime && (
         <div className="mb-0" aria-label="Last login time">

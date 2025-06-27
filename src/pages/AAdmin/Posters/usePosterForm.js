@@ -28,7 +28,7 @@ const normalizeCollection = (text) => {
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 };
 
-export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onUpdateTempPoster }) => {
+export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster }) => {
   const { firestore, storage, auth } = useFirebase();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -527,7 +527,7 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onU
         await onUpdatePoster(data, posterId);
       } else if (poster.source === "tempPosters") {
         // Update temp poster
-        await onUpdateTempPoster(data, posterId);
+        await onApproveTempPoster(data, posterId);
       }
     } catch (err) {
       setError(`Failed to submit poster: ${err.message}`);
