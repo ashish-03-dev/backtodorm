@@ -152,7 +152,7 @@ function CollectionCard({ title, link, image }) {
       >
         <img
           src={image}
-          alt={`${title} image`}
+          alt={title}
           style={{
             height: '17rem',
             objectFit: 'cover',

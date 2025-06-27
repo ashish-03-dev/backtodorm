@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFirebase } from "../context/FirebaseContext";
 
-export default function PhoneLogin() {
+export default function Login() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,9 +25,10 @@ export default function PhoneLogin() {
       await setUpRecaptcha("recaptcha-container", phone);
       setStep(2);
     } catch (err) {
-      alert("Failed to send OTP: " + err.message);
+      alert(`Failed to send OTP: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleOtpSubmit = async (e) => {
@@ -37,15 +38,22 @@ export default function PhoneLogin() {
       await verifyOtp(otp);
       navigate("/");
     } catch (err) {
-      if (err.code === "auth/invalid-verification-code") {
-        alert("The OTP is incorrect. Please try again.");
-      } else if (err.code === "auth/code-expired") {
-        alert("OTP has expired. Please request a new one.");
-      } else {
-        alert("Verification failed: " + err.message);
+      const errorMessages = {
+        "auth/invalid-verification-code": "The OTP is incorrect. Please try again.",
+        "auth/code-expired": "OTP has expired. Please request a new one.",
+        "auth/too-many-requests": "Too many attempts. Please wait and try again later.",
+        "auth/invalid-verification-id": "Verification session expired. Please request a new OTP.",
+      };
+      alert(errorMessages[err.code] || `Verification failed: ${err.message}`);
+      if (err.code === "auth/code-expired" || err.code === "auth/invalid-verification-id") {
+        setStep(1);
+        setOtp("");
+        const container = document.getElementById("recaptcha-container");
+        if (container) container.innerHTML = "";
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
@@ -55,8 +63,17 @@ export default function PhoneLogin() {
     } catch (err) {
       if (err.code !== "auth/popup-closed-by-user") {
         console.error("Google login failed:", err.message);
+        alert(`Google login failed: ${err.message}`);
       }
     }
+  };
+
+  const handleCancel = () => {
+    setPhone("");
+    setOtp("");
+    setStep(1);
+    const container = document.getElementById("recaptcha-container");
+    if (container) container.innerHTML = "";
   };
 
   return (
@@ -97,7 +114,6 @@ export default function PhoneLogin() {
                   maxLength="10"
                 />
               </div>
-
             </div>
             <div id="recaptcha-container" className="mb-3"></div>
             <button type="submit" className="btn btn-danger w-100" disabled={loading}>
@@ -119,9 +135,19 @@ export default function PhoneLogin() {
                 required
               />
             </div>
-            <button type="submit" className="btn btn-danger w-100" disabled={loading}>
-              {loading ? "Verifying..." : "Verify OTP"}
-            </button>
+            <div className="d-flex gap-2">
+              <button type="submit" className="btn btn-danger w-100" disabled={loading}>
+                {loading ? "Verifying..." : "Verify OTP"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary w-100"
+                onClick={handleCancel}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         )}
 

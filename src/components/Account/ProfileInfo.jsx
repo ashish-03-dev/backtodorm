@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Navigate } from 'react-router-dom';
 import { useFirebase } from "../../context/FirebaseContext";
-import { updateProfile, updateEmail } from 'firebase/auth';
+import { updateProfile } from 'firebase/auth';
 
 export default function ProfileInfo() {
-  const { auth, user, userData, verifyOtp, loadingUserData, updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
+  const { auth, user, userData, loadingUserData, updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount, confirmationResult } = useFirebase();
   const [tempName, setTempName] = useState(userData?.name || "");
   const [editingName, setEditingName] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
@@ -12,7 +12,6 @@ export default function ProfileInfo() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState(null);
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
 
   const handleSaveName = async () => {
@@ -40,48 +39,46 @@ export default function ProfileInfo() {
       window.location.reload();
     } catch (err) {
       console.error("Failed to link Google account:", err);
+      alert("Failed to link Google account: " + err.message);
     } finally {
       setIsLinkingGoogle(false);
     }
   };
 
-
   const handleSendOtp = async () => {
     try {
       console.log("Starting OTP send for:", phoneInput);
       setSendingOtp(true);
-
-      const confirmation = await setUpRecaptcha("recaptcha-container", phoneInput);
-      console.log("OTP sent. Confirmation result:", confirmation);
-
-      setConfirmationResult(confirmation);
+      await setUpRecaptcha("recaptcha-container", phoneInput); // Sets confirmationResult in FirebaseProvider
       setOtpSent(true);
     } catch (err) {
       console.error("Failed to send OTP:", err);
-      // alert(`Failed to send OTP: ${err.message}`);
+      alert(`Failed to send OTP: ${err.message}`);
     } finally {
       setSendingOtp(false);
     }
   };
 
-
   const handleVerifyOtp = async () => {
     try {
-      console.log(user.phoneNumber);
-      const result = await verifyOtp(confirmationResult, otp);
+      if (!confirmationResult) throw new Error('No OTP confirmation available');
+      if (!user) throw new Error('User not signed in');
+      
+      console.log('Current user phone:', user.phoneNumber);
       await linkPhoneNumber(confirmationResult.verificationId, otp);
       setEditingPhone(false);
       setOtpSent(false);
       setOtp("");
-      // window.location.reload(); // 🔄 Reload to reflect the linked phone
+      alert('Phone number linked successfully!');
     } catch (err) {
       const errorMessages = {
-        "auth/invalid-verification-code": "Invalid OTP. Please try again.",
-        "auth/code-expired": "OTP expired. Please resend and try again.",
-        "auth/too-many-requests": "Too many attempts. Please wait and try again later.",
-        "auth/invalid-verification-id": "Verification session expired. Please resend OTP.",
+        'auth/invalid-verification-code': 'Invalid OTP. Please try again.',
+        'auth/code-expired': 'OTP expired. Please resend and try again.',
+        'auth/too-many-requests': 'Too many attempts. Please wait and try again later.',
+        'auth/invalid-verification-id': 'Verification session expired. Please resend OTP.',
+        'auth/credential-already-in-use': 'This phone number is already linked with another account.',
       };
-      alert(errorMessages[err.code] || err.message || "Something went wrong while verifying.");
+      alert(errorMessages[err.code] || err.message || 'Something went wrong while verifying.');
     }
   };
 
@@ -96,10 +93,8 @@ export default function ProfileInfo() {
     return <Navigate to="/login" />;
   }
 
-
   return (
     <div className="d-flex flex-column h-100">
-
       {isLinkingGoogle && (
         <div
           style={{
@@ -169,8 +164,9 @@ export default function ProfileInfo() {
           <button
             className="btn btn-sm btn-outline-primary mt-3"
             onClick={handleLinkGoogle}
+            disabled={isLinkingGoogle}
           >
-            Link Google Account
+            {isLinkingGoogle ? 'Linking...' : 'Link Google Account'}
           </button>
         )}
       </div>
@@ -206,19 +202,14 @@ export default function ProfileInfo() {
                 >
                   {sendingOtp ? 'Sending OTP...' : 'Send OTP'}
                 </button>
-
                 <button
                   className="btn btn-sm btn-secondary"
                   disabled={sendingOtp}
-                  onClick={() => {
-                    setEditingPhone(false);
-                    setPhoneInput("");
-                  }}
+                  onClick={handleCancelPhone}
                 >
                   Cancel
                 </button>
               </div>
-
             ) : (
               <>
                 <input
@@ -232,6 +223,7 @@ export default function ProfileInfo() {
                   <button
                     className="btn btn-sm btn-primary"
                     onClick={handleVerifyOtp}
+                    disabled={!otp}
                   >
                     Verify
                   </button>

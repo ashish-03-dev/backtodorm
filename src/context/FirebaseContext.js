@@ -8,12 +8,8 @@ import {
   RecaptchaVerifier,
   GoogleAuthProvider,
   linkWithPopup,
-  updateProfile,
-  updateEmail,
   PhoneAuthProvider,
   linkWithCredential,
-  initializeAuth,
-  browserLocalPersistence,
 } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
@@ -26,14 +22,14 @@ export const useFirebase = () => useContext(FirebaseContext);
 
 export const FirebaseProvider = ({ children }) => {
   const auth = getAuth(app);
-  if (window.location.hostname === "localhost") {
-  console.log("auth.settings:", auth.settings);
-  auth.settings.appVerificationDisabledForTesting = true;
-}
   const firestore = getFirestore(app);
   const database = getDatabase(app);
   const storage = getStorage(app);
   const functions = getFunctions(app, 'us-central1');
+
+  if (window.location.hostname === 'localhost') {
+    auth.settings.appVerificationDisabledForTesting = true;
+  }
 
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -50,12 +46,10 @@ export const FirebaseProvider = ({ children }) => {
           const userRef = doc(firestore, 'users', currentUser.uid);
           const snapshot = await getDoc(userRef);
           if (snapshot.exists()) {
-            const data = snapshot.data();
-            setUserData(data);
+            setUserData(snapshot.data());
           } else {
             const nameToUse = currentUser.displayName || '';
             await httpsCallable(functions, 'updateUser')({ name: nameToUse });
-            console.log("this is called");
             const newSnapshot = await getDoc(userRef);
             if (newSnapshot.exists()) {
               setUserData({
@@ -101,56 +95,38 @@ export const FirebaseProvider = ({ children }) => {
 
   const logout = () => signOut(auth);
 
-const setUpRecaptcha = async (containerId, phoneNumber) => {
-  try {
-    console.log("Setting up reCAPTCHA for", phoneNumber);
+  const setUpRecaptcha = async (containerId, phoneNumber) => {
+    try {
+      const auth = getAuth();
+      if (!auth) throw new Error("Firebase Auth not initialized");
 
-    const auth = getAuth();
-    if (!auth) {
-      throw new Error("Firebase Auth not initialized");
+      const container = document.getElementById(containerId);
+      if (!container) throw new Error(`Container ${containerId} not found`);
+
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
+        container.innerHTML = '';
+      }
+
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: "invisible",
+        callback: (response) => console.log("reCAPTCHA solved:", response),
+        "expired-callback": () => { throw new Error("reCAPTCHA expired"); }
+      });
+
+      await window.recaptchaVerifier.render();
+
+      const phone = `+91${phoneNumber}`;
+      if (!phone.match(/^\+\d{11,12}$/)) throw new Error("Invalid phone number");
+
+      const result = await signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
+      setConfirmationResult(result);
+      return result;
+    } catch (err) {
+      throw new Error(`Recaptcha failed: ${err.message}`);
     }
-
-    const container = document.getElementById(containerId);
-    if (!container) {
-      throw new Error(`Container with ID ${containerId} not found`);
-    }
-
-    // Clear previous reCAPTCHA
-    if (window.recaptchaVerifier) {
-      console.log("Clearing existing recaptchaVerifier");
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = null;
-      container.innerHTML = ''; // Reset container
-    }
-
-    console.log("Creating new RecaptchaVerifier...");
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-      size: "invisible",
-      callback: (response) => console.log("reCAPTCHA solved, token:", response),
-      "expired-callback": () => {
-        console.warn("reCAPTCHA expired");
-        throw new Error("reCAPTCHA expired, please try again");
-      },
-    });
-
-    console.log("Rendering reCAPTCHA...");
-    await window.recaptchaVerifier.render();
-
-    console.log("Sending OTP...");
-    const formattedPhoneNumber = `+91${phoneNumber}`;
-    if (!formattedPhoneNumber.match(/^\+\d{11,12}$/)) {
-      throw new Error("Invalid phone number format");
-    }
-
-    const result = await signInWithPhoneNumber(auth, formattedPhoneNumber, window.recaptchaVerifier);
-    console.log("OTP sent:", result);
-    setConfirmationResult(result);
-    return result;
-  } catch (err) {
-    console.error("Recaptcha setup failed:", err?.message || err, err);
-    throw new Error(`Recaptcha setup failed: ${err?.message || err}`);
-  }
-};
+  };
 
   const verifyOtp = (otp) => {
     if (!confirmationResult) throw new Error('No OTP confirmation available');
@@ -177,12 +153,9 @@ const setUpRecaptcha = async (containerId, phoneNumber) => {
 
   const linkGoogleAccount = async () => {
     if (!auth.currentUser) throw new Error('User not signed in');
-
     try {
       const result = await linkWithPopup(auth.currentUser, new GoogleAuthProvider());
-      const googleProvider = result.user.providerData.find(p => p.providerId === "google.com");
-
-      return googleProvider;
+      return result.user.providerData.find(p => p.providerId === "google.com");
     } catch (err) {
       const msg = {
         'auth/credential-already-in-use': "This Google account is already linked with another user.",
@@ -192,12 +165,10 @@ const setUpRecaptcha = async (containerId, phoneNumber) => {
     }
   };
 
-
   const deactivateUserAccount = async () => {
     if (!auth.currentUser) throw new Error('User not signed in');
-    const user = auth.currentUser;
     try {
-      const userRef = doc(firestore, 'users', user.uid);
+      const userRef = doc(firestore, 'users', auth.currentUser.uid);
       await setDoc(userRef, { isActive: false, deactivatedAt: new Date().toISOString() }, { merge: true });
       await signOut(auth);
     } catch (err) {
@@ -228,6 +199,7 @@ const setUpRecaptcha = async (containerId, phoneNumber) => {
         checkUsernameAvailability,
         error,
         app,
+        confirmationResult,
       }}
     >
       {children}
