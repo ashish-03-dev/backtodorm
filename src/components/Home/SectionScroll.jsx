@@ -67,9 +67,9 @@ export default function SectionScroll({ sectionId, title, firestore }) {
               const badges = Array.isArray(data.badges) ? data.badges : [];
               const minPriceSize = sizes.length
                 ? sizes.reduce(
-                    (min, size) => (size.finalPrice < min.finalPrice ? size : min),
-                    sizes[0]
-                  )
+                  (min, size) => (size.finalPrice < min.finalPrice ? size : min),
+                  sizes[0]
+                )
                 : { price: 0, finalPrice: 0, size: '' };
 
               return {
@@ -189,7 +189,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <h2 className="fs-2 fw-bold mb-4">{title}</h2>
+      <h2 className="fs-2 fw-bold mb-4 text-center">{title}</h2>
 
       {isHovered && posters.length > 0 && (
         <>
@@ -297,10 +297,15 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                       </div>
                     )}
                   </div>
-                  <div className="py-3 d-flex flex-column text-center">
+                  <div className="pt-3 d-flex flex-column text-center">
                     <h6
-                      className="card-title mb-1 px-2 text-center text-truncate-2-lines"
-                      style={{ fontSize: '.92rem', minHeight: '2.2rem' }}
+                      className="card-title mb-2 px-2 text-truncate"
+                      style={{
+                        fontSize: '.95rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
                       title={item.title}
                     >
                       {item.title}
