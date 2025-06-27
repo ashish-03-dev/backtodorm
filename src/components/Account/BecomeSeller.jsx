@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { httpsCallable } from 'firebase/functions';
 
 export default function BecomeSeller() {
-  const { user, functions, userData, checkUsernameAvailability } = useFirebase();
+  const { functions, userData, checkUsernameAvailability } = useFirebase();
   const navigate = useNavigate();
   const [sellerUsername, setSellerUsername] = useState("@");
   const [error, setError] = useState("");
@@ -25,8 +25,10 @@ export default function BecomeSeller() {
   };
 
   const handleCheckUsername = async () => {
-    if (sellerUsername.length <= 1) {
-      setError("Username must contain at least one character after @");
+    // Check if username (excluding "@") is at least 6 characters
+    const usernameWithoutAt = sellerUsername.slice(1); // Remove "@" for length check
+    if (usernameWithoutAt.length < 6) {
+      setError("Username must be at least 6 characters long (excluding @)");
       return;
     }
     setLoading(true);
@@ -52,16 +54,14 @@ export default function BecomeSeller() {
     setLoading(true);
     setError("");
     try {
-      console.log(user);
       const becomeSellerFunction = httpsCallable(functions, 'becomeSeller');
       await becomeSellerFunction({ sellerUsername });
-      navigate("/seller");
+      navigate("/seller/dashboard");
     } catch (err) {
       setError(err.message || "Failed to become a seller");
       setLoading(false);
     }
   };
-
 
   if (userData?.isSeller) {
     return (
@@ -96,7 +96,7 @@ export default function BecomeSeller() {
               type="button"
               className="btn btn-outline-secondary"
               onClick={handleCheckUsername}
-              disabled={loading || sellerUsername.length <= 1}
+              disabled={loading || sellerUsername.length <= 6} // Updated to reflect min length
             >
               {loading ? "Checking..." : "Check Availability"}
             </button>

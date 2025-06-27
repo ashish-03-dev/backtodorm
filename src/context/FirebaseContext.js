@@ -49,14 +49,11 @@ export const FirebaseProvider = ({ children }) => {
             setUserData(snapshot.data());
           } else {
             const nameToUse = currentUser.displayName || '';
+            console.log(currentUser);
             await httpsCallable(functions, 'updateUser')({ name: nameToUse });
             const newSnapshot = await getDoc(userRef);
             if (newSnapshot.exists()) {
-              setUserData({
-                ...newSnapshot.data(),
-                isAdmin: newSnapshot.data().isAdmin ?? false,
-                isActive: newSnapshot.data().isActive ?? true,
-              });
+              setUserData(newSnapshot.data());
             }
           }
         } else {
@@ -79,17 +76,21 @@ export const FirebaseProvider = ({ children }) => {
     return fn(data);
   };
 
-  const checkUsernameAvailability = async (username) => {
-    if (!username.startsWith('@') || username.length < 2) {
-      return { available: false, message: 'Username must start with @ and contain at least one character' };
-    }
-    const q = query(collection(firestore, 'users'), where('sellerUsername', '==', username));
-    const querySnapshot = await getDocs(q);
-    return {
-      available: querySnapshot.empty,
-      message: querySnapshot.empty ? 'Username is available' : 'Username is already taken',
-    };
+const checkUsernameAvailability = async (username) => {
+  if (!username.startsWith('@') || username.length < 2) {
+    return {available: false,message: 'Username must start with @ and contain at least one character',};
+  }
+
+  const docRef = doc(firestore, 'sellers', username);
+  const docSnap = await getDoc(docRef);
+
+  return {
+    available: !docSnap.exists(),
+    message: docSnap.exists()
+      ? 'Username is already taken'
+      : 'Username is available',
   };
+};
 
   const putData = (key, data) => set(ref(database, key), data);
 
