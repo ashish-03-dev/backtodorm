@@ -4,7 +4,7 @@ import { useFirebase } from "../../context/FirebaseContext";
 import { updateProfile, updateEmail } from 'firebase/auth';
 
 export default function ProfileInfo() {
-  const { auth, user, userData, loadingUserData, updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
+  const { auth, user, userData, verifyOtp, loadingUserData, updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount } = useFirebase();
   const [tempName, setTempName] = useState(userData?.name || "");
   const [editingName, setEditingName] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
