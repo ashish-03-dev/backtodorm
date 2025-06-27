@@ -46,29 +46,30 @@ export default function ProfileInfo() {
   };
 
 
-const handleSendOtp = async () => {
-  try {
-    console.log("Starting OTP send for:", phoneInput);
-    setSendingOtp(true);
+  const handleSendOtp = async () => {
+    try {
+      console.log("Starting OTP send for:", phoneInput);
+      setSendingOtp(true);
 
-    const confirmation = await setUpRecaptcha("recaptcha-container", phoneInput);
-    console.log("OTP sent. Confirmation result:", confirmation);
+      const confirmation = await setUpRecaptcha("recaptcha-container", phoneInput);
+      console.log("OTP sent. Confirmation result:", confirmation);
 
-    setConfirmationResult(confirmation);
-    setOtpSent(true);
-  } catch (err) {
-    console.error("Failed to send OTP:", err);
-    // alert(`Failed to send OTP: ${err.message}`);
-  } finally {
-    setSendingOtp(false);
-  }
-};
+      setConfirmationResult(confirmation);
+      setOtpSent(true);
+    } catch (err) {
+      console.error("Failed to send OTP:", err);
+      // alert(`Failed to send OTP: ${err.message}`);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
 
   const handleVerifyOtp = async () => {
     try {
       console.log(user.phoneNumber);
-      const result = await linkPhoneNumber(confirmationResult.verificationId, otp);
+      const result = await verifyOtp(confirmationResult, otp);
+      await linkPhoneNumber(confirmationResult.verificationId, otp);
       setEditingPhone(false);
       setOtpSent(false);
       setOtp("");

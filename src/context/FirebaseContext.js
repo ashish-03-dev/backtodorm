@@ -144,6 +144,7 @@ const setUpRecaptcha = async (containerId, phoneNumber) => {
 
     const result = await signInWithPhoneNumber(auth, formattedPhoneNumber, window.recaptchaVerifier);
     console.log("OTP sent:", result);
+    setConfirmationResult(result);
     return result;
   } catch (err) {
     console.error("Recaptcha setup failed:", err?.message || err, err);
