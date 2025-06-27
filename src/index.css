@@ -10,7 +10,7 @@ html {
 /* Smaller font size for mobile */
 @media (max-width: 768px) {
   html {
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 

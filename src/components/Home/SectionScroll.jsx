@@ -189,7 +189,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <h2 className="fs-2 fw-bold mb-4 text-center">{title}</h2>
+      <h2 className="fs-2 fw-bold mb-4">{title}</h2>
 
       {isHovered && posters.length > 0 && (
         <>
@@ -297,11 +297,11 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                       </div>
                     )}
                   </div>
-                  <div className="pt-3 d-flex flex-column text-center">
+                  <div className="pt-3 px-2 d-flex flex-column text-center">
                     <h6
-                      className="card-title mb-2 px-2 text-truncate"
+                      className="card-title mb-1 text-truncate"
                       style={{
-                        fontSize: '.95rem',
+                        fontSize: '.92rem',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -316,7 +316,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                     >
                       Size: {item.defaultSize || 'N/A'}
                     </p>
-                    <p
+                    <div
                       className="price-text mb-2"
                       style={{
                         fontSize: window.innerWidth <= 576 ? '15px' : '17px',
@@ -324,16 +324,24 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                       }}
                     >
                       {item.discount > 0 ? (
-                        <>
-                          <span className="text-muted text-decoration-line-through me-2">
-                            ₹{item.price.toLocaleString('en-IN')}
+                        <div className="d-flex align-items-center justify-content-center flex-wrap">
+                          <span className="text-danger fw-semibold me-2">
+                            ↓ {item.discount}%
                           </span>
-                          <span>₹{item.finalPrice.toLocaleString('en-IN')} ({item.discount}% off)</span>
-                        </>
+                          <h6 className="text-muted text-decoration-line-through mb-0 me-2">
+                            ₹{item.price.toLocaleString('en-IN')}
+                          </h6>
+                          <h6 className="text-success mb-0" style={{ fontSize: '1rem' }}>
+                            ₹{item.finalPrice.toLocaleString('en-IN')}
+                          </h6>
+                        </div>
                       ) : (
-                        <span>₹{item.finalPrice.toLocaleString('en-IN')}</span>
+                        <h6 className="text-muted mb-0">
+                          From <span className='fw-semibold'>₹{item.finalPrice.toLocaleString('en-IN')}</span>
+                        </h6>
                       )}
-                    </p>
+
+                    </div>
                   </div>
                 </Link>
                 <button

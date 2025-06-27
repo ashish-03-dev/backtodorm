@@ -1,20 +1,26 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from "react-router-dom";
 import { useFirebase } from "../context/FirebaseContext";
 
 export default function PhoneLogin() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [tempName, setTempName] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const navigate = useNavigate();
 
-  const { setUpRecaptcha, verifyOtp, googleLogin, updateUser } = useFirebase();
+  const { setUpRecaptcha, verifyOtp, googleLogin } = useFirebase();
 
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    if (!/^[0-9]{10}$/.test(phone)) {
+      alert("Please enter a valid 10-digit phone number.");
+      setLoading(false);
+      return;
+    }
+
     try {
       await setUpRecaptcha("recaptcha-container", phone);
       setStep(2);
@@ -29,33 +35,15 @@ export default function PhoneLogin() {
     setLoading(true);
     try {
       await verifyOtp(otp);
-      setStep(3); // Move to name entry step
+      navigate("/");
     } catch (err) {
-      alert("Invalid OTP: " + err.message);
-    }
-    setLoading(false);
-  };
-
-  const handleNameSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (tempName.trim()) {
-        await updateUser({ name: tempName });
+      if (err.code === "auth/invalid-verification-code") {
+        alert("The OTP is incorrect. Please try again.");
+      } else if (err.code === "auth/code-expired") {
+        alert("OTP has expired. Please request a new one.");
+      } else {
+        alert("Verification failed: " + err.message);
       }
-      navigate("/"); // Redirect after name submission or skip
-    } catch (err) {
-      alert("Failed to update name: " + err.message);
-    }
-    setLoading(false);
-  };
-
-  const handleSkipName = async () => {
-    setLoading(true);
-    try {
-      navigate("/"); // Redirect without updating name
-    } catch (err) {
-      alert("Error: " + err.message);
     }
     setLoading(false);
   };
@@ -63,9 +51,11 @@ export default function PhoneLogin() {
   const handleGoogleLogin = async () => {
     try {
       await googleLogin();
-      navigate("/"); // Redirect after Google login
+      navigate("/");
     } catch (err) {
-      alert("Google login failed: " + err.message);
+      if (err.code !== "auth/popup-closed-by-user") {
+        console.error("Google login failed:", err.message);
+      }
     }
   };
 
@@ -82,28 +72,32 @@ export default function PhoneLogin() {
                 height: "50px",
                 marginRight: "10px",
                 borderRadius: "50%",
-                objectFit: "cover"
+                objectFit: "cover",
               }}
             />
           </a>
           <h4 className="fw-bold mt-3">Welcome</h4>
-          <p className="text-muted">
-            {step === 3 ? "Enter your name (optional)" : "Sign in with your phone number"}
-          </p>
+          <p className="text-muted">Sign in with your phone number</p>
         </div>
 
         {step === 1 && (
           <form onSubmit={handlePhoneSubmit}>
             <div className="mb-3">
               <label className="form-label">Phone Number</label>
-              <input
-                type="tel"
-                className="form-control"
-                placeholder="Enter 10-digit number"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
+              <div className="input-group">
+                <span className="input-group-text bg-light border-end-0">+91</span>
+                <input
+                  type="tel"
+                  className="form-control border-start-0"
+                  placeholder="Enter 10-digit number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  pattern="[0-9]{10}"
+                  maxLength="10"
+                />
+              </div>
+
             </div>
             <div id="recaptcha-container" className="mb-3"></div>
             <button type="submit" className="btn btn-danger w-100" disabled={loading}>
@@ -131,47 +125,15 @@ export default function PhoneLogin() {
           </form>
         )}
 
-        {step === 3 && (
-          <form onSubmit={handleNameSubmit}>
-            <div className="mb-3">
-              <label className="form-label">Your Name (Optional)</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Enter your name"
-                value={tempName}
-                onChange={(e) => setTempName(e.target.value)}
-              />
-            </div>
-            <div className="d-flex gap-2">
-              <button type="submit" className="btn btn-danger w-50" disabled={loading}>
-                {loading ? "Saving..." : "Save Name"}
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline-secondary w-50"
-                onClick={handleSkipName}
-                disabled={loading}
-              >
-                Later
-              </button>
-            </div>
-          </form>
-        )}
-
-        {step !== 3 && (
-          <>
-            <div className="text-center my-3">OR</div>
-            <button onClick={handleGoogleLogin} className="btn border w-100 mb-4">
-              <img
-                src="https://developers.google.com/identity/images/g-logo.png"
-                alt="Google"
-                style={{ width: "20px", marginRight: "10px" }}
-              />
-              Continue with Google
-            </button>
-          </>
-        )}
+        <div className="text-center my-3">OR</div>
+        <button onClick={handleGoogleLogin} className="btn border w-100 mb-4">
+          <img
+            src="https://developers.google.com/identity/images/g-logo.png"
+            alt="Google"
+            style={{ width: "20px", marginRight: "10px" }}
+          />
+          Continue with Google
+        </button>
 
         <p className="mb-0 text-center" style={{ fontSize: ".90em" }}>
           By continuing, you agree to our <Link to="/terms-and-conditions">Terms & Conditions</Link>

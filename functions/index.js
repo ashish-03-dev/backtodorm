@@ -57,7 +57,8 @@ exports.updateUser = onCall(
     timeoutSeconds: 60,
     concurrency: 80,
   },
-  async ({ data: { name }, auth }) => {
+  async ({ data = {}, auth }) => {
+    const { name } = data;
     if (!auth || !auth.uid) {
       throw new HttpsError('unauthenticated', 'User must be authenticated');
     }
@@ -75,7 +76,7 @@ exports.updateUser = onCall(
         const userDoc = await transaction.get(userRef);
         const userData = {
           uid: userId,
-          name: name ? name.trim() : (userDoc.exists ? userDoc.data().name : auth.token.name || 'Anonymous'),
+          name: name ? name.trim() : (userDoc.exists ? userDoc.data().name : auth.token.name || ''),
           email: auth.token.email || null,
           phone: auth.token.phone_number || null,
           photoURL: auth.token.picture || '',
