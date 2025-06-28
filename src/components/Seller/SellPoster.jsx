@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Form, Button, Alert, Modal, ProgressBar, Spinner } from "react-bootstrap";
 import { collection, getDocs, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
@@ -15,7 +14,7 @@ const POSTER_SIZES = {
   "A3*3": { widthPx: 3508 * 3, heightPx: 4961, aspectRatio: (3508 * 3) / 4961 },
 };
 
-function SellerPosterForm({ onSave }) {
+export default function SellYourPoster({ onSave }) {
   const { firestore, storage, user } = useFirebase();
   const [formData, setFormData] = useState({
     title: "",
@@ -42,9 +41,8 @@ function SellerPosterForm({ onSave }) {
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
   const imgRef = useRef(null);
   const fileInputRef = useRef(null);
-  const IMAGE_QUALITY = 0.9; // JPEG quality for compression
+  const IMAGE_QUALITY = 0.9;
 
-  // Fetch user data and collections
   useEffect(() => {
     const fetchData = async () => {
       if (!user || !firestore) {
@@ -67,7 +65,6 @@ function SellerPosterForm({ onSave }) {
     fetchData();
   }, [firestore, user]);
 
-  // Handle image change
   const handleImageChange = (e) => {
     if (!selectedSize || !POSTER_SIZES[selectedSize]) {
       setError("Please select a size in the size field before uploading an image.");
@@ -135,7 +132,6 @@ function SellerPosterForm({ onSave }) {
     reader.readAsDataURL(file);
   };
 
-  // Switch to recommended size
   const handleSwitchSize = () => {
     if (recommendedSize && formData.sizes.length === 1) {
       handleSizeChange(0, recommendedSize);
@@ -143,7 +139,6 @@ function SellerPosterForm({ onSave }) {
     }
   };
 
-  // Clear image
   const handleClearImage = () => {
     setFormData((prev) => ({ ...prev, imageFile: null }));
     setImageSrc(null);
@@ -157,7 +152,6 @@ function SellerPosterForm({ onSave }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Rotate image
   const handleRotate = () => {
     if (!imgRef.current || !originalImageSrc || !selectedSize || !POSTER_SIZES[selectedSize]) return;
     const img = new Image();
@@ -177,7 +171,7 @@ function SellerPosterForm({ onSave }) {
       ctx.rotate((newRotation * Math.PI) / 180);
       ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-      setImageSrc(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+      setImageSrc(canvas.toDataURL("image/jpeg",).toDataURL("image/jpeg", IMAGE_QUALITY));
       setCrop(
         centerCrop(
           makeAspectCrop(
@@ -196,7 +190,6 @@ function SellerPosterForm({ onSave }) {
     img.src = originalImageSrc;
   };
 
-  // Handle crop completion
   const handleCropComplete = async () => {
     if (!imgRef.current || !crop?.width || !crop?.height || crop.width < 10 || crop.height < 10 || !selectedSize || !POSTER_SIZES[selectedSize]) {
       setError("Invalid crop region or size selection. Please select a valid size and crop area.");
@@ -221,7 +214,7 @@ function SellerPosterForm({ onSave }) {
 
       await new Promise((resolve, reject) => {
         canvas.toBlob(
-          (blob) => {
+          (blob) =>{
             if (!blob) {
               reject(new Error("Failed to generate cropped image."));
               return;
@@ -248,7 +241,6 @@ function SellerPosterForm({ onSave }) {
     }
   };
 
-  // Handle size change
   const handleSizeChange = (index, value) => {
     const updatedSizes = [...formData.sizes];
     updatedSizes[index] = { size: value in POSTER_SIZES ? value : "" };
@@ -263,7 +255,6 @@ function SellerPosterForm({ onSave }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Add size
   const addSize = () => {
     if (formData.sizes.every((s) => s.size in POSTER_SIZES)) {
       setFormData((prev) => ({ ...prev, sizes: [...prev.sizes, { size: "" }] }));
@@ -273,7 +264,6 @@ function SellerPosterForm({ onSave }) {
     }
   };
 
-  // Remove size
   const removeSize = (index) => {
     if (formData.sizes.length > 1) {
       const newSizes = formData.sizes.filter((_, i) => i !== index);
@@ -284,7 +274,6 @@ function SellerPosterForm({ onSave }) {
     }
   };
 
-  // Simplify tags before submission
   const simplifyTags = (tags) => {
     return tags
       .split(",")
@@ -292,7 +281,6 @@ function SellerPosterForm({ onSave }) {
       .filter(Boolean);
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -380,9 +368,14 @@ function SellerPosterForm({ onSave }) {
   };
 
   return (
-    <div style={{ margin: "0 auto" }}>
+    <div className="p-4 p-md-5">
+      <h4 className="mb-4">Sell Your Poster</h4>
       <Form onSubmit={handleSubmit}>
-        {error && <Alert variant="danger" onClose={() => setError("")} dismissible>{error}</Alert>}
+        {error && (
+          <Alert variant="danger" onClose={() => setError("")} dismissible>
+            {error}
+          </Alert>
+        )}
         <Form.Group className="mb-3">
           <Form.Label>Title</Form.Label>
           <Form.Control
@@ -455,15 +448,15 @@ function SellerPosterForm({ onSave }) {
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Image</Form.Label>
-          <div className="position-relative" style={{ maxWidth: "100%" }}>
+          <div className="position-relative">
             <Form.Control
               type="file"
               accept="image/*"
               onChange={handleImageChange}
               required
               ref={fileInputRef}
-              style={{ paddingRight: formData.imageFile ? "60px" : undefined }}
               disabled={submitting || !selectedSize || !POSTER_SIZES[selectedSize]}
+              style={{ paddingRight: formData.imageFile ? "60px" : undefined }}
             />
             {formData.imageFile && (
               <span
@@ -573,7 +566,11 @@ function SellerPosterForm({ onSave }) {
                 >
                   Apply Crop
                 </Button>
-                <Button variant="secondary" onClick={handleRotate} disabled={cropping || !selectedSize || !POSTER_SIZES[selectedSize]}>
+                <Button
+                  variant="secondary"
+                  onClick={handleRotate}
+                  disabled={cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
+                >
                   Rotate 90°
                 </Button>
               </div>
@@ -585,7 +582,6 @@ function SellerPosterForm({ onSave }) {
   );
 }
 
-// Add a new poster to tempPosters with Firestore-generated ID
 export const addPoster = async (firestore, posterData) => {
   try {
     if (!posterData.title) throw new Error("Poster title is required");
@@ -654,5 +650,3 @@ export const addPoster = async (firestore, posterData) => {
     return { success: false, error: error.message };
   }
 };
-
-export default SellerPosterForm;

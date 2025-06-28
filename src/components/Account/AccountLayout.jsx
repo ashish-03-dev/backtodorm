@@ -100,7 +100,7 @@ export default function AccountLayout() {
 
         {/* Main Content */}
         <div
-          className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+          className={`bg-white shadow-sm flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
             }`}
           style={{ maxWidth: "100%", overflow: "auto" }}
         >

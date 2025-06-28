@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
 
 export default function SecuritySettings() {
-  const { user, deactivateUserAccount, loadingUserData } = useFirebase();
+  const { user, deactivateUserAccount } = useFirebase();
   const [error, setError] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -18,7 +18,6 @@ export default function SecuritySettings() {
     setError(null);
 
     try {
-      // Deactivate the account (updates Firestore and signs out)
       await deactivateUserAccount();
       setError('Your account has been deactivated successfully. You have been signed out.');
     } catch (err) {
@@ -26,16 +25,10 @@ export default function SecuritySettings() {
     }
   };
 
-  // Render loading state
-  if (loadingUserData) {
-    return <div>Loading...</div>;
-  }
-
   return (
-    <div aria-labelledby="security-settings-heading">
+    <div className="p-4 p-md-5">
       <h4 id="security-settings-heading" className="mb-4">Security Settings</h4>
 
-      {/* Display linked accounts */}
       {user?.providerData.some(p => p.providerId === 'google.com') && (
         <div className="mb-2 text-success" aria-label="Google account linked">
           <strong> Google Account: </strong>{user.email}
@@ -60,14 +53,12 @@ export default function SecuritySettings() {
         </div>
       )}
 
-      {/* Error message */}
       {error && (
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
       )}
 
-      {/* Deactivate account button */}
       <div className="mt-4 d-flex gap-2 border-top">
         <button
           className="btn btn-outline-danger border-0 mt-2"
@@ -79,7 +70,6 @@ export default function SecuritySettings() {
         </button>
       </div>
 
-      {/* Overlay for modal */}
       {showConfirmDialog && (
         <div
           className="modal-backdrop fade show"
@@ -89,7 +79,7 @@ export default function SecuritySettings() {
             left: 0,
             width: '100%',
             height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
             zIndex: 1040,
           }}
           onClick={() => setShowConfirmDialog(false)}
@@ -97,10 +87,9 @@ export default function SecuritySettings() {
         />
       )}
 
-      {/* Confirmation dialog */}
       {showConfirmDialog && (
         <div className="modal" style={{ display: 'block', zIndex: 1050 }} role="dialog" aria-labelledby="confirm-dialog-title">
-          <div className="modal-dialog">
+          <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 id="confirm-dialog-title" className="modal-title">Confirm Account Deactivation</h5>

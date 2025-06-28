@@ -20,7 +20,6 @@ import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
-import PosterFrameTest from "./PosterFrameTest";
 import FramesAdmin from "./pages/AAdmin/FramesAdmin";
 
 
@@ -39,7 +38,7 @@ const Support = lazy(() => import('./pages/AAdmin/Support'));
 const SellerLayout = lazy(() => import('./components/Seller/SellerLayout'));
 const SellerDashboard = lazy(() => import('./components/Seller/SellerDashboard'));
 const MyProducts = lazy(() => import('./components/Seller/MyProducts'));
-const SalesHistory = lazy(() => import('./components/Seller/SalesHistory'));
+const SellPoster = lazy(() => import('./components/Seller/SellPoster'));
 const Payouts = lazy(() => import('./components/Seller/Payouts'));
 
 function App() {
@@ -50,7 +49,6 @@ function App() {
       <Suspense fallback={<div>Loading...</div>}>
 
         <Routes>
-          <Route path="/frame" element={<PosterFrameTest />} />
           <Route path="/login" element={<Login />} />
           <Route path="/privacy-policy" element={<Policies />} />
           <Route path="/terms-and-conditions" element={<Policies />} />
@@ -74,7 +72,7 @@ function App() {
               <Route index element={<SellerDashboard />} />
               <Route path="dashboard" element={<SellerDashboard />} />
               <Route path="products" element={<MyProducts />} />
-              <Route path="sales" element={<SalesHistory />} />
+              <Route path="sell-poster" element={<SellPoster />} />
               <Route path="payouts" element={<Payouts />} />
             </Route>
             <Route path="/search" element={<SearchPage />} />

@@ -76,23 +76,21 @@ export const FirebaseProvider = ({ children }) => {
     return fn(data);
   };
 
-const checkUsernameAvailability = async (username) => {
-  if (!username.startsWith('@') || username.length < 2) {
-    return {available: false,message: 'Username must start with @ and contain at least one character',};
-  }
+  const checkUsernameAvailability = async (username) => {
+    if (!username.startsWith('@') || username.length < 2) {
+      return { available: false, message: 'Username must start with @ and contain at least one character', };
+    }
 
-  const docRef = doc(firestore, 'sellers', username);
-  const docSnap = await getDoc(docRef);
+    const docRef = doc(firestore, 'sellers', username);
+    const docSnap = await getDoc(docRef);
 
-  return {
-    available: !docSnap.exists(),
-    message: docSnap.exists()
-      ? 'Username is already taken'
-      : 'Username is available',
+    return {
+      available: !docSnap.exists(),
+      message: docSnap.exists()
+        ? 'Username is already taken'
+        : 'Username is available',
+    };
   };
-};
-
-  const putData = (key, data) => set(ref(database, key), data);
 
   const logout = () => signOut(auth);
 
@@ -185,12 +183,12 @@ const checkUsernameAvailability = async (username) => {
         user,
         auth,
         userData,
+        setUserData,
         loadingUserData,
         firestore,
         database,
         storage,
         functions,
-        putData,
         setUpRecaptcha,
         verifyOtp,
         googleLogin,

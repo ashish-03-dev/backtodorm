@@ -3,7 +3,7 @@ import { useFirebase } from '../../context/FirebaseContext';
 import { collection, query, onSnapshot, doc, setDoc, addDoc } from 'firebase/firestore';
 import { Alert, Spinner, Form, Button, Card, Table, Badge } from 'react-bootstrap';
 import { Navigate } from 'react-router-dom';
-  
+
 export default function HelpCentre() {
   const { user, firestore, userData, loadingUserData } = useFirebase();
   const [orders, setOrders] = useState([]);
@@ -19,7 +19,7 @@ export default function HelpCentre() {
 
   // Fetch user's past orders and support tickets
   useEffect(() => {
-    if (!user || !firestore) {
+    if (!firestore) {
       setLoading(false);
       return;
     }
@@ -33,10 +33,10 @@ export default function HelpCentre() {
           id: doc.data().orderId,
           date: doc.data().orderDate
             ? new Date(doc.data().orderDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-              })
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
             : 'N/A',
         }));
         setOrders(fetchedOrders.sort((a, b) => new Date(b.date) - new Date(a.date)));
@@ -135,28 +135,22 @@ export default function HelpCentre() {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-
   return (
-    <div className="container mt-4">
-      <h4 className="mb-4 border-bottom pb-2">Help Centre</h4>
+    <div className="p-4 p-md-5">
+      <h4 className="mb-4">My Support</h4>
 
       {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
       {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
 
       {!showForm ? (
         <>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h5>My Support Tickets</h5>
-            <Button
-              variant="primary"
-              onClick={() => setShowForm(true)}
-            >
-              Start New Ticket
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            className='mb-4'
+            onClick={() => setShowForm(true)}
+          >
+            Start New Ticket
+          </Button>
 
           {tickets.length === 0 ? (
             <p className="text-muted">You have no support tickets yet.</p>
@@ -195,72 +189,63 @@ export default function HelpCentre() {
           )}
         </>
       ) : (
-        <Card className="shadow-sm p-4">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5>Create New Support Ticket</h5>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowForm(false)}
+        <div className="p-4 card">
+
+          <h5 className='mb-4'>Create New Support Ticket</h5>
+
+          <Form onSubmit={handleSubmit}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Subject</Form.Label>
+              <Form.Select
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
                 disabled={submitting}
+                required
               >
-                Back to Tickets
-              </Button>
-            </div>
-            <Form onSubmit={handleSubmit}>
+                <option value="">Select an issue</option>
+                <option value="Order Related">Order Related</option>
+                <option value="Product Related">Product Related</option>
+                <option value="Other">Other</option>
+              </Form.Select>
+            </Form.Group>
+
+            {subject === 'Order Related' && (
               <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Subject</Form.Label>
+                <Form.Label className="fw-semibold">Select Order</Form.Label>
                 <Form.Select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  disabled={submitting}
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                  disabled={submitting || orders.length === 0}
                   required
                 >
-                  <option value="">Select an issue</option>
-                  <option value="Order Related">Order Related</option>
-                  <option value="Product Related">Product Related</option>
-                  <option value="Other">Other</option>
+                  <option value="">Select an order</option>
+                  {orders.map((order) => (
+                    <option key={order.id} value={order.id}>
+                      Order {order.id} - {order.date}
+                    </option>
+                  ))}
                 </Form.Select>
+                {orders.length === 0 && (
+                  <Form.Text className="text-muted">
+                    No past orders available.
+                  </Form.Text>
+                )}
               </Form.Group>
+            )}
 
-              {subject === 'Order Related' && (
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold">Select Order</Form.Label>
-                  <Form.Select
-                    value={orderId}
-                    onChange={(e) => setOrderId(e.target.value)}
-                    disabled={submitting || orders.length === 0}
-                    required
-                  >
-                    <option value="">Select an order</option>
-                    {orders.map((order) => (
-                      <option key={order.id} value={order.id}>
-                        Order {order.id} - {order.date}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  {orders.length === 0 && (
-                    <Form.Text className="text-muted">
-                      No past orders available.
-                    </Form.Text>
-                  )}
-                </Form.Group>
-              )}
-
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Describe Your Issue</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={5}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Please provide details about your issue..."
-                  disabled={submitting}
-                  required
-                />
-              </Form.Group>
-
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Describe Your Issue</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={5}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Please provide details about your issue..."
+                disabled={submitting}
+                required
+              />
+            </Form.Group>
+            <div className='d-flex gap-2'>
               <Button
                 type="submit"
                 variant="primary"
@@ -268,9 +253,16 @@ export default function HelpCentre() {
               >
                 {submitting ? 'Submitting...' : 'Submit Ticket'}
               </Button>
-            </Form>
-          </Card.Body>
-        </Card>
+              <Button
+                variant="secondary"
+                onClick={() => setShowForm(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+            </div>
+          </Form>
+        </div>
       )}
     </div>
   );

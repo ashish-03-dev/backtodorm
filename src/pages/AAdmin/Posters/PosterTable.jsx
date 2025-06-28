@@ -8,7 +8,7 @@ const PosterTable = ({
   onEdit,
   onView,
   onReject,
-  onUploadToCDN,
+  onUpload,
   onSetFrame,
 }) => {
   if (!posters || posters.length === 0) {
@@ -91,17 +91,6 @@ const PosterTable = ({
                     Reject
                   </Button>
                 )}
-                {onUploadToCDN && poster.approved === "approved" && (
-                  <Button
-                    variant="outline-info"
-                    size="sm"
-                    onClick={() => onUploadToCDN(poster.id)}
-                    title="Upload to CDN"
-                    disabled={poster.cdnUploaded}
-                  >
-                    {poster.cdnUploaded ? "Uploaded" : "Upload to CDN"}
-                  </Button>
-                )}
                 {onSetFrame && poster.approved === "approved" && (
                   <Button
                     variant="outline-info"
@@ -111,6 +100,17 @@ const PosterTable = ({
                     disabled={poster.framedImageUrl}
                   >
                     {poster.framedImageUrl ? "Framed" : "Set Frame"}
+                  </Button>
+                )}
+                {onUpload && poster.approved === "approved" && poster.framedImageUrl && (
+                  <Button
+                    variant="outline-info"
+                    size="sm"
+                    onClick={() => onUpload(poster.id)}
+                    title="Upload to CDN"
+                    disabled={poster.cdnUploaded}
+                  >
+                    {poster.cdnUploaded ? "Uploaded" : "Upload to CDN"}
                   </Button>
                 )}
               </div>

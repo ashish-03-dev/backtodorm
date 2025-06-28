@@ -85,7 +85,7 @@ export default function AddressForm({
   };
 
   return (
-    <div className="p-2">
+    <div className="card p-4">
       <h5 className="mb-3">{isEditMode ? 'Edit Address' : 'Add New Address'}</h5>
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError('')}>

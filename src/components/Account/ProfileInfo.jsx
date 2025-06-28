@@ -4,7 +4,7 @@ import { useFirebase } from "../../context/FirebaseContext";
 import { updateProfile } from 'firebase/auth';
 
 export default function ProfileInfo() {
-  const { auth, user, userData, loadingUserData, updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount, confirmationResult } = useFirebase();
+  const { auth, user, userData,  updateUser, setUpRecaptcha, linkPhoneNumber, linkGoogleAccount, confirmationResult } = useFirebase();
   const [tempName, setTempName] = useState(userData?.name || "");
   const [editingName, setEditingName] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
@@ -89,12 +89,8 @@ export default function ProfileInfo() {
     setPhoneInput("");
   };
 
-  if (!loadingUserData && !user) {
-    return <Navigate to="/login" />;
-  }
-
   return (
-    <div className="d-flex flex-column h-100">
+    <div className="d-flex flex-column p-4 p-md-5 h-100">
       {isLinkingGoogle && (
         <div
           style={{

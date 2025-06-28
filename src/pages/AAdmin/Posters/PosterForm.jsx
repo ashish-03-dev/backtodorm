@@ -1,15 +1,15 @@
 import React from "react";
-import { Form, Button, Modal, Alert } from "react-bootstrap";
+import { Form, Button, Modal, Alert, Spinner } from "react-bootstrap";
 import Select from "react-select";
 import ReactCrop from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { usePosterForm } from "./usePosterForm";
 
 const POSTER_SIZES = {
-  A4: { name: "A4", widthPx: 2480, heightPx: 3508, widthCm: 21, heightCm: 29.7 },
-  A3: { name: "A3", widthPx: 3508, heightPx: 4961, widthCm: 29.7, heightCm: 42 },
-  "A3*3": { name: "A3*3", widthPx: 3508 * 3, heightPx: 4961, widthCm: 29.7 * 3, heightCm: 42 },
-  "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7 },
+  A4: { name: "A4", widthPx: 2480, heightPx: 3508, widthCm: 21, heightCm: 29.7, aspectRatio: 2480 / 3508 },
+  A3: { name: "A3", widthPx: 3508, heightPx: 4961, widthCm: 29.7, heightCm: 42, aspectRatio: 3508 / 4961 },
+  "A3*3": { name: "A3*3", widthPx: 3508 * 3, heightPx: 4961, widthCm: 29.7 * 3, heightCm: 42, aspectRatio: (3508 * 3) / 4961 },
+  "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
 };
 
 const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster }) => {
@@ -36,10 +36,15 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       crop,
       imageSrc,
       showCropModal,
+      rotation,
+      croppedPreview,
+      originalImageSize,
+      recommendedSize,
+      cropping,
       discount,
       imageDownloadUrl,
     },
-    refs: { formRef, imgRef },
+    refs: { formRef, imgRef, fileInputRef },
     handlers: {
       setError,
       setTags,
@@ -64,7 +69,10 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       addSize,
       removeSize,
       handleImageChange,
+      handleClearImage,
+      handleRotate,
       handleCropComplete,
+      handleSwitchSize,
       handleDiscountChange,
       handleSubmit,
       handleApprove,
@@ -129,6 +137,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             defaultValue={poster?.title || ""}
             required
             placeholder="Enter poster title"
+            disabled={uploading}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -139,6 +148,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             name="description"
             defaultValue={poster?.description || ""}
             placeholder="Enter poster description"
+            disabled={uploading}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -148,6 +158,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="Enter tags (e.g., k-pop, minimalist)"
+            disabled={uploading}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -158,6 +169,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
               placeholder="Enter keywords..."
+              disabled={uploading}
             />
             <Button
               variant="outline-secondary"
@@ -179,12 +191,14 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               onChange={setSelectedCollections}
               className="flex-grow-1"
               placeholder="Select collections..."
+              isDisabled={uploading}
             />
             <Button
               variant="outline-primary"
               onClick={() => setShowNewCollectionModal(true)}
               title="Suggest new collection"
               aria-label="Suggest new collection"
+              disabled={uploading}
             >
               + New
             </Button>
@@ -199,6 +213,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                 value={sizeObj.size || ""}
                 onChange={(e) => handleSizeChange(index, "size", e.target.value)}
                 required
+                disabled={uploading}
               >
                 <option value="">Select size</option>
                 {Object.keys(POSTER_SIZES).map((size) => (
@@ -216,6 +231,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                 min="0"
                 step="0.01"
                 style={{ width: "120px" }}
+                disabled={uploading}
               />
               <Form.Control
                 type="text"
@@ -223,6 +239,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                 value={sizeObj.finalPrice || ""}
                 readOnly
                 style={{ width: "120px" }}
+                disabled={uploading}
               />
               {sizes.length > 1 && (
                 <Button
@@ -230,6 +247,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                   onClick={() => removeSize(index)}
                   title="Remove size"
                   aria-label="Remove size"
+                  disabled={uploading}
                 >
                   Remove
                 </Button>
@@ -242,6 +260,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             onClick={addSize}
             className="mt-2"
             aria-label="Add size"
+            disabled={uploading}
           >
             + Add Size
           </Button>
@@ -257,6 +276,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             min="0"
             max="100"
             step="0.1"
+            disabled={uploading}
           />
         </Form.Group>
         <Form.Group className="mb-3">
@@ -275,13 +295,54 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               )}
             </div>
           ) : (
-            <Form.Control
-              type="file"
-              name="imageFile"
-              accept="image/*"
-              onChange={handleImageChange}
-              required
-            />
+            <div className="position-relative" style={{ maxWidth: "100%" }}>
+              <Form.Control
+                type="file"
+                name="imageFile"
+                accept="image/*"
+                onChange={handleImageChange}
+                required
+                ref={fileInputRef}
+                style={{ paddingRight: croppedPreview ? "60px" : undefined }}
+                disabled={uploading || !selectedSize || !POSTER_SIZES[selectedSize]}
+              />
+              {croppedPreview && (
+                <span
+                  onClick={handleClearImage}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    right: "10px",
+                    transform: "translateY(-50%)",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    color: "#007bff",
+                  }}
+                >
+                  Clear
+                </span>
+              )}
+            </div>
+          )}
+          {recommendedSize && (
+            <div className="mt-2">
+              <p>
+                Image resolution is too low for {selectedSize}. Would you like to switch to {recommendedSize} (
+                {POSTER_SIZES[recommendedSize].widthPx}x{POSTER_SIZES[recommendedSize].heightPx}px)?
+              </p>
+              <Button variant="outline-primary" size="sm" onClick={handleSwitchSize}>
+                Switch to {recommendedSize}
+              </Button>
+            </div>
+          )}
+          {croppedPreview && selectedSize && POSTER_SIZES[selectedSize] && (
+            <div className="mt-3">
+              <p>
+                Original image size: {originalImageSize.width}x{originalImageSize.height}px<br />
+                Preview (image will be saved at {selectedSize} resolution: {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px):
+              </p>
+              <img src={croppedPreview} alt="Preview" style={{ maxWidth: "200px" }} />
+            </div>
           )}
         </Form.Group>
         <Form.Group className="mb-3">
@@ -301,11 +362,13 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               isInvalid={sellerChecked && !isSellerValid}
               isValid={sellerChecked && isSellerValid}
               aria-describedby="sellerUsernameFeedback"
+              disabled={uploading}
             />
             <Button
               variant="outline-secondary"
               onClick={checkSellerUsername}
               aria-label="Check Seller Username"
+              disabled={uploading}
             >
               Check
             </Button>
@@ -313,6 +376,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               variant="outline-secondary"
               onClick={insertUserId}
               aria-label="Use Current User ID"
+              disabled={uploading}
             >
               Use My ID
             </Button>
@@ -328,68 +392,99 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             name="isActive"
             label="Active"
             defaultChecked={poster?.isActive !== false}
+            disabled={uploading}
           />
         </Form.Group>
         <div className="d-flex gap-2">
-            {(!poster || poster.source === "posters") && (
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
-              >
-                {uploading ? "Uploading..." : poster ? "Update Poster" : "Submit Poster"}
-              </Button>
-            )}
-              {/* Show Approve button only for pending tempPosters */}
-              {poster?.approved === "pending" && poster.source === "tempPosters" && (
-                <Button
-                  type="submit"
-                  variant="success"
-                  disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
-                >
-                  Approve
-                </Button>
-              )}
+          {(!poster || poster.source === "posters") && (
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
+            >
+              {uploading ? "Uploading..." : poster ? "Update Poster" : "Submit Poster"}
+            </Button>
+          )}
+          {poster?.approved === "pending" && poster.source === "tempPosters" && (
             <Button
               type="button"
-              variant="secondary"
-              onClick={() => onSubmit(null)}
-              disabled={uploading}
+              variant="success"
+              onClick={handleApprove}
+              disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
             >
-              Cancel
+              Approve
             </Button>
-          </div>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onSubmit(null)}
+            disabled={uploading}
+          >
+            Cancel
+          </Button>
+        </div>
       </Form>
 
-      <Modal show={showCropModal} onHide={() => setShowCropModal(false)}>
+      <Modal
+        show={showCropModal}
+        onHide={() => {
+          setShowCropModal(false);
+          handleClearImage();
+        }}
+      >
         <Modal.Header closeButton>
-          <Modal.Title>Crop Image to {selectedSize}</Modal.Title>
+          <Modal.Title>{selectedSize && POSTER_SIZES[selectedSize] ? `Crop Image to ${selectedSize}` : "Crop Image"}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {POSTER_SIZES[selectedSize] ? (
-            <ReactCrop
-              crop={crop}
-              onChange={(_, percentCrop) => setCrop(percentCrop)}
-              aspect={POSTER_SIZES[selectedSize].aspectRatio}
-            >
-              <img
-                ref={imgRef}
-                src={imageSrc}
-                alt="Crop preview"
-                style={{ maxWidth: "100%" }}
-              />
-            </ReactCrop>
+          {selectedSize && POSTER_SIZES[selectedSize] ? (
+            <>
+              <ReactCrop
+                crop={crop}
+                onChange={(_, percentCrop) => setCrop(percentCrop)}
+                aspect={POSTER_SIZES[selectedSize].aspectRatio}
+                minWidth={POSTER_SIZES[selectedSize].widthPx / 20}
+                minHeight={POSTER_SIZES[selectedSize].heightPx / 20}
+              >
+                <img
+                  ref={imgRef}
+                  src={imageSrc}
+                  alt="Crop preview"
+                  style={{ maxWidth: "100%", imageRendering: "auto" }}
+                  crossOrigin="anonymous"
+                />
+              </ReactCrop>
+              <div className="d-flex flex-column align-items-center gap-2 mt-3">
+                {cropping ? (
+                  <div className="d-flex flex-column align-items-center">
+                    <Spinner animation="border" className="d-block text-primary" role="status">
+                      <span className="visually-hidden">Processing...</span>
+                    </Spinner>
+                    <p className="mt-2 text-muted">Processing...</p>
+                  </div>
+                ) : (
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="primary"
+                      onClick={handleCropComplete}
+                      disabled={!crop?.width || !crop?.height || cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
+                    >
+                      Apply Crop
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleRotate}
+                      disabled={cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
+                    >
+                      Rotate 90°
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             <Alert variant="danger">Invalid size selected for cropping.</Alert>
           )}
-          <Button
-            variant="primary"
-            onClick={() => handleCropComplete(crop)}
-            className="mt-3"
-            disabled={!POSTER_SIZES[selectedSize]}
-          >
-            Apply Crop
-          </Button>
         </Modal.Body>
       </Modal>
 
@@ -416,7 +511,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             <Button
               type="submit"
               variant="primary"
-              disabled={!newCollectionName.trim()}
+              disabled={!newCollectionName.trim() || uploading}
             >
               Save Collection
             </Button>

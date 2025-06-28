@@ -1,14 +1,12 @@
 import {
   doc,
   getDoc,
-  addDoc,
   setDoc,
-  collection,
-  deleteDoc,
+  updateDoc,
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from "firebase/storage";
 
 // Helper function to normalize text for keywords
 const normalizeText = (text) => {
@@ -28,13 +26,11 @@ const normalizeCollection = (text) => {
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 };
 
-// Submit a new poster for admin panel
 export const submitPoster = async (
   firestore,
   storage,
   posterData,
   posterId,
-  adminUser
 ) => {
   try {
     // Validate inputs
@@ -51,9 +47,10 @@ export const submitPoster = async (
     await uploadBytes(imageRef, posterData.imageFile);
     const imageUrl = await getDownloadURL(imageRef);
 
-    // Prepare poster data
+    // Prepare poster data, excluding imageFile
+    const { imageFile, ...posterDataWithoutImage } = posterData;
     const poster = {
-      ...posterData,
+      ...posterDataWithoutImage,
       posterId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -63,17 +60,27 @@ export const submitPoster = async (
     };
 
     await runTransaction(firestore, async (transaction) => {
+      // Step 1: Perform all reads
       const posterRef = doc(firestore, "tempPosters", posterId);
       const posterDoc = await transaction.get(posterRef);
       if (posterDoc.exists()) throw new Error("Poster ID already exists");
 
-      // Set poster in tempPosters
-      transaction.set(posterRef, poster);
-
-      // Update seller document
       const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
       const sellerDoc = await transaction.get(sellerRef);
       if (!sellerDoc.exists()) throw new Error("Seller not found");
+
+      const collections = posterData.collections || [];
+      const collectionDocs = await Promise.all(
+        collections.map((col) =>
+          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        )
+      );
+
+      // Step 2: Perform all writes
+      // Write poster to tempPosters
+      transaction.set(posterRef, poster);
+
+      // Update seller document
       const sellerData = sellerDoc.data();
       const tempPosters = sellerData.tempPosters || [];
       transaction.update(sellerRef, {
@@ -82,13 +89,6 @@ export const submitPoster = async (
       });
 
       // Update collections
-      const collections = posterData.collections || [];
-      const collectionDocs = await Promise.all(
-        collections.map((col) =>
-          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
-        )
-      );
-
       collections.forEach((col, index) => {
         const colId = normalizeCollection(col);
         const colDoc = collectionDocs[index];
@@ -406,49 +406,78 @@ export const rejectPoster = async (firestore, storage, posterId) => {
     return { success: false, error: error.message };
   }
 };
-
 export const saveFramedImage = async (firestore, storage, posterId, imageData, user) => {
-  // try {
-  //   if (!user) throw new Error("User not authenticated");
-  //   const posterRef = doc(firestore, "tempPosters", posterId);
-  //   const framedImageRef = ref(storage, `framedImages/${posterId}_${Date.now()}.png`);
+  if (!user) {
+    return { success: false, error: "User not authenticated" };
+  }
 
-  //   // Upload base64 image to Firebase Storage
-  //   await uploadString(framedImageRef, imageData, "data_url");
-  //   const framedImageUrl = await getDownloadURL(framedImageRef);
+  if (!firestore || !storage || !posterId || !imageData) {
+    return { success: false, error: "Missing required parameters" };
+  }
 
-  //   // Update tempPosters document with framedImageUrl
-  //   await setDoc(posterRef, { framedImageUrl }, { merge: true });
+  try {
+    // Convert base64 data URL to Blob
+    const base64String = imageData.split(",")[1]; // Remove "data:image/png;base64," prefix
+    const byteCharacters = atob(base64String);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "image/png" });
 
-  //   return { success: true, framedImageUrl };
-  // } catch (error) {
-  //   console.error("Error saving framed image:", error);
-  //   return { success: false, error: error.message };
-  // }
+    // Create storage reference
+    const framedImageRef = ref(storage, `framedImages/${posterId}_${Date.now()}.png`);
+
+    // Upload using uploadBytesResumable
+    const uploadTask = uploadBytesResumable(framedImageRef, blob);
+
+    // Wait for upload to complete
+    await new Promise((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        null, // Progress callback (optional)
+        (error) => reject(error), // Error callback
+        () => resolve() // Completion callback
+      );
+    });
+
+    // Get download URL
+    const framedImageUrl = await getDownloadURL(framedImageRef);
+
+    // Update Firestore document
+    const posterRef = doc(firestore, "tempPosters", posterId);
+    await setDoc(posterRef, { framedImageUrl, frameSet: true }, { merge: true });
+
+    return { success: true, framedImageUrl };
+  } catch (error) {
+    return { success: false, error: `Failed to save framed image: ${error.message}` };
+  }
 };
-
-
 
 export const saveFrame = async (firestore, storage, frameData, file, user) => {
   try {
     if (!user) throw new Error("User not authenticated");
-    if (!file) throw new Error("No file selected");
-
-    const frameRef = await addDoc(collection(firestore, "frames"), {
+    const frameRef = doc(firestore, "frames", `frame_${Date.now()}`);
+    let imageUrl = "";
+    let fileName = "";
+    if (file) {
+      fileName = file.name;
+      const storageRef = ref(storage, `frames/${frameRef.id}/${fileName}`);
+      await uploadBytes(storageRef, file);
+      imageUrl = await getDownloadURL(storageRef);
+    }
+    await setDoc(frameRef, {
       ...frameData,
+      imageUrl,
+      fileName,
+      uploaded: false,
       createdBy: user.uid,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     });
-
-    const imageRef = ref(storage, `frames/frame_${frameRef.id}_${Date.now()}.png`);
-    await uploadBytes(imageRef, file);
-    const imageUrl = await getDownloadURL(imageRef);
-
-    await setDoc(frameRef, { imageUrl }, { merge: true });
-
     return { success: true, id: frameRef.id, imageUrl };
   } catch (error) {
-    console.error("Error saving frame:", error);
+    console.error("Failed to save frame:", error);
     return { success: false, error: error.message };
   }
 };
@@ -457,40 +486,20 @@ export const updateFrame = async (firestore, storage, frameId, frameData, file, 
   try {
     if (!user) throw new Error("User not authenticated");
     const frameRef = doc(firestore, "frames", frameId);
-
-    let imageUrl = frameData.imageUrl;
+    let imageUrl = frameData.imageUrl || "";
     if (file) {
-      const imageRef = ref(storage, `frames/frame_${frameId}_${Date.now()}.png`);
-      await uploadBytes(imageRef, file);
-      imageUrl = await getDownloadURL(imageRef);
+      const storageRef = ref(storage, `frames/${frameId}/${file.name}`);
+      await uploadBytes(storageRef, file);
+      imageUrl = await getDownloadURL(storageRef);
     }
-
-    await setDoc(frameRef, {
+    await updateDoc(frameRef, {
       ...frameData,
       imageUrl,
       updatedBy: user.uid,
-      updatedAt: new Date(),
-    }, { merge: true });
-
+      updatedAt: new Date().toISOString(),
+    });
     return { success: true, imageUrl };
   } catch (error) {
-    console.error("Error updating frame:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const deleteFrame = async (firestore, storage, frameId) => {
-  try {
-    const frameRef = doc(firestore, "frames", frameId);
-    const frameSnap = await getDoc(frameRef);
-    if (frameSnap.exists() && frameSnap.data().imageUrl) {
-      const imageRef = ref(storage, frameSnap.data().imageUrl);
-      await deleteObject(imageRef).catch((err) => console.warn("Failed to delete image:", err));
-    }
-    await deleteDoc(frameRef);
-    return { success: true };
-  } catch (error) {
-    console.error("Error deleting frame:", error);
     return { success: false, error: error.message };
   }
 };

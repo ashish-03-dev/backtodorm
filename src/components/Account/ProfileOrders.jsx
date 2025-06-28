@@ -11,7 +11,7 @@ export default function ProfileOrders() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user || !firestore) {
+    if (!firestore) {
       setError('User or Firestore not available.');
       setLoading(false);
       return;
@@ -99,12 +99,12 @@ export default function ProfileOrders() {
     });
 
     return () => unsubscribeOrders();
-  }, [user, firestore]);
+  }, []);
 
   const renderOrders = (orderList) => (
     <div className="d-flex flex-column gap-4">
       {orderList.length === 0 ? (
-        <p className="text-muted text-center fs-5 my-4">No orders found.</p>
+        <p className="text-muted ms-3">No Orders Yet.</p>
       ) : (
         orderList.map((order) => (
           <Card
@@ -219,17 +219,20 @@ export default function ProfileOrders() {
     </div>
   );
 
-  if (loading) return <Spinner animation="border" className="d-block mx-auto mt-5" />;
+  if (loading) return (
+    <div className="text-center d-flex align-items-center justify-content-center" style={{ height: "calc(100svh - 65px - 3rem)" }}>
+      <p className="mt-2">Loading your orders...</p>
+    </div>
+  );
+
   if (error) return <Alert variant="danger" className="w-75 mx-auto mt-5">{error}</Alert>;
 
   return (
-    <Container className="my-5">
-      <Row className="align-items-center mb-4">
-        <Col><h2 className="fw-bold">My Orders</h2></Col>
-        <Col className="text-end">
-        </Col>
+    <Container className="p-4 p-md-5">
+      <Row className="align-items-center">
+        <Col><h4 className='mb-4'>My Orders</h4></Col>
       </Row>
-      <Tabs defaultActiveKey="all" variant="pills" className="mb-4">
+      <Tabs defaultActiveKey="all" variant="pills" className="mb-4 gap-3">
         <Tab eventKey="all" title="All Orders">{renderOrders(orders)}</Tab>
         <Tab eventKey="pending" title="Pending Payment">{renderOrders(orders.filter((order) => order.isPending))}</Tab>
         <Tab eventKey="confirmed" title="Confirmed Orders">{renderOrders(orders.filter((order) => !order.isPending))}</Tab>

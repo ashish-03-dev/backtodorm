@@ -58,16 +58,16 @@ const OrderTable = ({
                 )}
               </td>
               <td>
+                <div className='d-flex gap-2'>
                 <Button
                   variant="outline-info"
                   size="sm"
-                  className="me-2"
                   onClick={() => {
                     handleShowDetail(order);
                     setShowDetailModal(true);
                   }}
                   disabled={submitting}
-                >
+                  >
                   View
                 </Button>
                 {isPendingTab ? (
@@ -80,43 +80,45 @@ const OrderTable = ({
                   </Button>
                 ) : (
                   <Button
-                    variant="outline-success"
-                    size="sm"
-                    className="me-2"
-                    onClick={() => {
-                      setSupplierData({
-                        supplierName: '',
-                        contact: '',
-                        items: order.items,
-                        address: order.shippingAddress || {
-                          name: '',
-                          address: '',
-                          locality: '',
-                          city: '',
-                          state: '',
-                          pincode: '',
-                          landmark: ''
-                        },
-                        supplierOrderId: '',
-                        sentOrderId: order.id,
-                      });
-                      setShowSupplierModal(true);
-                    }}
-                    disabled={submitting || order.paymentStatus !== 'Completed'}
+                  variant="outline-success"
+                  size="sm"
+                  className="me-2"
+                  onClick={() => {
+                    setSupplierData({
+                      supplierName: '',
+                      contact: '',
+                      items: order.items,
+                      address: order.shippingAddress || {
+                        name: '',
+                        address: '',
+                        locality: '',
+                        city: '',
+                        state: '',
+                        pincode: '',
+                        landmark: ''
+                      },
+                      supplierOrderId: '',
+                      sentOrderId: order.id,
+                    });
+                    setShowSupplierModal(true);
+                  }}
+                  disabled={submitting || order.paymentStatus !== 'Completed'}
                   >
                     Send to Supplier
                   </Button>
                 )}
-                {!isPendingTab && order.paymentStatus === 'Completed' && (
+                {!isPendingTab && order.paymentStatus === 'Completed' && !order.verified && (
                   <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() => handleVerifyPricing(order.id)}
-                    disabled={submitting}
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={() => handleVerifyPricing(order.id)}
+                  disabled={submitting}
                   >
                     Verify Pricing
                   </Button>
-                )}
+                    
+                  )}
+                  </div>
               </td>
             </tr>
           ))}

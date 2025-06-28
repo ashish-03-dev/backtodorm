@@ -43,6 +43,7 @@ const PosterApprovals = () => {
           ...doc.data(),
           source: "tempPosters",
           cdnUploaded: doc.data().cdnUploaded || false, // Track CDN upload status
+          frameSet: doc.data().frameSet || false,
         }));
 
         // Fetch download URLs for tempPosters
@@ -76,7 +77,7 @@ const PosterApprovals = () => {
   }, [firestore, storage]);
 
   // Poster management functions
-  const openEdit = (poster = null) => {
+  const openEdit = (poster) => {
     setEditing(poster);
     setShowEditModal(true);
   };
@@ -149,15 +150,10 @@ const PosterApprovals = () => {
     }
   };
 
-
-  const uploadToCDNHandler = async (posterId) => {
+  const uploadHandler = async (posterId) => {
     try {
-      if (!user) {
-        setError("User not authenticated");
-        return;
-      }
-      const uploadToCDN = httpsCallable(functions, "uploadToCDN");
-      const result = await uploadToCDN({ posterId });
+      const approvePoster = httpsCallable(functions, "approvePoster");
+      const result = await approvePoster({ posterId });
       if (result.data.success) {
         setTempPosters((prev) =>
           prev.map((p) =>
@@ -165,11 +161,10 @@ const PosterApprovals = () => {
           )
         );
       } else {
-        setError("Failed to upload to CDN: " + (result.data.error || "Unknown error"));
+        setError("Failed to approve poster: " + (result.data.error || "Unknown error"));
       }
     } catch (error) {
-      console.error("CDN upload error", { code: error.code, message: error.message, details: error.details });
-      setError(`CDN upload failed: ${error.message} (Code: ${error.code})`);
+      setError(`Approval failed: ${error.message}`);
     }
   };
 
@@ -251,7 +246,7 @@ const PosterApprovals = () => {
             posters={approvedList}
             onEdit={openEdit}
             onView={openView}
-            onUploadToCDN={uploadToCDNHandler}
+            onUpload={uploadHandler}
             onSetFrame={openFrame}
           />
         </Tab>
@@ -270,10 +265,10 @@ const PosterApprovals = () => {
           <Modal.Title>{editing ? "Edit Poster" : "Add New Poster"}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          < rm
+          <PosterForm
             poster={editing}
             onSubmit={submitPosterHandler}
-            onUpdateTempPoster={approveTempPosterHandler}
+            onApproveTempPoster={approveTempPosterHandler}
           />
         </Modal.Body>
       </Modal>

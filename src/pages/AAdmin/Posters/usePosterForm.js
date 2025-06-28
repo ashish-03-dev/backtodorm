@@ -28,7 +28,7 @@ const normalizeCollection = (text) => {
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 };
 
-export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster }) => {
+export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempPoster }) => {
   const { firestore, storage, auth } = useFirebase();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -64,11 +64,19 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
   });
   const [crop, setCrop] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
+  const [originalImageSrc, setOriginalImageSrc] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [croppedPreview, setCroppedPreview] = useState(null);
+  const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const [recommendedSize, setRecommendedSize] = useState(null);
+  const [cropping, setCropping] = useState(false);
   const [discount, setDiscount] = useState(poster?.discount?.toString() || "0");
   const [imageDownloadUrl, setImageDownloadUrl] = useState(null);
   const formRef = useRef(null);
   const imgRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const IMAGE_QUALITY = 0.9; // JPEG quality for compression
 
   // Fetch download URL for originalImageUrl in edit mode
   useEffect(() => {
@@ -122,14 +130,14 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
             setIsSellerValid(true);
             setSellerChecked(true);
           } else {
-            setIsSellerValid(false);
             setSellerName("User not found");
+            setIsSellerValid(false);
             setSellerChecked(true);
           }
         } catch (error) {
           console.error("Error fetching seller info:", error);
-          setIsSellerValid(false);
           setSellerName("Error fetching user");
+          setIsSellerValid(false);
           setSellerChecked(true);
         }
       } else {
@@ -340,6 +348,14 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
     setSizes(updatedSizes);
     if (field === "size" && POSTER_SIZES[value]) {
       setSelectedSize(value);
+      setCroppedPreview(null);
+      setImageSrc(null);
+      setOriginalImageSrc(null);
+      setCrop(null);
+      setRotation(0);
+      setRecommendedSize(null);
+      setOriginalImageSize({ width: 0, height: 0 });
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -348,7 +364,7 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
       setSizes([...sizes, { size: "A4", price: "", finalPrice: "" }]);
       setSelectedSize("A4");
     } else {
-      setError("Please fill in the current size and price before adding a new one.");
+      setError("Pleasefills in the current size and price before adding a new one.");
     }
   };
 
@@ -365,80 +381,183 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
 
   // Image handling
   const handleImageChange = (e) => {
+    if (!selectedSize || !POSTER_SIZES[selectedSize]) {
+      setError("Please select a valid size before uploading an image.");
+      return;
+    }
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          if (!POSTER_SIZES[selectedSize]) {
-            setError("Invalid poster size selected for cropping.");
-            return;
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        setOriginalImageSize({ width: img.width, height: img.height });
+        const { widthPx, heightPx, aspectRatio } = POSTER_SIZES[selectedSize];
+        const bestSize = Object.keys(POSTER_SIZES).reduce((best, size) => {
+          const { widthPx: w, heightPx: h } = POSTER_SIZES[size];
+          if (img.width >= w && img.height >= h && (!best || w * h > POSTER_SIZES[best].widthPx * POSTER_SIZES[best].heightPx)) {
+            return size;
           }
-          const targetAspect = POSTER_SIZES[selectedSize].aspectRatio;
-          const imageAspect = img.width / img.height;
-          if (Math.abs(imageAspect - targetAspect) > 0.01) {
-            setImageSrc(event.target.result);
-            setShowCropModal(true);
-            setCrop(
-              centerCrop(
-                makeAspectCrop(
-                  { unit: "%", width: 90, aspect: targetAspect },
-                  targetAspect,
-                  img.width,
-                  img.height
-                ),
-                img.width,
-                img.height
-              )
-            );
-          } else {
-            setImageSrc(null);
-            setShowCropModal(false);
-            setCrop(null);
-            const fileList = new DataTransfer();
-            fileList.items.add(file);
-            formRef.current.imageFile.files = fileList.files;
-          }
-        };
-        img.src = event.target.result;
+          return best;
+        }, null);
+
+        const isUpscaling = img.width < widthPx || img.height < heightPx;
+        if (isUpscaling && bestSize && bestSize !== selectedSize) {
+          setRecommendedSize(bestSize);
+        } else {
+          setRecommendedSize(null);
+        }
+
+        const imageDataUrl = event.target.result;
+        if (Math.abs(img.width / img.height - aspectRatio) > 0.05) {
+          setOriginalImageSrc(imageDataUrl);
+          setImageSrc(imageDataUrl);
+          setShowCropModal(true);
+          setRotation(0);
+          setCrop(
+            centerCrop(
+              makeAspectCrop({ unit: "%", width: 80, aspect: aspectRatio }, aspectRatio, img.width, img.height),
+              img.width,
+              img.height
+            )
+          );
+        } else {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = widthPx;
+          canvas.height = heightPx;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, widthPx, heightPx);
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const scaledFile = new File([blob], `scaled_${Date.now()}.jpg`, { type: "image/jpeg" });
+                const fileList = new DataTransfer();
+                fileList.items.add(scaledFile);
+                formRef.current.imageFile.files = fileList.files;
+                setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+              }
+            },
+            "image/jpeg",
+            IMAGE_QUALITY
+          );
+        }
       };
-      reader.readAsDataURL(file);
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearImage = () => {
+    const fileList = new DataTransfer();
+    formRef.current.imageFile.files = fileList.files;
+    setImageSrc(null);
+    setOriginalImageSrc(null);
+    setCroppedPreview(null);
+    setShowCropModal(false);
+    setCrop(null);
+    setRotation(0);
+    setRecommendedSize(null);
+    setOriginalImageSize({ width: 0, height: 0 });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleRotate = () => {
+    if (!imgRef.current || !originalImageSrc || !selectedSize || !POSTER_SIZES[selectedSize]) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const newRotation = (rotation + 90) % 360;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = newRotation % 180 === 0 ? img.width : img.height;
+      canvas.height = newRotation % 180 === 0 ? img.height : img.width;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((newRotation * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      setImageSrc(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+      setCrop(
+        centerCrop(
+          makeAspectCrop(
+            { unit: "%", width: 80, aspect: POSTER_SIZES[selectedSize].aspectRatio },
+            POSTER_SIZES[selectedSize].aspectRatio,
+            canvas.width,
+            canvas.height
+          ),
+          canvas.width,
+          canvas.height
+        )
+      );
+      setRotation(newRotation);
+      setOriginalImageSize({ width: canvas.width, height: canvas.height });
+    };
+    img.src = originalImageSrc;
+  };
+
+  const handleCropComplete = async () => {
+    if (!imgRef.current || !crop?.width || !crop?.height || crop.width < 10 || crop.height < 10 || !selectedSize || !POSTER_SIZES[selectedSize]) {
+      setError("Invalid crop region or size selection. Please select a valid size and crop area.");
+      setShowCropModal(false);
+      return;
+    }
+    setCropping(true);
+    try {
+      const { widthPx, heightPx } = POSTER_SIZES[selectedSize];
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = widthPx;
+      canvas.height = heightPx;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      const cropX = (crop.x / 100) * imgRef.current.naturalWidth;
+      const cropY = (crop.y / 100) * imgRef.current.naturalHeight;
+      const cropWidth = (crop.width / 100) * imgRef.current.naturalWidth;
+      const cropHeight = (crop.height / 100) * imgRef.current.naturalHeight;
+      ctx.drawImage(imgRef.current, cropX, cropY, cropWidth, cropHeight, 0, 0, widthPx, heightPx);
+
+      await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Failed to generate cropped image."));
+              return;
+            }
+            const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: "image/jpeg" });
+            const fileList = new DataTransfer();
+            fileList.items.add(croppedFile);
+            formRef.current.imageFile.files = fileList.files;
+            setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+            resolve();
+          },
+          "image/jpeg",
+          IMAGE_QUALITY
+        );
+      });
+
+      setShowCropModal(false);
+      setImageSrc(null);
+      setOriginalImageSrc(null);
+      setCrop(null);
+      setRotation(0);
+    } catch (err) {
+      setError("Failed to process crop: " + err.message);
+    } finally {
+      setCropping(false);
     }
   };
 
-  const handleCropComplete = (crop) => {
-    if (imgRef.current && crop.width && crop.height) {
-      if (!POSTER_SIZES[selectedSize]) {
-        setError("Invalid poster size selected for cropping.");
-        setShowCropModal(false);
-        return;
-      }
-      const canvas = document.createElement("canvas");
-      const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
-      const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
-      canvas.width = crop.width * scaleX;
-      canvas.height = crop.height * scaleY;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(
-        imgRef.current,
-        crop.x * scaleX,
-        crop.y * scaleY,
-        crop.width * scaleX,
-        crop.height * scaleY,
-        0,
-        0,
-        crop.width * scaleX,
-        crop.height * scaleY
-      );
-      canvas.toBlob((blob) => {
-        const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: "image/jpeg" });
-        const fileList = new DataTransfer();
-        fileList.items.add(croppedFile);
-        formRef.current.imageFile.files = fileList.files;
-        setShowCropModal(false);
-        setImageSrc(null);
-      }, "image/jpeg");
+  const handleSwitchSize = () => {
+    if (recommendedSize && sizes.length === 1) {
+      handleSizeChange(0, "size", recommendedSize);
+      setRecommendedSize(null);
     }
   };
 
@@ -522,7 +641,6 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
         // New poster submission
         await onSubmit(data, posterId);
       } else if (poster.source === "posters") {
-        console.log(poster.source)
         // Update approved poster
         await onUpdatePoster(data, posterId);
       } else if (poster.source === "tempPosters") {
@@ -546,8 +664,10 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
       return;
     }
 
+  const data = preparePosterData(form, posterId);
+
     try {
-      await onApprove(posterId);
+      await onApproveTempPoster(data, posterId);
     } catch (err) {
       setError(`Failed to approve poster: ${err.message}`);
     } finally {
@@ -577,11 +697,17 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
       selectedSize,
       crop,
       imageSrc,
+      originalImageSrc,
       showCropModal,
+      rotation,
+      croppedPreview,
+      originalImageSize,
+      recommendedSize,
+      cropping,
       discount,
       imageDownloadUrl,
     },
-    refs: { formRef, imgRef },
+    refs: { formRef, imgRef, fileInputRef },
     handlers: {
       setError,
       setTags,
@@ -594,7 +720,13 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
       setSelectedSize,
       setCrop,
       setImageSrc,
+      setOriginalImageSrc,
       setShowCropModal,
+      setRotation,
+      setCroppedPreview,
+      setOriginalImageSize,
+      setRecommendedSize,
+      setCropping,
       setDiscount,
       checkIdUniqueness,
       suggestId,
@@ -606,7 +738,10 @@ export const usePosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onA
       addSize,
       removeSize,
       handleImageChange,
+      handleClearImage,
+      handleRotate,
       handleCropComplete,
+      handleSwitchSize,
       handleDiscountChange,
       handleSubmit,
       handleApprove,

@@ -7,35 +7,15 @@ import AddressForm from './AddressForm';
 
 export default function AddressBook() {
   const { getAddressList, addAddress, deleteAddress, updateAddress } = useAddress();
-  const { auth } = useFirebase();
   const [addresses, setAddresses] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    if (!auth) {
-      setError('Firebase authentication is not available.');
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) {
-        setError('Please log in to view your addresses.');
-        setAddresses([]);
-        setLoading(false);
-      } else {
-        setError('');
-        fetchAddresses();
-      }
-    });
-
-    return () => unsubscribeAuth();
-  }, [auth]);
+    fetchAddresses();
+  }, []);
 
   const fetchAddresses = async () => {
     try {
@@ -44,6 +24,7 @@ export default function AddressBook() {
       setAddresses(list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
       setLoading(false);
     } catch (err) {
+      setAddresses([]);
       setError(`Failed to load addresses: ${err.message}`);
       setLoading(false);
     }
@@ -81,8 +62,7 @@ export default function AddressBook() {
 
   if (loading) {
     return (
-      <div className="text-center my-5">
-        <Spinner animation="border" variant="primary" />
+      <div className="text-center d-flex align-items-center justify-content-center" style={{height:"calc(100svh - 65px - 3rem)"}}>
         <p className="mt-2">Loading your addresses...</p>
       </div>
     );
@@ -97,8 +77,8 @@ export default function AddressBook() {
   }
 
   return (
-    <div>
-      <h4 className="mb-3">Saved Addresses</h4>
+    <div className='p-4 p-md-5'>
+      <h4 className="mb-4">Saved Addresses</h4>
 
       {!showAddForm && !editingAddressId && (
         <Button

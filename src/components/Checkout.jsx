@@ -35,18 +35,10 @@ const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, set
 
   return (
     <Card>
-      <Card.Body className="p-3">
-        <h5 className="mb-2">Add Address</h5>
+      <Card.Body className="p-4">
+        <h5 className="mb-4">Add Address</h5>
         {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
         <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="Title (e.g., Home, Office)"
-              value={newAddress.title}
-              onChange={(e) => setNewAddress({ ...newAddress, title: e.target.value })}
-            />
-          </Form.Group>
           <Form.Group className="mb-2">
             <Form.Control
               type="text"
@@ -113,29 +105,16 @@ const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, set
           <Form.Group className="mb-2">
             <Form.Control
               type="text"
-              placeholder="Landmark"
+              placeholder="Landmark (Optional)"
               value={newAddress.landmark}
               onChange={(e) => setNewAddress({ ...newAddress, landmark: e.target.value })}
             />
           </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Check
-              type="radio"
-              label="Home"
-              value="Home"
-              checked={newAddress.type === 'Home'}
-              onChange={(e) => setNewAddress({ ...newAddress, type: e.target.value })}
-            />
-            <Form.Check
-              type="radio"
-              label="Work"
-              value="Work"
-              checked={newAddress?.type === 'Work'}
-              onChange={(e) => setNewAddress({ ...newAddress, type: e.target.value })}
-            />
+          <Form.Group className='mt-4'>
+
+            <Button type="submit" variant="primary" size="sm" className="me-2">Save</Button>
+            <Button variant="outline-secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
           </Form.Group>
-          <Button type="submit" variant="primary" size="sm" className="me-2">Save</Button>
-          <Button variant="outline-secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
         </Form>
       </Card.Body>
     </Card>
@@ -148,21 +127,48 @@ const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowF
       <Modal.Header closeButton>
         <Modal.Title>Select Address</Modal.Title>
       </Modal.Header>
+
       <Modal.Body>
-        <ListGroup>
-          {addresses.map(addr => (
+        <ListGroup variant="flush">
+          {addresses.length === 0 && (
+            <ListGroup.Item className="text-muted pb-4">
+              No saved addresses found.
+            </ListGroup.Item>
+          )}
+
+          {addresses.map((addr) => (
             <ListGroup.Item
               key={addr.id}
               action
-              onClick={() => { handleAddressSelect(addr.id); onHide(); }}
+              className="py-3"
+              onClick={() => {
+                handleAddressSelect(addr.id);
+                onHide();
+              }}
             >
-              <p className="mb-1"><strong>{addr.title || addr.name}</strong> {addr.phone}</p>
-              <p className="mb-1 text-muted">{addr.address}, {addr.locality}, {addr.city}{addr.landmark && `, ${addr.landmark}`}</p>
-              <p className="mb-0 text-muted">{addr.state} - {addr.pincode}</p>
+              <div className="d-flex justify-content-between align-items-start">
+                <div>
+                  <div className="fw-semibold">
+                    {addr.title || addr.name} <span className="ms-2 text-muted small">+91 {addr.phone}</span>
+                  </div>
+                  <div className="small text-muted">
+                    {addr.address}, {addr.locality}, {addr.city}
+                    {addr.landmark && `, ${addr.landmark}`}<br />
+                    {addr.state} - {addr.pincode}
+                  </div>
+                </div>
+              </div>
             </ListGroup.Item>
           ))}
-          <ListGroup.Item action onClick={() => { setShowForm(true); onHide(); }}>
-            <strong>+ Add New Address</strong>
+          <ListGroup.Item
+            action
+            onClick={() => {
+              setShowForm(true);
+              onHide();
+            }}
+            className="text-primary text-center fw-semibold"
+          >
+            + Add New Address
           </ListGroup.Item>
         </ListGroup>
       </Modal.Body>
@@ -191,12 +197,12 @@ const Checkout = () => {
   const items = buyNowItem ? [buyNowItem] : cartItems || [];
   const subtotal = items.length > 0
     ? items.reduce((sum, item) => {
-        const price = item.type === 'collection'
-          ? (item.posters || []).reduce((pSum, p) => pSum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1)
-          : (item.finalPrice || item.price || 0) * (item.quantity || 1);
-        const discount = item.type === 'collection' ? (item.collectionDiscount || 0) : 0;
-        return sum + price * (1 - discount / 100);
-      }, 0)
+      const price = item.type === 'collection'
+        ? (item.posters || []).reduce((pSum, p) => pSum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1)
+        : (item.finalPrice || item.price || 0) * (item.quantity || 1);
+      const discount = item.type === 'collection' ? (item.collectionDiscount || 0) : 0;
+      return sum + price * (1 - discount / 100);
+    }, 0)
     : 0;
 
   const isFreeDelivery = subtotal >= freeDeliveryThreshold;
@@ -459,8 +465,8 @@ const Checkout = () => {
         <div className="col-md-6">
           <Card className="mb-3">
             <Card.Body className="p-3">
-              <h4 className="mb-2">Shipping Details</h4>
-              <div className="d-flex justify-content-between align-items-center mb-2">
+              <h4 className="mb-4">Shipping Details</h4>
+              <div className="d-flex justify-content-between align-items-center mb-4 px-2">
                 <span>Select Address</span>
                 <span
                   className="text-primary"

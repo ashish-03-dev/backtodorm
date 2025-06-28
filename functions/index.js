@@ -50,6 +50,55 @@ async function fetchDeliveryConfig() {
 }
 
 
+exports.uploadFrame = onCall(
+  {
+    region: "us-central1",
+    timeoutSeconds: 60,
+    concurrency: 80,
+    secrets: CLOUDINARY_SECRETS,
+  },
+  async ({ data, auth }) => {
+    if (!auth || !auth.uid) {
+      throw new HttpsError("unauthenticated", "User must be authenticated");
+    }
+    const { imageUrl, frameId, fileName } = data;
+    if (!imageUrl || !frameId || !fileName) {
+      throw new HttpsError("invalid-argument", "imageUrl, frameId, and fileName are required");
+    }
+
+    try {
+      cloudinary.config({
+        cloud_name: CLOUDINARY_SECRETS[0].value(),
+        api_key: CLOUDINARY_SECRETS[1].value(),
+        api_secret: CLOUDINARY_SECRETS[2].value(),
+      });
+
+      // Upload to Cloudinary
+      const response = await cloudinary.uploader.upload(imageUrl, {
+        folder: "frames",
+        format: "webp",
+      });
+
+      if (!response.secure_url || !response.secure_url.startsWith("https://res.cloudinary.com")) {
+        throw new Error("Invalid Cloudinary URL returned");
+      }
+
+      // Delete from Firebase Storage
+      try {
+        const storageRef = storage.file(`frames/${frameId}/${fileName}`);
+        await storageRef.delete();
+        console.log(`Deleted image from Firebase Storage: frames/${frameId}/${fileName}`);
+      } catch (error) {
+        console.warn(`No file found in Firebase Storage or failed to delete: ${error.message}`);
+      }
+
+      return { success: true, cloudinaryUrl: response.secure_url };
+    } catch (error) {
+      console.error("Failed to upload to Cloudinary or delete from Storage:", error);
+      throw new HttpsError("internal", `Failed to process image: ${error.message}`);
+    }
+  }
+);
 
 exports.updateUser = onCall(
   {
@@ -123,7 +172,6 @@ exports.setAdminStatus = onCall(
     }
   }
 );
-
 exports.approvePoster = onCall(
   {
     secrets: CLOUDINARY_SECRETS,
@@ -153,25 +201,50 @@ exports.approvePoster = onCall(
     if (!tempPoster.exists) throw new HttpsError("not-found", "Poster not found");
 
     const posterData = tempPoster.data();
-    let imageUrl = posterData.originalImageUrl;
+    let imageUrl = posterData.framedImageUrl;
+    let originalImageUrl = posterData.originalImageUrl;
 
+    // Upload framed image to Cloudinary posters/ folder
     if (imageUrl) {
       try {
         const file = storage.file(imageUrl);
         const [buffer] = await file.download();
         const result = await cloudinary.uploader.upload(
           `data:image/jpeg;base64,${buffer.toString("base64")}`,
-          { folder: "posters", public_id: `${posterId}_${Date.now()}`, timeout: 120000 }
+          { folder: "posters", public_id: `${posterId}_framed_${Date.now()}`, timeout: 120000 }
         );
         if (result.secure_url) {
           imageUrl = result.secure_url;
           await file.delete();
         }
       } catch (error) {
-        console.warn("Cloudinary upload failed, using Storage URL", error.message);
+        console.warn("Cloudinary framed image upload failed, using Storage URL", error.message);
       }
     } else {
-      throw new HttpsError("invalid-argument", "Image URL missing");
+      throw new HttpsError("invalid-argument", "Framed image URL missing");
+    }
+
+    // Upload original image to Cloudinary originalPoster/ folder and store in originalPoster collection
+    if (originalImageUrl) {
+      try {
+        const file = storage.file(originalImageUrl);
+        const [buffer] = await file.download();
+        const result = await cloudinary.uploader.upload(
+          `data:image/jpeg;base64,${buffer.toString("base64")}`,
+          { folder: "originalPoster", public_id: `${posterData.posterId}_original_${Date.now()}`, timeout: 120000 }
+        );
+        if (result.secure_url) {
+          await db.collection("originalPoster").doc(posterData.posterId).set({
+            imageUrl: result.secure_url,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          await file.delete();
+        }
+      } catch (error) {
+        console.warn("Cloudinary original image upload failed", error.message);
+      }
+    } else {
+      throw new HttpsError("invalid-argument", "Original image URL missing");
     }
 
     await db.runTransaction(async (t) => {
@@ -185,9 +258,10 @@ exports.approvePoster = onCall(
         ...collectionRefs.map((ref) => t.get(ref)),
       ]);
 
-      t.set(db.collection("posters").doc(posterId), {
+      t.set(db.collection("posters").doc(posterData.posterId), {
         ...posterData,
         imageUrl,
+        framedImageUrl: null,
         originalImageUrl: null,
         approved: "approved",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -229,7 +303,6 @@ exports.approvePoster = onCall(
     return { success: true, posterId, imageUrl };
   }
 );
-
 
 exports.createRazorpayOrder = onCall(
   {
