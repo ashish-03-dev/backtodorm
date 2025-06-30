@@ -10,8 +10,10 @@ const PosterTable = ({
   onReject,
   onUpload,
   onSetFrame,
+  lastPosterRef,
 }) => {
   const [uploadingPosterId, setUploadingPosterId] = useState(false);
+
   if (!posters || posters.length === 0) {
     return <p>No posters found.</p>;
   }
@@ -19,9 +21,9 @@ const PosterTable = ({
   const handleUploadClick = async (posterId) => {
     setUploadingPosterId(posterId);
     try {
-      await onUpload(posterId); // Call the onView function passed from MyProducts
+      await onUpload(posterId);
     } finally {
-      setUploadingPosterId(null); // Reset loading state after view operation completes
+      setUploadingPosterId(null);
     }
   };
 
@@ -38,8 +40,11 @@ const PosterTable = ({
         </tr>
       </thead>
       <tbody>
-        {posters.map((poster) => (
-          <tr key={poster.id}>
+        {posters.map((poster, index) => (
+          <tr
+            key={poster.id}
+            ref={index === posters.length - 3 ? lastPosterRef : null}
+          >
             <td>
               {poster.imageUrl || poster.originalImageUrl ? (
                 <Image
@@ -56,8 +61,11 @@ const PosterTable = ({
             <td>{poster.sellerUsername || "Unknown"}</td>
             <td>{poster.approved || "Pending"}</td>
             <td>
-              {poster.createdAt
-                ? moment(poster.createdAt.toDate ? poster.createdAt.toDate() : poster.createdAt).format("YYYY-MM-DD")
+              {poster.createdAt?.toDate
+                ? poster.createdAt.toDate().toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
                 : "N/A"}
             </td>
             <td>
@@ -90,7 +98,6 @@ const PosterTable = ({
                     Edit
                   </Button>
                 )}
-
                 {onReject && poster.approved === "pending" && (
                   <Button
                     variant="outline-warning"

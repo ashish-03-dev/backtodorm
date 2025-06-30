@@ -235,7 +235,7 @@ const Orders = () => {
                 subtotal: orderData.subtotal,
                 deliveryCharge: orderData.deliveryCharge,
                 totalPrice: orderData.total,
-                orderDate: orderData.createdAt ? new Date(orderData.createdAt.toDate()).toISOString() : new Date().toISOString(),
+                orderDate: orderData.createdAt,
                 paymentStatus: orderData.paymentStatus,
                 shippingAddress: orderData.shippingAddress,
                 razorpay_order_id: orderData.orderId,

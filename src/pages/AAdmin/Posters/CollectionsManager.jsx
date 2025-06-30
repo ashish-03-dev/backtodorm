@@ -32,7 +32,7 @@ const CollectionsManager = () => {
   const [posterImages, setPosterImages] = useState({});
   const [formPosterImages, setFormPosterImages] = useState({});
 
-  // Fetch collections
+  // Fetch collections only
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -44,10 +44,20 @@ const CollectionsManager = () => {
           posterIds: doc.data().posterIds || [],
         }));
         setCollections(collectionsData);
+      } catch (err) {
+        setError("Failed to fetch collections: " + err.message);
+      }
+    };
+    if (firestore) fetchData();
+  }, [firestore]);
 
-        // Pre-fetch image URLs
-        const allIds = collectionsData.flatMap((collection) => collection.posterIds);
-        const uniqueIds = [...new Set(allIds)];
+  // Fetch poster images when detail modal opens
+  useEffect(() => {
+    const fetchPosterImages = async () => {
+      if (!showDetailModal || !selectedCollection || !selectedCollection.posterIds?.length) return;
+
+      try {
+        const uniqueIds = [...new Set(selectedCollection.posterIds)];
         const chunks = [];
         for (let i = 0; i < uniqueIds.length; i += 10) {
           chunks.push(uniqueIds.slice(i, i + 10));
@@ -61,15 +71,16 @@ const CollectionsManager = () => {
             imageResults.push([doc.id, doc.data().imageUrl || ""]);
           });
         }
-        setPosterImages(Object.fromEntries(imageResults));
+        setPosterImages((prev) => ({ ...prev, ...Object.fromEntries(imageResults) }));
       } catch (err) {
-        setError("Failed to fetch collections: " + err.message);
+        setError("Failed to fetch poster images: " + err.message);
       }
     };
-    if (firestore) fetchData();
-  }, [firestore]);
 
-  // Debounced fetch for form poster
+    fetchPosterImages();
+  }, [showDetailModal, selectedCollection, firestore]);
+
+  // Debounced fetch for form poster (unchanged)
   const fetchFormPosterImage = debounce(async (id) => {
     if (!id || formPosterImages[id] !== undefined || posterImages[id] !== undefined) return;
     setFormPosterImages((prev) => ({ ...prev, [id]: null }));
@@ -83,7 +94,7 @@ const CollectionsManager = () => {
     }
   }, 300);
 
-  // Update form poster images
+  // Update form poster images (unchanged)
   useEffect(() => {
     const idsToFetch = formData.posterIds || [];
     idsToFetch.forEach((id) => {
@@ -97,13 +108,13 @@ const CollectionsManager = () => {
     });
   }, [formData.posterIds, posterImages]);
 
-  // Filter collections
+  // Filter collections (unchanged)
   const filteredCollections = collections.filter((collection) =>
     collection.name.toLowerCase().includes(filter.search.toLowerCase())
   );
   const isFiltering = filter.search.trim().length > 0;
 
-  // Validate form
+  // Validate form (unchanged)
   const validateForm = async () => {
     const errors = {};
     if (!formData.collectionId.trim()) {
@@ -145,6 +156,7 @@ const CollectionsManager = () => {
   // Handlers
   const handleShowCollectionDetail = (collection) => {
     setSelectedCollection(collection);
+    setPosterImages({}); // Clear previous poster images
     setShowDetailModal(true);
   };
 
@@ -257,14 +269,14 @@ const CollectionsManager = () => {
       setCollections((prev) =>
         prev.some((c) => c.id === collectionId)
           ? prev.map((c) =>
-            c.id === collectionId
-              ? { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds }
-              : c
-          )
+              c.id === collectionId
+                ? { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds }
+                : c
+            )
           : [
-            ...prev,
-            { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds },
-          ]
+              ...prev,
+              { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds },
+            ]
       );
       const newPosterIds = posterIds.filter((id) => !posterImages[id]);
       if (newPosterIds.length) {
@@ -404,15 +416,19 @@ const CollectionsManager = () => {
                     <span>
                       <strong>ID:</strong> {id}
                     </span>
-                    {posterImages[id] && (
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => handleViewImage(id)}
-                        title="View image"
-                      >
-                        <BiImage />
-                      </Button>
+                    {posterImages[id] === null ? (
+                      <span>Loading...</span>
+                    ) : (
+                      posterImages[id] && (
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => handleViewImage(id)}
+                          title="View image"
+                        >
+                          <BiImage />
+                        </Button>
+                      )
                     )}
                   </ListGroup.Item>
                 ))}
@@ -425,7 +441,7 @@ const CollectionsManager = () => {
         </Modal.Body>
       </Modal>
 
-      {/* EDIT/CREATE MODAL */}
+      {/* EDIT/CREATE MODAL (unchanged) */}
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>{selectedCollection ? "Edit Collection" : "Create Collection"}</Modal.Title>
@@ -529,7 +545,7 @@ const CollectionsManager = () => {
         </Modal.Body>
       </Modal>
 
-      {/* DELETE CONFIRMATION MODAL */}
+      {/* DELETE CONFIRMATION MODAL (unchanged) */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Deletion</Modal.Title>

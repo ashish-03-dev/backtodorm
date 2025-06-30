@@ -414,9 +414,8 @@ export const saveFramedImage = async (firestore, storage, posterId, imageData, u
   }
 };
 
-export const saveFrame = async (firestore, storage, frameData, file, user) => {
+export const saveFrame = async (firestore, storage, frameData, file) => {
   try {
-    if (!user) throw new Error("User not authenticated");
     const frameRef = doc(firestore, "frames", `frame_${Date.now()}`);
     let imageUrl = "";
     let fileName = "";
@@ -431,8 +430,7 @@ export const saveFrame = async (firestore, storage, frameData, file, user) => {
       imageUrl,
       fileName,
       uploaded: false,
-      createdBy: user.uid,
-      createdAt: new Date().toISOString(),
+      createdAt: serverTimestamp(),
     });
     return { success: true, id: frameRef.id, imageUrl };
   } catch (error) {

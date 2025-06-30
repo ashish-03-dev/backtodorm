@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebase } from '../../context/FirebaseContext';
-import { collection, query, onSnapshot, doc, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Alert, Spinner, Form, Button, Card, Table, Badge } from 'react-bootstrap';
 import { Navigate } from 'react-router-dom';
 
@@ -98,8 +98,8 @@ export default function HelpCentre() {
         orderId: subject === 'Order Related' ? orderId : null,
         description,
         status: 'Open',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         adminNotes: '',
         resolution: '',
       };

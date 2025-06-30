@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { doc, getDoc, collection, getDocs, setDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, getDownloadURL } from "firebase/storage";
 import { centerCrop, makeAspectCrop } from "react-image-crop";
 import { useFirebase } from "../../../context/FirebaseContext";
@@ -613,7 +613,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       approved: poster?.source === "posters" ? "approved" : "pending",
       isActive: form.isActive.checked,
       sellerUsername,
-      createdAt: poster?.createdAt || new Date().toISOString(),
+      createdAt: poster?.createdAt || serverTimestamp(),
       updatedAt: new Date().toISOString(),
       posterId: form.posterId.value,
     };

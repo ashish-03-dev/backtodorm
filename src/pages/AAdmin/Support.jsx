@@ -28,7 +28,13 @@ export default function AdminSupport() {
             id: doc.id,
             ...doc.data(),
           }));
-          setTickets(ticketList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+          //sort using date and time
+          setTickets(
+            ticketList.sort(
+              (a, b) =>
+                b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime()
+            )
+          );
           setLoading(false);
         } catch (err) {
           setError(`Failed to fetch tickets: ${err.message}`);
@@ -49,7 +55,7 @@ export default function AdminSupport() {
     setError("");
     try {
       const ticketRef = doc(firestore, "supportTickets", ticketId);
-      await updateDoc(ticketRef, { 
+      await updateDoc(ticketRef, {
         status: newStatus,
         updatedAt: new Date().toISOString(),
       });
@@ -57,7 +63,7 @@ export default function AdminSupport() {
       // Update userSupportTickets collection
       const ticket = tickets.find(t => t.id === ticketId);
       const userTicketRef = doc(firestore, `userSupportTickets/${ticket.userId}/tickets`, ticketId);
-      await updateDoc(userTicketRef, { 
+      await updateDoc(userTicketRef, {
         status: newStatus,
         updatedAt: new Date().toISOString(),
       });

@@ -36,11 +36,10 @@ export default function PosterTable({ posters, onView, onDelete, isDashboardView
                 </td>
                 <td>
                   {poster.createdAt
-                    ? new Date(
-                        poster.createdAt.seconds
-                          ? poster.createdAt.seconds * 1000
-                          : poster.createdAt
-                      ).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                    ? poster.createdAt.toDate().toLocaleString("en-IN", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })
                     : "N/A"}
                 </td>
                 <td>

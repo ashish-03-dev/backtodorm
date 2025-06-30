@@ -63,9 +63,10 @@ const PosterView = ({ poster }) => {
           <ListGroup.Item>
             <small>
               <strong>{poster.source === "rejectedPosters" ? "Rejected At" : "Created At"}:</strong>{" "}
-              {new Date(
-                poster.createdAt.seconds ? poster.createdAt.seconds * 1000 : poster.createdAt
-              ).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+              {poster.createdAt.toDate().toLocaleString("en-US", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
             </small>
           </ListGroup.Item>
         )}

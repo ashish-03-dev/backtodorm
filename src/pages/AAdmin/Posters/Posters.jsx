@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Tabs, Tab, Modal, Spinner, Alert } from "react-bootstrap";
 import PosterTable from "./PosterTable";
 import PosterFilter from "./PosterFilter";
-import PosterForm from "./PosterForm";
+import PosterForm from "../PosterApprovals/PosterForm";
 import PosterView from "./PosterView";
 import CollectionsManager from "./CollectionsManager";
 import { useFirebase } from "../../../context/FirebaseContext";
-import { collection, onSnapshot } from "firebase/firestore";
-import { updatePoster, submitPoster } from "./adminPosterUtils"; // Import submitPoster
+import { collection, onSnapshot, query, orderBy, startAfter, limit } from "firebase/firestore";
+import { updatePoster, submitPoster } from "./adminPosterUtils";
 import { ref, getDownloadURL } from "firebase/storage";
 import "bootstrap/dist/css/bootstrap.min.css";
 
@@ -15,20 +15,24 @@ const Posters = () => {
   const { firestore, storage, user, loadingUserData } = useFirebase();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ search: "", approved: "" });
   const [tabFilters, setTabFilters] = useState({
-    recent: { search: "" },
     inactive: { search: "" },
     collections: { search: "" },
   });
-  const [activeTab, setActiveTab] = useState("recent");
+  const [activeTab, setActiveTab] = useState("all");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const observer = useRef(null);
+  const lastPosterRef = useRef(null);
 
-  // Fetch posters with image URLs
+  // Fetch initial posters
   useEffect(() => {
     if (!firestore || !storage) {
       console.error("Firestore or Storage instance is undefined");
@@ -37,8 +41,9 @@ const Posters = () => {
       return;
     }
 
+    const q = query(collection(firestore, "posters"), orderBy("createdAt", "desc"), limit(10));
     const unsubscribePosters = onSnapshot(
-      collection(firestore, "posters"),
+      q,
       async (snapshot) => {
         const postersData = snapshot.docs.map((doc) => ({
           id: doc.id,
@@ -46,7 +51,6 @@ const Posters = () => {
           source: "posters",
         }));
 
-        // Fetch download URLs for posters
         const postersWithUrls = await Promise.all(
           postersData.map(async (poster) => {
             if (poster.imageUrl) {
@@ -64,6 +68,8 @@ const Posters = () => {
         );
 
         setPosters(postersWithUrls);
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMore(snapshot.docs.length === 10);
         setLoading(false);
       },
       (error) => {
@@ -75,6 +81,81 @@ const Posters = () => {
 
     return () => unsubscribePosters();
   }, [firestore, storage]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+
+    observer.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && posters.length >= 3) {
+          fetchMorePosters();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (lastPosterRef.current) {
+      observer.current.observe(lastPosterRef.current);
+    }
+
+    return () => {
+      if (observer.current) {
+        observer.current.disconnect();
+      }
+    };
+  }, [posters, hasMore, loadingMore]);
+
+  // Fetch more posters
+  const fetchMorePosters = async () => {
+    if (!hasMore || !lastDoc) return;
+
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(firestore, "posters"),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDoc),
+        limit(10)
+      );
+
+      const snapshot = await new Promise((resolve, reject) => {
+        const unsubscribe = onSnapshot(q, resolve, reject);
+        return () => unsubscribe();
+      });
+
+      const newPosters = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        source: "posters",
+      }));
+
+      const postersWithUrls = await Promise.all(
+        newPosters.map(async (poster) => {
+          if (poster.imageUrl) {
+            try {
+              const imageRef = ref(storage, poster.imageUrl);
+              const url = await getDownloadURL(imageRef);
+              return { ...poster, imageUrl: url };
+            } catch (err) {
+              console.warn(`Failed to load image URL for poster ${poster.id}:`, err.message);
+              return poster;
+            }
+          }
+          return poster;
+        })
+      );
+
+      setPosters((prev) => [...prev, ...postersWithUrls]);
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+      setHasMore(snapshot.docs.length === 10);
+    } catch (error) {
+      console.error("Error fetching more posters:", error);
+      setError(`Failed to fetch more posters: ${error.message}`);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Poster management functions
   const openEdit = (poster) => {
@@ -143,12 +224,6 @@ const Posters = () => {
     );
   };
 
-  const recentList = applySearchFilter(
-    posters
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5),
-    tabFilters.recent.search
-  );
   const allFiltered = applySearchFilter(posters, filter.search);
   const inactiveList = applySearchFilter(
     posters.filter((p) => !p.isActive && p.approved === "approved"),
@@ -182,18 +257,6 @@ const Posters = () => {
         onSelect={(k) => setActiveTab(k)}
         className="mb-3"
       >
-        <Tab eventKey="recent" title="🕑 Recent">
-          <PosterFilter
-            filter={tabFilters.recent}
-            onFilterChange={(f) => handleTabFilterChange("recent", f)}
-            hideApprovedFilter
-          />
-          <PosterTable
-            posters={recentList}
-            onEdit={openEdit}
-            onView={openView}
-          />
-        </Tab>
         <Tab eventKey="all" title="📋 All Posters">
           <PosterFilter
             filter={filter}
@@ -203,7 +266,13 @@ const Posters = () => {
             posters={allFiltered}
             onEdit={openEdit}
             onView={openView}
+            lastPosterRef={lastPosterRef}
           />
+          {loadingMore && (
+            <div className="text-center mt-3">
+              <Spinner animation="border" className="text-primary" />
+            </div>
+          )}
         </Tab>
         <Tab eventKey="inactive" title="🔒 Inactive">
           <PosterFilter
@@ -242,8 +311,8 @@ const Posters = () => {
             poster={editing}
             onSubmit={submitPosterHandler}
             onUpdatePoster={updatePosterHandler}
-            onUpdateTempPoster={() => {}} // Placeholder, not used in Posters
-            onRejectTempPoster={() => {}} // Placeholder, not used in Posters
+            onUpdateTempPoster={() => { }}
+            onRejectTempPoster={() => { }}
           />
         </Modal.Body>
       </Modal>

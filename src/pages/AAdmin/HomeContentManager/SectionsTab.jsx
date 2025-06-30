@@ -336,7 +336,7 @@ const SectionsTab = ({
                   aria-label={`Update section ${section.id}`}
                   disabled={!firestore || (!sectionUpdateRules[section.id] && !sectionUpdateRules.default)}
                 >
-                  <BiRefresh /> Update
+                  <BiRefresh /> Auto Update
                 </Button>
                 <Button
                   variant="outline-danger"

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { doc, onSnapshot, query, collection, where } from 'firebase/firestore';
@@ -10,9 +10,78 @@ export default function SectionScroll({ sectionId, title, firestore }) {
   const [posters, setPosters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [allPosterIds, setAllPosterIds] = useState([]);
+  const [loadedPosterIds, setLoadedPosterIds] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
+  const batchSize = 10; // Firestore 'in' query limit
 
+  // Fetch a batch of posters
+  const fetchPosterBatch = useCallback(
+    (idsToFetch) => {
+      if (!firestore || !idsToFetch.length) {
+        setHasMore(false);
+        return () => {};
+      }
+
+      const postersQuery = query(
+        collection(firestore, 'posters'),
+        where('__name__', 'in', idsToFetch),
+        where('approved', '==', 'approved'),
+        where('isActive', '==', true)
+      );
+
+      const unsubscribe = onSnapshot(
+        postersQuery,
+        (postersSnap) => {
+          const fetchedPosters = postersSnap.docs.map((doc) => {
+            const data = doc.data();
+            const sizes = Array.isArray(data.sizes) ? data.sizes : [];
+            const badges = Array.isArray(data.badges) ? data.badges : [];
+            const minPriceSize = sizes.length
+              ? sizes.reduce(
+                  (min, size) => (size.finalPrice < min.finalPrice ? size : min),
+                  sizes[0]
+                )
+              : { price: 0, finalPrice: 0, size: '' };
+
+            return {
+              id: doc.id,
+              title: data.title || 'Untitled',
+              image: data.imageUrl || '',
+              price: minPriceSize.price || 0,
+              finalPrice: minPriceSize.finalPrice || minPriceSize.price || 0,
+              discount: minPriceSize.discount || data.discount || 0,
+              sizes,
+              badges,
+              defaultSize: minPriceSize.size,
+              seller: data.seller || null,
+            };
+          });
+
+          setPosters((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newPosters = fetchedPosters.filter((p) => !existingIds.has(p.id));
+            return [...prev, ...newPosters];
+          });
+
+          setLoadedPosterIds((prev) => [...new Set([...prev, ...idsToFetch])]);
+          setIsLoading(false);
+        },
+        (err) => {
+          setError(`Failed to load posters: ${err.message}`);
+          setIsLoading(false);
+          setHasMore(false);
+        }
+      );
+
+      return unsubscribe;
+    },
+    [firestore]
+  );
+
+  // Fetch section data and initialize poster IDs
   useEffect(() => {
     if (!firestore) {
       setError('Firestore is not available. Please try again later.');
@@ -28,6 +97,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
           setError(`${title} data not found.`);
           setPosters([]);
           setIsLoading(false);
+          setHasMore(false);
           return;
         }
 
@@ -38,72 +108,68 @@ export default function SectionScroll({ sectionId, title, firestore }) {
           setError(`${title} not configured.`);
           setPosters([]);
           setIsLoading(false);
+          setHasMore(false);
           return;
         }
 
-        const posterIds = section.posterIds
-          ?.slice(0, 10)
-          .filter(id => typeof id === 'string' && id.trim() !== '') || [];
+        const posterIds = section.posterIds?.filter(
+          (id) => typeof id === 'string' && id.trim() !== ''
+        ) || [];
 
         if (!posterIds.length) {
           setPosters([]);
           setIsLoading(false);
+          setHasMore(false);
           return;
         }
 
-        const postersQuery = query(
-          collection(firestore, 'posters'),
-          where('__name__', 'in', posterIds),
-          where('approved', '==', 'approved'),
-          where('isActive', '==', true)
-        );
+        setAllPosterIds(posterIds);
+        const firstBatch = posterIds.slice(0, batchSize);
+        setLoadedPosterIds(firstBatch);
+        setHasMore(posterIds.length > batchSize);
 
-        const unsubscribePosters = onSnapshot(
-          postersQuery,
-          (postersSnap) => {
-            const fetchedPosters = postersSnap.docs.map((doc) => {
-              const data = doc.data();
-              const sizes = Array.isArray(data.sizes) ? data.sizes : [];
-              const badges = Array.isArray(data.badges) ? data.badges : [];
-              const minPriceSize = sizes.length
-                ? sizes.reduce(
-                  (min, size) => (size.finalPrice < min.finalPrice ? size : min),
-                  sizes[0]
-                )
-                : { price: 0, finalPrice: 0, size: '' };
-
-              return {
-                id: doc.id,
-                title: data.title || 'Untitled',
-                image: data.imageUrl || '',
-                price: minPriceSize.price || 0,
-                finalPrice: minPriceSize.finalPrice || minPriceSize.price || 0,
-                discount: minPriceSize.discount || data.discount || 0,
-                sizes,
-                badges,
-                defaultSize: minPriceSize.size,
-                seller: data.seller || null,
-              };
-            });
-            setPosters(fetchedPosters);
-            setIsLoading(false);
-          },
-          (err) => {
-            setError(`Failed to load posters: ${err.message}`);
-            setIsLoading(false);
-          }
-        );
-
+        const unsubscribePosters = fetchPosterBatch(firstBatch);
         return () => unsubscribePosters();
       },
       (err) => {
         setError(`Failed to load ${title.toLowerCase()}: ${err.message}`);
         setIsLoading(false);
+        setHasMore(false);
       }
     );
 
     return () => unsubscribeSection();
-  }, [firestore, sectionId, title]);
+  }, [firestore, sectionId, title, fetchPosterBatch]);
+
+  // Handle scroll to fetch more posters
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || !hasMore) return;
+
+    const handleScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      const posterWidth = 200; // Approximate poster width in pixels
+      const postersVisible = Math.ceil((scrollLeft + clientWidth) / posterWidth);
+      const totalPosters = posters.length;
+      const postersRemaining = totalPosters - postersVisible;
+
+      if (postersRemaining <= 2 && hasMore && !isLoading) {
+        const nextBatchStart = loadedPosterIds.length;
+        const nextBatch = allPosterIds.slice(nextBatchStart, nextBatchStart + batchSize);
+
+        if (nextBatch.length > 0) {
+          setIsLoading(true);
+          fetchPosterBatch(nextBatch);
+          setHasMore(allPosterIds.length > nextBatchStart + batchSize);
+        } else {
+          setHasMore(false);
+        }
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasMore, posters.length, loadedPosterIds.length, allPosterIds, fetchPosterBatch, isLoading]);
 
   const scroll = (direction) => {
     const container = scrollRef.current;
@@ -189,7 +255,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <h2 className="fs-2 fw-bold mb-4">{title}</h2>
+      <h2 className="fs-2 fw-bold mb-4 text-center">{title}</h2>
 
       {isHovered && posters.length > 0 && (
         <>
@@ -212,7 +278,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
         </>
       )}
 
-      {isLoading && (
+      {isLoading && posters.length === 0 && (
         <div
           ref={scrollRef}
           className="d-flex overflow-auto gap-2 pb-2"
@@ -337,10 +403,9 @@ export default function SectionScroll({ sectionId, title, firestore }) {
                         </div>
                       ) : (
                         <h6 className="text-muted mb-0">
-                          From <span className='fw-semibold'>₹{item.finalPrice.toLocaleString('en-IN')}</span>
+                          From <span className="fw-semibold">₹{item.finalPrice.toLocaleString('en-IN')}</span>
                         </h6>
                       )}
-
                     </div>
                   </div>
                 </Link>
@@ -356,6 +421,18 @@ export default function SectionScroll({ sectionId, title, firestore }) {
               </div>
             </div>
           ))}
+          {isLoading && posters.length > 0 && (
+            <div
+              className="d-flex overflow-auto gap-2"
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              {Array(3)
+                .fill()
+                .map((_, index) => (
+                  <SkeletonCard key={`loading-${index}`} />
+                ))}
+            </div>
+          )}
         </div>
       )}
     </section>

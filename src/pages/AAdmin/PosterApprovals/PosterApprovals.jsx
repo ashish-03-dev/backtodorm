@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Modal, Spinner, Alert, Tabs, Tab } from "react-bootstrap";
 import PosterTable from "../Posters/PosterTable";
 import PosterFilter from "../Posters/PosterFilter";
-import PosterForm from "../Posters/PosterForm";
+import PosterForm from "./PosterForm";
 import PosterView from "../Posters/PosterView";
 import PosterFrameForm from '../PosterApprovals/PosterFrameForm';
 import { useFirebase } from "../../../context/FirebaseContext";

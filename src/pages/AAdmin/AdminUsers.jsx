@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Modal, Button, Form, Badge, Alert } from 'react-bootstrap';
 import { useFirebase } from '../../context/FirebaseContext';
-import { collection, query, where, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, setDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function AdminUsers() {
   const { firestore } = useFirebase();
@@ -89,7 +89,7 @@ export default function AdminUsers() {
         email: newAdmin.email,
         isAdmin: true,
         isActive: true,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
       });
 
       setAdmins((prev) => [
@@ -207,7 +207,7 @@ export default function AdminUsers() {
             Close
           </Button>
         </Modal.Footer>
-        </Modal>
+      </Modal>
     </div>
   );
 }

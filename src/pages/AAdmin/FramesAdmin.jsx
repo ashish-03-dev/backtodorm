@@ -8,105 +8,106 @@ import "react-image-crop/dist/ReactCrop.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
-const FRAME_SIZES = {
-  A4: { name: "A4", widthPx: 900, heightPx: 1200, aspectRatio: 3 / 4 },
-  A3: { name: "A3", widthPx: 1000, heightPx: 1333, aspectRatio: 3 / 4 },
-  "A3 x 3": { name: "A3 x 3", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
-  "A4 x 5": { name: "A4 x 5", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
-};
-const POSTER_POSITIONS = {
-  "top-left": {
-    label: "Top Left",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.15,
-      y: FRAME_SIZES[size].heightPx * 0.15,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "top-center": {
-    label: "Top Center",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.175,
-      y: FRAME_SIZES[size].heightPx * 0.15,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "top-right": {
-    label: "Top Right",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.225,
-      y: FRAME_SIZES[size].heightPx * 0.15,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "center-left": {
-    label: "Center Left",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.15,
-      y: FRAME_SIZES[size].heightPx * 0.225,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "center": {
-    label: "Center",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.175,
-      y: FRAME_SIZES[size].heightPx * 0.175,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "center-right": {
-    label: "Center Right",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.225,
-      y: FRAME_SIZES[size].heightPx * 0.225,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "bottom-left": {
-    label: "Bottom Left",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.15,
-      y: FRAME_SIZES[size].heightPx * 0.3,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "bottom-center": {
-    label: "Bottom Center",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.175,
-      y: FRAME_SIZES[size].heightPx * 0.3,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
-  "bottom-right": {
-    label: "Bottom Right",
-    getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.225,
-      y: FRAME_SIZES[size].heightPx * 0.3,
-      width: FRAME_SIZES[size].widthPx * 0.65,
-      height: FRAME_SIZES[size].heightPx * 0.65,
-    }),
-  },
+  const FRAME_SIZES = {
+    A4: { name: "A4", widthPx: 800, heightPx: 1200, aspectRatio: 2 / 3 },
+    A3: { name: "A3", widthPx: 1000, heightPx: 1333, aspectRatio: 3 / 4 },
+    "A3 x 3": { name: "A3 x 3", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
+    "A4 x 5": { name: "A4 x 5", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
+  };
 
-  "custom": {
-    label: "Custom",
-    getPosition: () => ({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-    }),
-  },
-};
+  const POSTER_POSITIONS = {
+    "top-left": {
+      label: "Top Left",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.15,
+        y: FRAME_SIZES[size].heightPx * 0.15,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "top-center": {
+      label: "Top Center",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.175,
+        y: FRAME_SIZES[size].heightPx * 0.15,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "top-right": {
+      label: "Top Right",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.225,
+        y: FRAME_SIZES[size].heightPx * 0.15,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "center-left": {
+      label: "Center Left",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.15,
+        y: FRAME_SIZES[size].heightPx * 0.225,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "center": {
+      label: "Center",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.175,
+        y: FRAME_SIZES[size].heightPx * 0.175,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "center-right": {
+      label: "Center Right",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.225,
+        y: FRAME_SIZES[size].heightPx * 0.225,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "bottom-left": {
+      label: "Bottom Left",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.15,
+        y: FRAME_SIZES[size].heightPx * 0.3,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "bottom-center": {
+      label: "Bottom Center",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.175,
+        y: FRAME_SIZES[size].heightPx * 0.3,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+    "bottom-right": {
+      label: "Bottom Right",
+      getPosition: (size) => ({
+        x: FRAME_SIZES[size].widthPx * 0.225,
+        y: FRAME_SIZES[size].heightPx * 0.3,
+        width: FRAME_SIZES[size].widthPx * 0.65,
+        height: FRAME_SIZES[size].heightPx * 0.65,
+      }),
+    },
+
+    "custom": {
+      label: "Custom",
+      getPosition: () => ({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+      }),
+    },
+  };
 
 const FramesAdmin = () => {
   const { firestore, storage, user } = useFirebase();
@@ -461,7 +462,7 @@ const handleSubmit = async (e) => {
         },
         uploaded: false,
       };
-      const result = await saveFrame(firestore, storage, frameData, formData.file, user);
+      const result = await saveFrame(firestore, storage, frameData, formData.file);
       if (result.success) {
         setFrames((prev) => [
           ...prev,

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { ListGroup, Button, Modal, Form, Collapse } from "react-bootstrap";
 import { BiPlus, BiClipboard, BiTrash, BiImage, BiChevronDown, BiChevronUp } from "react-icons/bi";
-import { collection, getDocs, setDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc,serverTimestamp } from "firebase/firestore";
 import { useFirebase } from "../../../context/FirebaseContext";
 import { fetchImages } from "./utils";
 
@@ -69,10 +69,10 @@ const StandaloneCollectionsTab = ({
           image: ensureString(d.data().image),
           posters: Array.isArray(d.data().posters)
             ? d.data().posters.map((p) => ({
-                posterId: ensureString(p.posterId || p),
-                size: ensureString(p.size),
-                price: Number.isFinite(p.price) ? p.price : 0,
-              }))
+              posterId: ensureString(p.posterId || p),
+              size: ensureString(p.size),
+              price: Number.isFinite(p.price) ? p.price : 0,
+            }))
             : [],
           discount: Number.isFinite(d.data().discount) ? d.data().discount : 20,
           createdAt: d.data().createdAt,
@@ -210,8 +210,8 @@ const StandaloneCollectionsTab = ({
           price: parseFloat(p.price) || 0,
         })).filter((p) => p.posterId && p.size),
         discount: parseFloat(formData.discount) || 20,
-        createdAt: selectedItem ? selectedItem.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: selectedItem ? selectedItem.createdAt : serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
       await setDoc(doc(firestore, "standaloneCollections", id), newCollection);
       setCollections((prev) => {
@@ -264,10 +264,10 @@ const StandaloneCollectionsTab = ({
       image: ensureString(item?.image),
       posters: Array.isArray(item?.posters)
         ? item.posters.map((p) => ({
-            posterId: ensureString(p.posterId || p),
-            size: ensureString(p.size),
-            price: Number.isFinite(p.price) ? p.price : -1,
-          }))
+          posterId: ensureString(p.posterId || p),
+          size: ensureString(p.size),
+          price: Number.isFinite(p.price) ? p.price : -1,
+        }))
         : [],
       discount: Number.isFinite(item?.discount) ? item.discount : 20,
     };
@@ -592,8 +592,8 @@ const StandaloneCollectionsTab = ({
   return (
     <div className="border rounded p-3" style={{ maxHeight: "600px", overflowY: "auto" }}>
       <div className="d-flex justify-content-end mb-3">
-        <Button variant="primary" onClick={() => handleEdit()} aria-label="Create new standalone collection">
-          Create Standalone Collection
+        <Button variant="primary" onClick={() => handleEdit()} aria-label="Create new collection pack">
+          New Collection Pack
         </Button>
       </div>
       {submissionError && (

@@ -30,10 +30,10 @@ export const rejectPoster = async (firestore, storage, posterId) => {
         updatedTempPosters = tempPosters.map((p) =>
           p.posterId === posterId
             ? {
-                ...p,
-                status: "rejected",
-                data: { ...rest, approved: "rejected", updatedAt: new Date().toISOString() },
-              }
+              ...p,
+              status: "rejected",
+              data: { ...rest, approved: "rejected", updatedAt: new Date().toISOString() },
+            }
             : p
         );
       } else {
@@ -42,7 +42,7 @@ export const rejectPoster = async (firestore, storage, posterId) => {
             posterId: posterId,
             status: "rejected",
             data: { ...rest, approved: "rejected", updatedAt: new Date().toISOString() },
-            createdAt: new Date().toISOString(),
+            createdAt: serverTimestamp(),
           },
         ];
       }
