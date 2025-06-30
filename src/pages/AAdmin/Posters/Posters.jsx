@@ -169,8 +169,8 @@ const Posters = () => {
   }
 
   return (
-    <div className="container mt-4" style={{ maxWidth: "1400px" }}>
-      <h2>🖼️ Posters Management</h2>
+    <div className="p-4 p-md-5" style={{ maxWidth: "1400px" }}>
+      <h3 className="mb-4">🖼️ Posters Management</h3>
       {error && (
         <Alert variant="danger" onClose={() => setError(null)} dismissible>
           {error}

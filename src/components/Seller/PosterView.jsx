@@ -13,7 +13,7 @@ const PosterView = ({ poster }) => {
             src={imageUrl}
             alt={poster?.title || "Poster"}
             fluid
-            style={{ maxHeight: "300px", objectFit: "contain" }}
+            style={{ height: "300px", objectFit: "contain" }}
             onError={(e) => {
               e.target.onerror = null;
               e.target.src = "https://via.placeholder.com/300x300?text=Image+not+found";

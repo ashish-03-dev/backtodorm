@@ -1,21 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Form, Button, Alert, Modal, ProgressBar, Spinner } from "react-bootstrap";
-import { collection, getDocs, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytesResumable } from "firebase/storage";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { useFirebase } from "../../context/FirebaseContext";
+import { addPoster } from "./sellerUtils";
 
-// Poster sizes (300 DPI)
 const POSTER_SIZES = {
   A4: { widthPx: 2480, heightPx: 3508, aspectRatio: 2480 / 3508 },
   A3: { widthPx: 3508, heightPx: 4961, aspectRatio: 3508 / 4961 },
   "A3*3": { widthPx: 3508 * 3, heightPx: 4961, aspectRatio: (3508 * 3) / 4961 },
 };
 
-export default function SellYourPoster({ onSave }) {
+export default function SellYourPoster() {
   const { firestore, storage, user } = useFirebase();
+  const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -25,6 +27,7 @@ export default function SellYourPoster({ onSave }) {
     imageFile: null,
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [cropping, setCropping] = useState(false);
@@ -38,11 +41,48 @@ export default function SellYourPoster({ onSave }) {
   const [collections, setCollections] = useState([]);
   const [sellerUsername, setSellerUsername] = useState("");
   const [recommendedSize, setRecommendedSize] = useState(null);
-  const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const [cropImageSize, setCropImageSize] = useState({ width: 0, height: 0 });
   const imgRef = useRef(null);
   const fileInputRef = useRef(null);
   const IMAGE_QUALITY = 0.9;
 
+  // Reset form when closing
+  useEffect(() => {
+    if (!editing) {
+      setFormData({
+        title: "",
+        description: "",
+        tags: "",
+        collections: [],
+        sizes: [{ size: "" }],
+        imageFile: null,
+      });
+      setError("");
+      setSubmitting(false);
+      setProgress(0);
+      setCropping(false);
+      setCrop(null);
+      setImageSrc(null);
+      setOriginalImageSrc(null);
+      setShowCropModal(false);
+      setSelectedSize("");
+      setRotation(0);
+      setCroppedPreview(null);
+      setRecommendedSize(null);
+      setCropImageSize({ width: 0, height: 0 });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [editing]);
+
+  // Clear success message after 5 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
+  // Fetch user data and collections
   useEffect(() => {
     const fetchData = async () => {
       if (!user || !firestore) {
@@ -62,36 +102,60 @@ export default function SellYourPoster({ onSave }) {
         setError("Failed to load data: " + err.message);
       }
     };
-    fetchData();
-  }, [firestore, user]);
+    if (editing) fetchData();
+  }, [firestore, user, editing]);
+
+  // Update crop size only during active cropping
+  useEffect(() => {
+    if (
+      crop &&
+      imageSrc &&
+      imgRef.current?.naturalWidth &&
+      imgRef.current?.naturalHeight &&
+      selectedSize &&
+      POSTER_SIZES[selectedSize]
+    ) {
+      const cropWidth = (crop.width / 100) * imgRef.current.naturalWidth;
+      const cropHeight = (crop.height / 100) * imgRef.current.naturalHeight;
+      if (cropWidth > 0 && cropHeight > 0) {
+        setCropImageSize({ width: Math.round(cropWidth), height: Math.round(cropHeight) });
+      } else {
+        setCropImageSize({ width: 0, height: 0 });
+      }
+    }
+    // Do not reset cropImageSize when croppedPreview exists or after cropping
+  }, [crop, imageSrc, selectedSize]);
 
   const handleImageChange = (e) => {
     if (!selectedSize || !POSTER_SIZES[selectedSize]) {
-      setError("Please select a size in the size field before uploading an image.");
+      setError("Please select a size before uploading an image.");
       return;
     }
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        setOriginalImageSize({ width: img.width, height: img.height });
         const { widthPx, heightPx, aspectRatio } = POSTER_SIZES[selectedSize];
+
+        // Set cropImageSize to original image resolution
+        setCropImageSize({ width: img.width, height: img.height });
+
+        // Check for recommended size
         const bestSize = Object.keys(POSTER_SIZES).reduce((best, size) => {
           const { widthPx: w, heightPx: h } = POSTER_SIZES[size];
-          if (img.width >= w && img.height >= h && (!best || w * h > POSTER_SIZES[best].widthPx * POSTER_SIZES[best].heightPx)) {
+          const aspectDiff = Math.abs((img.width / img.height) - POSTER_SIZES[size].aspectRatio);
+          const isLargeEnough = img.width >= w && img.height >= h;
+          if (isLargeEnough && (!best || aspectDiff < Math.abs((img.width / img.height) - POSTER_SIZES[best].aspectRatio))) {
             return size;
           }
           return best;
         }, null);
 
         const isUpscaling = img.width < widthPx || img.height < heightPx;
-        if (isUpscaling && bestSize && bestSize !== selectedSize) {
-          setRecommendedSize(bestSize);
-        } else {
-          setRecommendedSize(null);
-        }
+        setRecommendedSize(isUpscaling && bestSize && bestSize !== selectedSize ? bestSize : null);
 
         const imageDataUrl = event.target.result;
         if (Math.abs(img.width / img.height - aspectRatio) > 0.05) {
@@ -120,6 +184,10 @@ export default function SellYourPoster({ onSave }) {
                 const scaledFile = new File([blob], `scaled_${Date.now()}.jpg`, { type: "image/jpeg" });
                 setFormData((prev) => ({ ...prev, imageFile: scaledFile }));
                 setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+                // Retain original image resolution for display
+                setCropImageSize({ width: img.width, height: img.height });
+              } else {
+                setError("Failed to process image.");
               }
             },
             "image/jpeg",
@@ -148,7 +216,7 @@ export default function SellYourPoster({ onSave }) {
     setCrop(null);
     setRotation(0);
     setRecommendedSize(null);
-    setOriginalImageSize({ width: 0, height: 0 });
+    setCropImageSize({ width: 0, height: 0 });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -160,18 +228,14 @@ export default function SellYourPoster({ onSave }) {
       const newRotation = (rotation + 90) % 360;
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-
       canvas.width = newRotation % 180 === 0 ? img.width : img.height;
       canvas.height = newRotation % 180 === 0 ? img.height : img.width;
-
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate((newRotation * Math.PI) / 180);
       ctx.drawImage(img, -img.width / 2, -img.height / 2);
-
-      setImageSrc(canvas.toDataURL("image/jpeg",).toDataURL("image/jpeg", IMAGE_QUALITY));
+      setImageSrc(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
       setCrop(
         centerCrop(
           makeAspectCrop(
@@ -185,14 +249,18 @@ export default function SellYourPoster({ onSave }) {
         )
       );
       setRotation(newRotation);
-      setOriginalImageSize({ width: canvas.width, height: canvas.height });
+      // Update cropImageSize to rotated image dimensions
+      setCropImageSize({
+        width: Math.round(canvas.width),
+        height: Math.round(canvas.height),
+      });
     };
     img.src = originalImageSrc;
   };
 
   const handleCropComplete = async () => {
     if (!imgRef.current || !crop?.width || !crop?.height || crop.width < 10 || crop.height < 10 || !selectedSize || !POSTER_SIZES[selectedSize]) {
-      setError("Invalid crop region or size selection. Please select a valid size and crop area.");
+      setError("Invalid crop region or size selection.");
       setShowCropModal(false);
       return;
     }
@@ -203,7 +271,6 @@ export default function SellYourPoster({ onSave }) {
       const ctx = canvas.getContext("2d");
       canvas.width = widthPx;
       canvas.height = heightPx;
-
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       const cropX = (crop.x / 100) * imgRef.current.naturalWidth;
@@ -211,10 +278,9 @@ export default function SellYourPoster({ onSave }) {
       const cropWidth = (crop.width / 100) * imgRef.current.naturalWidth;
       const cropHeight = (crop.height / 100) * imgRef.current.naturalHeight;
       ctx.drawImage(imgRef.current, cropX, cropY, cropWidth, cropHeight, 0, 0, widthPx, heightPx);
-
       await new Promise((resolve, reject) => {
         canvas.toBlob(
-          (blob) =>{
+          (blob) => {
             if (!blob) {
               reject(new Error("Failed to generate cropped image."));
               return;
@@ -222,13 +288,14 @@ export default function SellYourPoster({ onSave }) {
             const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: "image/jpeg" });
             setFormData((prev) => ({ ...prev, imageFile: croppedFile }));
             setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+            // Store cropped resolution
+            setCropImageSize({ width: Math.round(cropWidth), height: Math.round(cropHeight) });
             resolve();
           },
           "image/jpeg",
           IMAGE_QUALITY
         );
       });
-
       setShowCropModal(false);
       setImageSrc(null);
       setOriginalImageSrc(null);
@@ -251,7 +318,7 @@ export default function SellYourPoster({ onSave }) {
     setCroppedPreview(null);
     setShowCropModal(false);
     setRecommendedSize(null);
-    setOriginalImageSize({ width: 0, height: 0 });
+    setCropImageSize({ width: 0, height: 0 });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -267,7 +334,7 @@ export default function SellYourPoster({ onSave }) {
   const removeSize = (index) => {
     if (formData.sizes.length > 1) {
       const newSizes = formData.sizes.filter((_, i) => i !== index);
-      setFormData((prev) => ({ ...prev, sizes: newSizes }));
+      setFormData((prev) => ({ ...prev, sizes: new formData.sizes }));
       if (formData.sizes[index].size === selectedSize) {
         setSelectedSize(newSizes[0]?.size in POSTER_SIZES ? newSizes[0].size : "");
       }
@@ -277,13 +344,21 @@ export default function SellYourPoster({ onSave }) {
   const simplifyTags = (tags) => {
     return tags
       .split(",")
-      .map((t) => t.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""))
+      .map((t) =>
+        t
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, "") // remove non-alphanumerics but keep space
+          .replace(/\s+/g, "-")        // then convert space to single "-"
+      )
       .filter(Boolean);
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setSubmitting(true);
     setProgress(0);
 
@@ -318,21 +393,20 @@ export default function SellYourPoster({ onSave }) {
       return;
     }
 
+    // Prepare data, using collection values directly
     const data = {
       title: formData.title.trim(),
       description: formData.description.trim(),
       tags: simplifyTags(formData.tags),
-      collections: formData.collections.map((col) => col.value),
+      collections: formData.collections.map((col) => col.value), // Use collection values as-is
       sizes: formData.sizes,
       sellerUsername,
-      approved: "pending",
-      isActive: true,
     };
 
     try {
+      // Proceed with image upload and poster submission
       const imageRef = ref(storage, `posters/${sellerUsername}/${Date.now()}_${formData.imageFile.name}`);
       const uploadTask = uploadBytesResumable(imageRef, formData.imageFile);
-
       uploadTask.on(
         "state_changed",
         (snapshot) => {
@@ -349,12 +423,14 @@ export default function SellYourPoster({ onSave }) {
             data.originalImageUrl = imageRef.fullPath;
             const result = await addPoster(firestore, data);
             if (result.success) {
-              onSave(data, result.id);
+              setSuccess("Poster submitted successfully! It will be reviewed soon.");
+              setEditing(false);
             } else {
               setError(result.error || "Failed to save poster.");
             }
           } catch (err) {
-            setError(err.message);
+            setError("Failed to save poster: " + err.message);
+          } finally {
             setSubmitting(false);
             setProgress(0);
           }
@@ -370,283 +446,229 @@ export default function SellYourPoster({ onSave }) {
   return (
     <div className="p-4 p-md-5">
       <h4 className="mb-4">Sell Your Poster</h4>
-      <Form onSubmit={handleSubmit}>
-        {error && (
-          <Alert variant="danger" onClose={() => setError("")} dismissible>
-            {error}
-          </Alert>
-        )}
-        <Form.Group className="mb-3">
-          <Form.Label>Title</Form.Label>
-          <Form.Control
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-            required
-            placeholder="Poster title"
-            disabled={submitting}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Description</Form.Label>
-          <Form.Control
-            as="textarea"
-            value={formData.description}
-            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-            required
-            placeholder="Describe your poster"
-            rows={2}
-            disabled={submitting}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Tags (comma-separated)</Form.Label>
-          <Form.Control
-            type="text"
-            value={formData.tags}
-            onChange={(e) => setFormData((prev) => ({ ...prev, tags: e.target.value }))}
-            placeholder="e.g., k-pop, minimalist"
-            disabled={submitting}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Collections</Form.Label>
-          <Select
-            isMulti
-            options={collections}
-            value={formData.collections}
-            onChange={(selected) => setFormData((prev) => ({ ...prev, collections: selected }))}
-            placeholder="Select collections"
-            isDisabled={submitting}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Sizes</Form.Label>
-          {formData.sizes.map((sizeObj, index) => (
-            <div key={index} className="d-flex align-items-center gap-2 mb-2">
-              <Form.Select
-                value={sizeObj.size}
-                onChange={(e) => handleSizeChange(index, e.target.value)}
-                required
-                disabled={submitting}
-              >
-                <option value="">Select size</option>
-                {Object.keys(POSTER_SIZES).map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </Form.Select>
-              {formData.sizes.length > 1 && (
-                <Button variant="outline-danger" onClick={() => removeSize(index)} disabled={submitting}>
-                  Remove
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button variant="outline-primary" size="sm" onClick={addSize} disabled={submitting}>
-            + Add Size
-          </Button>
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Image</Form.Label>
-          <div className="position-relative">
-            <Form.Control
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              required
-              ref={fileInputRef}
-              disabled={submitting || !selectedSize || !POSTER_SIZES[selectedSize]}
-              style={{ paddingRight: formData.imageFile ? "60px" : undefined }}
-            />
-            {formData.imageFile && (
-              <span
-                onClick={handleClearImage}
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  right: "10px",
-                  transform: "translateY(-50%)",
-                  cursor: "pointer",
-                  fontSize: "0.9rem",
-                  color: "#007bff",
-                }}
-              >
-                Clear
-              </span>
+      {success && (
+        <Alert variant="success" onClose={() => setSuccess("")} dismissible>
+          {success}
+        </Alert>
+      )}
+      {editing ? (
+        <>
+          <Form>
+            {error && (
+              <Alert variant="danger" onClose={() => setError("")} dismissible>
+                {error}
+              </Alert>
             )}
-          </div>
-          {recommendedSize && (
-            <div className="mt-2">
-              <p>
-                Image resolution is too low for {selectedSize}. Would you like to switch to {recommendedSize} (
-                {POSTER_SIZES[recommendedSize].widthPx}x{POSTER_SIZES[recommendedSize].heightPx}px)?
-              </p>
-              <Button variant="outline-primary" size="sm" onClick={handleSwitchSize}>
-                Switch to {recommendedSize}
+            <Form.Group className="mb-3">
+              <Form.Label>Title</Form.Label>
+              <Form.Control
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                required
+                placeholder="Poster title"
+                disabled={submitting}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                value={formData.description}
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                required
+                placeholder="Describe your poster"
+                rows={2}
+                disabled={submitting}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Tags (comma-separated)</Form.Label>
+              <Form.Control
+                type="text"
+                value={formData.tags}
+                onChange={(e) => setFormData((prev) => ({ ...prev, tags: e.target.value }))}
+                placeholder="e.g., k-pop, minimalist"
+                disabled={submitting}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Collections</Form.Label>
+              <CreatableSelect
+                isMulti
+                options={collections}
+                value={formData.collections}
+                onChange={(selected) => setFormData((prev) => ({ ...prev, collections: selected }))}
+                placeholder="Select or type to create collections"
+                isDisabled={submitting}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Sizes</Form.Label>
+              {formData.sizes.map((sizeObj, index) => (
+                <div key={index} className="d-flex align-items-center gap-2 mb-2">
+                  <Form.Select
+                    value={sizeObj.size}
+                    onChange={(e) => handleSizeChange(index, e.target.value)}
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="">Select size</option>
+                    {Object.keys(POSTER_SIZES).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </Form.Select>
+                  {formData.sizes.length > 1 && (
+                    <Button variant="outline-danger" onClick={() => removeSize(index)} disabled={submitting}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline-primary" size="sm" onClick={addSize} disabled={submitting}>
+                + Add Size
+              </Button>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Image</Form.Label>
+              <div className="position-relative">
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  required
+                  ref={fileInputRef}
+                  disabled={submitting || !selectedSize || !POSTER_SIZES[selectedSize]}
+                  style={{ paddingRight: formData.imageFile ? "60px" : undefined }}
+                />
+                {formData.imageFile && (
+                  <span
+                    onClick={handleClearImage}
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      right: "10px",
+                      transform: "translateY(-50%)",
+                      cursor: "pointer",
+                      fontSize: "0.9rem",
+                      color: "#007bff",
+                    }}
+                  >
+                    Clear
+                  </span>
+                )}
+              </div>
+              {recommendedSize && (
+                <div className="mt-2">
+                  <p>
+                    Image resolution is too low for {selectedSize} (
+                    {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px). Recommended size: {recommendedSize} (
+                    {POSTER_SIZES[recommendedSize].widthPx}x{POSTER_SIZES[recommendedSize].heightPx}px).
+                  </p>
+                  <Button variant="outline-primary" size="sm" onClick={handleSwitchSize}>
+                    Switch to {recommendedSize}
+                  </Button>
+                </div>
+              )}
+              {croppedPreview && selectedSize && POSTER_SIZES[selectedSize] && (
+                <div className="mt-3">
+                  <p>
+                    Source resolution: {cropImageSize.width}x{cropImageSize.height}px<br />
+                    Expected resolution ({selectedSize}): {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px<br />
+                  </p>
+                  <img src={croppedPreview} alt="Preview" style={{ maxWidth: "200px" }} />
+                </div>
+              )}
+            </Form.Group>
+            <div className="d-flex gap-2">
+              <Button type="submit" variant="primary" onClick={handleSubmit} disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit"}
+              </Button>
+              <Button variant="secondary" onClick={() => setEditing(false)} disabled={submitting}>
+                Cancel
               </Button>
             </div>
-          )}
-          {croppedPreview && selectedSize && POSTER_SIZES[selectedSize] && (
-            <div className="mt-3">
-              <p>
-                Original image size: {originalImageSize.width}x{originalImageSize.height}px<br />
-                Preview (image will be saved at {selectedSize} resolution: {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px):
-              </p>
-              <img src={croppedPreview} alt="Preview" style={{ maxWidth: "200px" }} />
-            </div>
-          )}
-        </Form.Group>
-        <div className="d-flex gap-2">
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit"}
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => onSave(null)} disabled={submitting}>
-            Cancel
-          </Button>
-        </div>
-        {progress > 0 && progress < 100 && (
-          <ProgressBar
-            now={progress}
-            label={`${Math.round(progress)}%`}
-            className="mt-3"
-            animated
-          />
-        )}
-      </Form>
-      <Modal
-        show={showCropModal}
-        onHide={() => {
-          setShowCropModal(false);
-          setFormData((prev) => ({ ...prev, imageFile: null }));
-          setImageSrc(null);
-          setOriginalImageSrc(null);
-          setCroppedPreview(null);
-          setCrop(null);
-          setRotation(0);
-          setRecommendedSize(null);
-          setOriginalImageSize({ width: 0, height: 0 });
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        }}
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>{selectedSize && POSTER_SIZES[selectedSize] ? `Crop Image to ${selectedSize}` : "Crop Image"}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedSize && POSTER_SIZES[selectedSize] && (
-            <ReactCrop
-              crop={crop}
-              onChange={(_, percentCrop) => setCrop(percentCrop)}
-              aspect={POSTER_SIZES[selectedSize].aspectRatio}
-              minWidth={POSTER_SIZES[selectedSize].widthPx / 20}
-              minHeight={POSTER_SIZES[selectedSize].heightPx / 20}
-            >
-              <img
-                ref={imgRef}
-                src={imageSrc}
-                alt="Crop preview"
-                style={{ maxWidth: "100%", imageRendering: "auto" }}
-                crossOrigin="anonymous"
-              />
-            </ReactCrop>
-          )}
-          <div className="d-flex flex-column align-items-center gap-2 mt-3">
-            {cropping ? (
-              <div className="d-flex flex-column align-items-center">
-                <Spinner animation="border" className="d-block text-primary" role="status">
-                  <span className="visually-hidden">Processing...</span>
-                </Spinner>
-                <p className="mt-2 text-muted">Processing...</p>
-              </div>
-            ) : (
-              <div className="d-flex gap-2">
-                <Button
-                  variant="primary"
-                  onClick={handleCropComplete}
-                  disabled={!crop?.width || !crop?.height || cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
-                >
-                  Apply Crop
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleRotate}
-                  disabled={cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
-                >
-                  Rotate 90°
-                </Button>
-              </div>
+            {progress > 0 && progress < 100 && (
+              <ProgressBar now={progress} label={`${Math.round(progress)}%`} className="mt-3" animated />
             )}
-          </div>
-        </Modal.Body>
-      </Modal>
+          </Form>
+          <Modal
+            show={showCropModal}
+            onHide={() => {
+              setShowCropModal(false);
+              setFormData((prev) => ({ ...prev, imageFile: null }));
+              setImageSrc(null);
+              setOriginalImageSrc(null);
+              setCroppedPreview(null);
+              setCrop(null);
+              setRotation(0);
+              setRecommendedSize(null);
+              setCropImageSize({ width: 0, height: 0 });
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          >
+            <Modal.Header closeButton>
+              <Modal.Title>{selectedSize && POSTER_SIZES[selectedSize] ? `Crop Image to ${selectedSize}` : "Crop Image"}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              {selectedSize && POSTER_SIZES[selectedSize] && (
+                <>
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(_, percentCrop) => setCrop(percentCrop)}
+                    aspect={POSTER_SIZES[selectedSize].aspectRatio}
+                    minWidth={POSTER_SIZES[selectedSize].widthPx / 20}
+                    minHeight={POSTER_SIZES[selectedSize].heightPx / 20}
+                  >
+                    <img
+                      ref={imgRef}
+                      src={imageSrc}
+                      alt="Crop preview"
+                      style={{ maxWidth: "100%", imageRendering: "auto" }}
+                      crossOrigin="anonymous"
+                    />
+                  </ReactCrop>
+                  <p className="mt-2">
+                    Crop resolution: {cropImageSize.width}x{cropImageSize.height}px<br />
+                    Expected resolution ({selectedSize}): {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px
+                  </p>
+                </>
+              )}
+              <div className="d-flex flex-column align-items-center gap-2 mt-3">
+                {cropping ? (
+                  <div className="d-flex flex-column align-items-center">
+                    <Spinner animation="border" className="d-block text-primary" role="status">
+                      <span className="visually-hidden">Processing...</span>
+                    </Spinner>
+                    <p className="mt-2 text-muted">Processing...</p>
+                  </div>
+                ) : (
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="primary"
+                      onClick={handleCropComplete}
+                      disabled={!crop?.width || !crop?.height || cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
+                    >
+                      Apply Crop
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleRotate}
+                      disabled={cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
+                    >
+                      Rotate 90°
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Modal.Body>
+          </Modal>
+        </>
+      ) : (
+        <Button variant="primary" onClick={() => setEditing(true)}>
+          Submit New Poster
+        </Button>
+      )}
     </div>
   );
 }
-
-export const addPoster = async (firestore, posterData) => {
-  try {
-    if (!posterData.title) throw new Error("Poster title is required");
-    if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0 || !posterData.sizes.every(s => s.size && s.size in POSTER_SIZES))
-      throw new Error("At least one valid size object is required");
-    if (!posterData.sellerUsername) throw new Error("Seller username is required");
-
-    const posterRef = doc(collection(firestore, "tempPosters"));
-    const posterId = posterRef.id;
-    const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
-    const collectionRefs = (posterData.collections || []).map((col) =>
-      doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
-    );
-
-    await runTransaction(firestore, async (transaction) => {
-      const sellerDoc = await transaction.get(sellerRef);
-      const collectionDocs = await Promise.all(collectionRefs.map((ref) => transaction.get(ref)));
-
-      transaction.set(posterRef, {
-        ...posterData,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      collectionRefs.forEach((colRef, index) => {
-        const colDoc = collectionDocs[index];
-        const colId = colRef.id;
-        if (!colDoc.exists()) {
-          transaction.set(colRef, {
-            name: colId,
-            posterIds: [posterId],
-            createdAt: serverTimestamp(),
-          });
-        } else {
-          const posterIds = colDoc.data().posterIds || [];
-          if (!posterIds.includes(posterId)) {
-            transaction.update(colRef, {
-              posterIds: [...posterIds, posterId],
-              updatedAt: serverTimestamp(),
-            });
-          }
-        }
-      });
-
-      const existingTempPosters = sellerDoc.exists() ? sellerDoc.data().tempPosters || [] : [];
-      transaction.set(
-        sellerRef,
-        {
-          sellerUsername: posterData.sellerUsername,
-          tempPosters: [
-            ...existingTempPosters,
-            {
-              id: posterId,
-              status: posterData.approved || "Pending",
-              createdAt: new Date(),
-            },
-          ],
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    });
-
-    return { success: true, id: posterId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-};

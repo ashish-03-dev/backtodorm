@@ -10,22 +10,102 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 
 const FRAME_SIZES = {
   A4: { name: "A4", widthPx: 900, heightPx: 1200, aspectRatio: 3 / 4 },
-  A3: { name: "A3", widthPx: 1000, heightPx: 1500, aspectRatio: 2 / 3 },
-  "A3 x 3": { name: "A3*3", widthPx: 1200, heightPx: 1800, aspectRatio: 2 / 3 },
-  "A4 x 5": { name: "A4*5", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
+  A3: { name: "A3", widthPx: 1000, heightPx: 1333, aspectRatio: 3 / 4 },
+  "A3 x 3": { name: "A3 x 3", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
+  "A4 x 5": { name: "A4 x 5", widthPx: 1200, heightPx: 1600, aspectRatio: 3 / 4 },
 };
-
 const POSTER_POSITIONS = {
-  "top-left": { label: "Top Left", getPosition: (size) => ({ x: 50, y: 50, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "top-center": { label: "Top Center", getPosition: (size) => ({ x: FRAME_SIZES[size].widthPx * 0.1, y: 50, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "top-right": { label: "Top Right", getPosition: (size) => ({ x: FRAME_SIZES[size].widthPx * 0.2, y: 50, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "center-left": { label: "Center Left", getPosition: (size) => ({ x: 50, y: FRAME_SIZES[size].heightPx * 0.1, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "center": { label: "Center", getPosition: (size) => ({ x: FRAME_SIZES[size].widthPx * 0.1, y: FRAME_SIZES[size].heightPx * 0.1, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "center-right": { label: "Center Right", getPosition: (size) => ({ x: FRAME_SIZES[size].widthPx * 0.2, y: FRAME_SIZES[size].heightPx * 0.1, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "bottom-left": { label: "Bottom Left", getPosition: (size) => ({ x: 50, y: FRAME_SIZES[size].heightPx * 0.2, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "bottom-center": { label: "Bottom Center", getPosition: (size) => ({ x: FRAME_SIZES[size].widthPx * 0.1, y: FRAME_SIZES[size].heightPx * 0.2, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "bottom-right": { label: "Bottom Right", getPosition: (size) => ({ x: FRAME_SIZES[size].widthPx * 0.2, y: FRAME_SIZES[size].heightPx * 0.2, width: FRAME_SIZES[size].widthPx * 0.8, height: FRAME_SIZES[size].heightPx * 0.8 }) },
-  "custom": { label: "Custom", getPosition: () => ({ x: 0, y: 0, width: 0, height: 0 }) },
+  "top-left": {
+    label: "Top Left",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.15,
+      y: FRAME_SIZES[size].heightPx * 0.15,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "top-center": {
+    label: "Top Center",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.175,
+      y: FRAME_SIZES[size].heightPx * 0.15,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "top-right": {
+    label: "Top Right",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.225,
+      y: FRAME_SIZES[size].heightPx * 0.15,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "center-left": {
+    label: "Center Left",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.15,
+      y: FRAME_SIZES[size].heightPx * 0.225,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "center": {
+    label: "Center",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.175,
+      y: FRAME_SIZES[size].heightPx * 0.175,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "center-right": {
+    label: "Center Right",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.225,
+      y: FRAME_SIZES[size].heightPx * 0.225,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "bottom-left": {
+    label: "Bottom Left",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.15,
+      y: FRAME_SIZES[size].heightPx * 0.3,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "bottom-center": {
+    label: "Bottom Center",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.175,
+      y: FRAME_SIZES[size].heightPx * 0.3,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+  "bottom-right": {
+    label: "Bottom Right",
+    getPosition: (size) => ({
+      x: FRAME_SIZES[size].widthPx * 0.225,
+      y: FRAME_SIZES[size].heightPx * 0.3,
+      width: FRAME_SIZES[size].widthPx * 0.65,
+      height: FRAME_SIZES[size].heightPx * 0.65,
+    }),
+  },
+
+  "custom": {
+    label: "Custom",
+    getPosition: () => ({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+    }),
+  },
 };
 
 const FramesAdmin = () => {
@@ -305,14 +385,31 @@ const FramesAdmin = () => {
     }
   };
 
-  const handleInputChange = (e) => {
+const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name.includes("position.")) {
       const key = name.split(".")[1];
       setFormData((prev) => ({
         ...prev,
         posterPosition: "custom",
-        position: { ...prev.position, [key]: parseFloat(value) || 0 },
+        position: {
+          ...prev.position,
+          [key]: value === "" ? null : parseFloat(value) || 0,
+        },
+      }));
+    } else if (name === "posterPosition" && value !== "custom" && formData.size && POSTER_POSITIONS[value]) {
+      const position = POSTER_POSITIONS[value].getPosition(formData.size);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+        position,
+      }));
+    } else if (name === "size" && formData.posterPosition !== "custom") {
+      const position = POSTER_POSITIONS[formData.posterPosition].getPosition(value);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+        position,
       }));
     } else if (name === "file") {
       handleImageChange(e);
@@ -320,8 +417,7 @@ const FramesAdmin = () => {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
-
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
       setError("User not authenticated.");
@@ -339,25 +435,38 @@ const FramesAdmin = () => {
       setError("Image is required.");
       return;
     }
-    if (formData.position.width <= 0 || formData.position.height <= 0) {
-      setError("Poster position width and height must be greater than 0.");
+    if (
+      formData.position.x === null ||
+      formData.position.y === null ||
+      formData.position.width === null ||
+      formData.position.height === null ||
+      formData.position.width <= 0 ||
+      formData.position.height <= 0
+    ) {
+      setError("All position coordinates (x, y, width, height) must be valid numbers greater than 0.");
       return;
     }
     try {
       setLoading(true);
       setError(null);
-
       const frameData = {
         size: formData.size,
         frameStyle: formData.frameStyle,
         posterPosition: formData.posterPosition,
-        position: formData.position,
+        position: {
+          x: formData.position.x,
+          y: formData.position.y,
+          width: formData.position.width,
+          height: formData.position.height,
+        },
         uploaded: false,
       };
-
       const result = await saveFrame(firestore, storage, frameData, formData.file, user);
       if (result.success) {
-        setFrames((prev) => [...prev, { id: result.id, ...frameData, imageUrl: result.imageUrl, fileName: formData.file.name, uploaded: false }]);
+        setFrames((prev) => [
+          ...prev,
+          { id: result.id, ...frameData, imageUrl: result.imageUrl, fileName: formData.file.name, uploaded: false },
+        ]);
         resetForm();
       } else {
         setError(`Failed to save frame: ${result.error}`);
@@ -370,13 +479,13 @@ const FramesAdmin = () => {
     }
   };
 
-  const resetForm = () => {
+const resetForm = () => {
     setFormData({
       id: null,
       size: "A4",
       frameStyle: "",
       posterPosition: "center",
-      position: { x: 0, y: 0, width: 0, height: 0 },
+      position: POSTER_POSITIONS.center.getPosition("A4"),
       file: null,
     });
     setCroppedPreview(null);
@@ -397,8 +506,8 @@ const FramesAdmin = () => {
   }
 
   return (
-    <div className="container mt-4" style={{ maxWidth: "1400px" }}>
-      <h2 className="mb-3">🖼️ Frame Management</h2>
+    <div className="p-4 p-md-5">
+      <h3 className="mb-4">🖼️ Frame Management</h3>
       {error && (
         <Alert variant="danger" onClose={() => setError(null)} dismissible>
           {error}
@@ -462,48 +571,55 @@ const FramesAdmin = () => {
           </div>
           <div className="mt-2">
             <Form.Label>Poster Position Coordinates (pixels)</Form.Label>
-            <div className="d-flex gap-2">
-              <Form.Control
-                type="number"
-                name="position.x"
-                value={formData.position.x}
-                onChange={handleInputChange}
-                placeholder="X"
-                required
-                min="0"
-                disabled={loading}
-              />
-              <Form.Control
-                type="number"
-                name="position.y"
-                value={formData.position.y}
-                onChange={handleInputChange}
-                placeholder="Y"
-                required
-                min="0"
-                disabled={loading}
-              />
-              <Form.Control
-                type="number"
-                name="position.width"
-                value={formData.position.width}
-                onChange={handleInputChange}
-                placeholder="Width"
-                required
-                min="0"
-                disabled={loading}
-              />
-              <Form.Control
-                type="number"
-                name="position.height"
-                value={formData.position.height}
-                onChange={handleInputChange}
-                placeholder="Height"
-                required
-                min="0"
-                disabled={loading}
-              />
-            </div>
+           <div className="d-flex gap-2">
+    <Form.Control
+      type="number"
+      name="position.x"
+      value={formData.position.x ?? ""} // Use empty string for null
+      onChange={handleInputChange}
+      placeholder="X"
+      required
+      min="0"
+      step="any"
+      disabled={loading}
+    />
+    <Form.Control
+      type="number"
+      name="position.y"
+      value={formData.position.y ?? ""}
+      onChange={handleInputChange}
+      placeholder="Y"
+      required
+      min="0"
+      step="any"
+      disabled={loading}
+    />
+    <Form.Control
+      type="number"
+      name="position.width"
+      value={formData.position.width ?? ""}
+      onChange={handleInputChange}
+      placeholder="Width"
+      required
+      min="0"
+      step="any"
+      disabled={loading}
+    />
+    <Form.Control
+      type="number"
+      name="position.height"
+      value={formData.position.height ?? ""}
+      onChange={handleInputChange}
+      placeholder="Height"
+      required
+      min="0"
+      step="any"
+      disabled={loading}
+    />
+  </div>
+  <Form.Text className="text-muted">
+    Enter coordinates as numbers (decimals allowed).
+  </Form.Text>
           </div>
         </Form.Group>
         <Form.Group className="mb-3">

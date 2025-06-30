@@ -85,9 +85,9 @@ exports.uploadFrame = onCall(
 
       // Delete from Firebase Storage
       try {
-        const storageRef = storage.file(`frames/${frameId}/${fileName}`);
+        const storageRef = storage.file(`frames/${fileName}`);
         await storageRef.delete();
-        console.log(`Deleted image from Firebase Storage: frames/${frameId}/${fileName}`);
+        console.log(`Deleted image from Firebase Storage: frames/${fileName}`);
       } catch (error) {
         console.warn(`No file found in Firebase Storage or failed to delete: ${error.message}`);
       }
@@ -172,6 +172,7 @@ exports.setAdminStatus = onCall(
     }
   }
 );
+
 exports.approvePoster = onCall(
   {
     secrets: CLOUDINARY_SECRETS,
@@ -201,24 +202,29 @@ exports.approvePoster = onCall(
     if (!tempPoster.exists) throw new HttpsError("not-found", "Poster not found");
 
     const posterData = tempPoster.data();
-    let imageUrl = posterData.framedImageUrl;
+    let framedImageUrl = posterData.framedImageUrl;
     let originalImageUrl = posterData.originalImageUrl;
 
+    let framedCloudinaryUrl = null;
+    let originalCloudinaryUrl = null;
+    const deletionPromises = [];
+
     // Upload framed image to Cloudinary posters/ folder
-    if (imageUrl) {
+    if (framedImageUrl) {
       try {
-        const file = storage.file(imageUrl);
+        const file = storage.file(framedImageUrl);
         const [buffer] = await file.download();
         const result = await cloudinary.uploader.upload(
           `data:image/jpeg;base64,${buffer.toString("base64")}`,
           { folder: "posters", public_id: `${posterId}_framed_${Date.now()}`, timeout: 120000 }
         );
         if (result.secure_url) {
-          imageUrl = result.secure_url;
-          await file.delete();
+          framedCloudinaryUrl = result.secure_url;
+          deletionPromises.push(file.delete());
         }
       } catch (error) {
         console.warn("Cloudinary framed image upload failed, using Storage URL", error.message);
+        throw new HttpsError("download-failed", "invalid imageUrl");
       }
     } else {
       throw new HttpsError("invalid-argument", "Framed image URL missing");
@@ -234,14 +240,21 @@ exports.approvePoster = onCall(
           { folder: "originalPoster", public_id: `${posterData.posterId}_original_${Date.now()}`, timeout: 120000 }
         );
         if (result.secure_url) {
-          await db.collection("originalPoster").doc(posterData.posterId).set({
-            imageUrl: result.secure_url,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-          await file.delete();
+          originalCloudinaryUrl = result.secure_url;
+          deletionPromises.push(file.delete());
+        } else {
+          throw new Error("No secure_url returned from Cloudinary");
         }
       } catch (error) {
         console.warn("Cloudinary original image upload failed", error.message);
+        if (framedCloudinaryUrl) {
+          try {
+            await cloudinary.uploader.destroy(`posters/${posterId}_framed_${Date.now()}`);
+          } catch (cleanupError) {
+            console.warn("Failed to clean up framed image from Cloudinary:", cleanupError.message);
+          }
+        }
+        throw new HttpsError("internal", "Failed to upload original image to Cloudinary");
       }
     } else {
       throw new HttpsError("invalid-argument", "Original image URL missing");
@@ -260,19 +273,25 @@ exports.approvePoster = onCall(
 
       t.set(db.collection("posters").doc(posterData.posterId), {
         ...posterData,
-        imageUrl,
+        imageUrl: framedCloudinaryUrl,
         framedImageUrl: null,
         originalImageUrl: null,
         approved: "approved",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      t.set(db.collection("originalPoster").doc(posterData.posterId), {
+        imageUrl: originalCloudinaryUrl,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
       t.delete(tempPosterRef);
 
       collections.forEach((col, i) => {
-        if (col.exists && !col.data().posterIds?.includes(posterId)) {
+        if (col.exists && !col.data().posterIds?.includes(posterData.posterId)) {
           t.update(collectionRefs[i], {
-            posterIds: admin.firestore.FieldValue.arrayUnion(posterId),
+            posterIds: admin.firestore.FieldValue.arrayUnion(posterData.posterId),
           });
         }
       });
@@ -284,7 +303,7 @@ exports.approvePoster = onCall(
         );
         t.update(sellerRef, {
           tempPosters: updatedTempPosters,
-          approvedPosters: admin.firestore.FieldValue.arrayUnion(posterId),
+          approvedPosters: admin.firestore.FieldValue.arrayUnion(posterData.posterId),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
@@ -300,7 +319,14 @@ exports.approvePoster = onCall(
       }
     });
 
-    return { success: true, posterId, imageUrl };
+    try {
+      await Promise.all(deletionPromises);
+    } catch (error) {
+      console.error("Failed to delete files from Firebase Storage:", error.message);
+      // Log for manual cleanup but don't fail the function
+    }
+
+    return { success: true };
   }
 );
 

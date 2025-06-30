@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import HomeLayout from './pages/HomeLayout';
 import Policies from "./components/Policies";
 import MainLanding from './components/Home/MainLanding';
+import AllPosters from './components/Collections/AllPosters';
 import CollectionDetail from './components/Collections/CollectionsDetail';
 import SingleCollection from './components/Collections/SingleCollection';
 import Poster from './components/Collections/Poster';
@@ -46,53 +47,51 @@ function App() {
   return (
     <Router>
       <ScrollManager />
-      <Suspense fallback={<div>Loading...</div>}>
-
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/privacy-policy" element={<Policies />} />
-          <Route path="/terms-and-conditions" element={<Policies />} />
-          <Route path="/return-policy" element={<Policies />} />
-          <Route path="/" element={<HomeLayout />}>
-            <Route index element={<MainLanding />} />
-            <Route path="collections/:collectionId" element={<CollectionDetail />} />
-            <Route path="collection/:collectionId" element={<SingleCollection />} />
-            <Route path="poster/:id" element={<Poster />} />
-            <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
-            <Route path="account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
-              <Route index element={<ProfileInfo />} />
-              <Route path="profile" element={<ProfileInfo />} />
-              <Route path="orders" element={<ProfileOrders />} />
-              <Route path="addresses" element={<ProfileAddresses />} />
-              <Route path="security" element={<SecuritySettings />} />
-              <Route path="become-seller" element={<BecomeSeller />} />
-              <Route path="help-centre" element={<HelpCentre />} />
-            </Route>
-            <Route path="seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
-              <Route index element={<SellerDashboard />} />
-              <Route path="dashboard" element={<SellerDashboard />} />
-              <Route path="products" element={<MyProducts />} />
-              <Route path="sell-poster" element={<SellPoster />} />
-              <Route path="payouts" element={<Payouts />} />
-            </Route>
-            <Route path="/search" element={<SearchPage />} />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/privacy-policy" element={<Policies />} />
+        <Route path="/terms-and-conditions" element={<Policies />} />
+        <Route path="/return-policy" element={<Policies />} />
+        <Route path="/" element={<HomeLayout />}>
+          <Route index element={<MainLanding />} />
+          <Route path="all-posters" element={<AllPosters />} />
+          <Route path="collections/:collectionId" element={<CollectionDetail />} />
+          <Route path="collection/:collectionId" element={<SingleCollection />} />
+          <Route path="poster/:id" element={<Poster />} />
+          <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+          <Route path="account" element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
+            <Route index element={<ProfileInfo />} />
+            <Route path="profile" element={<ProfileInfo />} />
+            <Route path="orders" element={<ProfileOrders />} />
+            <Route path="addresses" element={<ProfileAddresses />} />
+            <Route path="security" element={<SecuritySettings />} />
+            <Route path="become-seller" element={<BecomeSeller />} />
+            <Route path="help-centre" element={<HelpCentre />} />
           </Route>
-          <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
-            <Route index element={<Dashboard />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="home-content" element={<SectionManager />} />
-            <Route path="sellers" element={<Sellers />} />
-            <Route path="posters" element={<Posters />} />
-            <Route path="poster-approvals" element={<PosterApprovals />} />
-            <Route path="frames" element={<FramesAdmin />} />
-            <Route path="users" element={<Users />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="admin-users" element={<AdminUsers />} />
-            <Route path="support" element={<Support />} />
+          <Route path="seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
+            <Route index element={<SellerDashboard />} />
+            <Route path="dashboard" element={<SellerDashboard />} />
+            <Route path="products" element={<MyProducts />} />
+            <Route path="sell-poster" element={<SellPoster />} />
+            <Route path="payouts" element={<Payouts />} />
           </Route>
-        </Routes>
-      </Suspense>
+          <Route path="/search" element={<SearchPage />} />
+        </Route>
+        <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
+          <Route index element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="home-content" element={<SectionManager />} />
+          <Route path="sellers" element={<Sellers />} />
+          <Route path="posters" element={<Posters />} />
+          <Route path="poster-approvals" element={<PosterApprovals />} />
+          <Route path="frames" element={<FramesAdmin />} />
+          <Route path="users" element={<Users />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="admin-users" element={<AdminUsers />} />
+          <Route path="support" element={<Support />} />
+        </Route>
+      </Routes>
     </Router>
   );
 }

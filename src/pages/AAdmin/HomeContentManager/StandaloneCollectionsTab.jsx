@@ -79,7 +79,6 @@ const StandaloneCollectionsTab = ({
           updatedAt: d.data().updatedAt,
         }));
         setCollections(collections);
-        console.log("Fetched standaloneCollections:", collections);
       } catch (err) {
         console.error("Fetch error:", err);
         setSubmissionError(

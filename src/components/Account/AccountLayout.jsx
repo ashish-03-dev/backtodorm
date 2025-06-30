@@ -58,12 +58,18 @@ export default function AccountLayout() {
 
   return (
     <div className="bg-light p-3">
-      <div className="d-flex gap-3" style={{ height: "calc(100svh - 97px)" }}>
+      <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 97px)" }}>
         {/* Sidebar */}
         {!showContentOnMobile && (
           <div
             className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`}
-            style={{ minWidth: "300px", flexShrink: 0 }}
+            style={{
+              position: "sticky",
+              top: "calc(65px + 1rem)",
+              minWidth: "300px",
+              flexShrink: 0,
+              maxHeight: "calc(100svh - 65px - 2rem)"
+            }}
           >
             <div className="text-center p-4 bg-white shadow-sm">
               <h5 className="mb-0">My Account</h5>
@@ -100,9 +106,9 @@ export default function AccountLayout() {
 
         {/* Main Content */}
         <div
-          className={`bg-white shadow-sm flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+          className={`bg-white shadow-sm flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
             }`}
-          style={{ maxWidth: "100%", overflow: "auto" }}
+          style={{ maxWidth: "100%" }}
         >
           {error && <div className="alert alert-danger">{error}</div>}
           <Outlet />

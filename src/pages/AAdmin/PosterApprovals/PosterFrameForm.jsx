@@ -17,7 +17,6 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
   const validSizes = Object.keys(POSTER_SIZES);
   const [size, setSize] = useState(() => {
     const firstValidSize = poster?.sizes?.find((s) => validSizes.includes(s.size))?.size || "A4";
-    console.log("Initial size:", firstValidSize);
     return firstValidSize;
   });
   const [frames, setFrames] = useState([]);
@@ -57,7 +56,6 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
         if (poster.originalImageUrl && poster.source === "tempPosters") {
           const imageRef = ref(storage, poster.originalImageUrl);
           posterUrl = await getDownloadURL(imageRef);
-          console.log("Poster URL:", posterUrl);
         } else if (poster.imageUrl && poster.source === "posters") {
           posterUrl = poster.imageUrl;
         } else {
@@ -75,7 +73,6 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
         } else {
           setFrames(framesData);
           setSelectedFrame(framesData[0]);
-          console.log("Selected frame:", framesData[0]);
         }
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -134,7 +131,6 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
         canvas.width = frameWidth;
         canvas.height = frameHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        console.log("Canvas set to frame resolution:", { width: frameWidth, height: frameHeight });
 
         // Draw frame (background) at full resolution
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
@@ -142,11 +138,9 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
         // Get poster dimensions
         const posterWidth = posterImg.naturalWidth;
         const posterHeight = posterImg.naturalHeight;
-        console.log("Poster dimensions:", { posterWidth, posterHeight });
 
         // Get position from selectedFrame.position (area where poster should be placed)
         const { x: posX, y: posY, width: posWidth, height: posHeight } = selectedFrame.position;
-        console.log("Position area:", { posX, posY, posWidth, posHeight });
 
         // Scale poster to fit within position area while preserving aspect ratio
         const posterAspectRatio = posterWidth / posterHeight;
@@ -163,7 +157,6 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
 
         // Draw poster on top
         ctx.drawImage(posterImg, posterX, posterY, finalPosterWidth, finalPosterHeight);
-        console.log("Canvas drawn successfully. Data URL:", canvas.toDataURL("image/webp", 0.9).slice(0, 50));
       } catch (err) {
         console.error("Canvas rendering error:", err);
         setError(`Failed to render canvas: ${err.message}. Check image URLs or Firebase Storage rules.`);

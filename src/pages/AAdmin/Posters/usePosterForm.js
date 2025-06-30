@@ -12,16 +12,6 @@ const POSTER_SIZES = {
   "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
 };
 
-const normalizeText = (text) => {
-  if (!text) return [];
-  const lower = text.toLowerCase().trim();
-  const title = lower
-    .split(/\s+|-/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-  const hyphenated = lower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  return [...new Set([lower, title, hyphenated])].filter(Boolean);
-};
 
 const normalizeCollection = (text) => {
   if (!text) return "";
@@ -37,9 +27,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
   const [collectionError, setCollectionError] = useState(null);
   const [availableCollections, setAvailableCollections] = useState([]);
   const [tags, setTags] = useState(poster?.tags?.join(", ") || "");
-  const [showNewCollectionModal, setShowNewCollectionModal] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState("");
-  const [newCollectionError, setNewCollectionError] = useState(null);
   const [selectedCollections, setSelectedCollections] = useState([]);
   const [sellerUsername, setSellerUsername] = useState(poster?.sellerUsername || "");
   const [sellerName, setSellerName] = useState("");
@@ -109,11 +96,13 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
         }));
         setAvailableCollections(collections);
         if (poster?.collections) {
-          const selected = collections.filter((col) =>
-            poster.collections.includes(col.value)
-          );
+          const selected = poster.collections.map((id) => ({
+            value: id,
+            label: id, // You can customize label here if needed
+          }));
           setSelectedCollections(selected);
         }
+
       } catch (error) {
         console.error("Error fetching collections:", error);
         setCollectionError("Failed to load collections.");
@@ -177,7 +166,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       return true;
     }
     try {
-      const docRef = doc(firestore, "tempPosters", posterId);
+      const docRef = doc(firestore, "posters", posterId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         setIdError("Poster ID already exists. Choose a unique ID.");
@@ -277,75 +266,81 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
   };
 
   // Keyword generation
-  const generateKeywordsLocal = () => {
+  const generateKeywords = () => {
     const form = formRef.current;
     const title = form?.title?.value?.trim() || "";
     const description = form?.description?.value?.trim() || "";
     const tagArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
     const collections = selectedCollections.map((col) => col.label);
-    const stopWords = new Set(["a", "an", "the", "and", "or", "but", "in", "on", "at", "to"]);
+    const stopWords = new Set(["a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for"]);
+
+    const normalizeText = (text, isTag = false, isTitle = false) => {
+      if (!text) return [];
+      if (isTag) {
+        // For tags, replace whitespace with hyphens, preserve existing hyphens
+        return [text
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "")
+        ].filter((word) => word.length > 2);
+      }
+      if (isTitle) {
+        // For title, split on whitespace only, preserve hyphens
+        return text
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .map((word) => word.replace(/[^a-z0-9-]/g, ""))
+          .filter((word) => word.length > 2);
+      }
+      // For description and collections, split on whitespace or hyphens
+      return text
+        .toLowerCase()
+        .trim()
+        .split(/\s+|-/)
+        .map((word) => word.replace(/[^a-z0-9]/g, ""))
+        .filter((word) => word.length > 2);
+    };
+
     const words = [
-      ...title.toLowerCase().split(/\s+/),
-      ...description.toLowerCase().split(/\s+/),
-      ...tagArray.flatMap(normalizeText),
+      ...normalizeText(title, false, true), // Preserve hyphens in title
+      ...normalizeText(description),
+      ...tagArray.flatMap((tag) => normalizeText(tag, true)),
       ...collections.flatMap(normalizeText),
     ];
+
     const newKeywords = [...new Set(words)]
       .filter((word) => !stopWords.has(word) && word.length > 2)
       .slice(0, 50);
-    setKeywords(newKeywords.join(", "));
-  };
 
-  // Collection management
-  const handleNewCollectionSubmit = async (e) => {
-    e.preventDefault();
-    const name = newCollectionName.trim();
-    if (!name) {
-      setNewCollectionError("Collection name is required.");
-      return;
-    }
-    const normalizedName = normalizeCollection(name);
-    if (!normalizedName) {
-      setNewCollectionError("Invalid collection name.");
-      return;
-    }
-    if (availableCollections.some((c) => c.label === normalizedName)) {
-      setNewCollectionError("Collection already exists.");
-      return;
-    }
-    try {
-      const collectionId = normalizedName;
-      await setDoc(doc(firestore, "collections", collectionId), {
-        name: normalizedName,
-        createdAt: new Date(),
-        posterIds: [],
-      });
-      const newCollection = { value: collectionId, label: normalizedName };
-      setAvailableCollections((prev) => [...prev, newCollection]);
-      setSelectedCollections((prev) => [...prev, newCollection]);
-      setNewCollectionName("");
-      setNewCollectionError(null);
-      setShowNewCollectionModal(false);
-    } catch (err) {
-      setNewCollectionError("Failed to save collection: " + err.message);
-      console.error("Error saving collection:", err);
-      setError("Failed to save collection: " + err.message);
-    }
+    setKeywords(newKeywords.join(", "));
   };
 
   // Size management
   const handleSizeChange = (index, field, value) => {
     const updatedSizes = [...sizes];
     updatedSizes[index] = { ...updatedSizes[index], [field]: value };
+
+    // If user enters an unsupported size
     if (field === "size" && !POSTER_SIZES[value]) {
       updatedSizes[index].size = "A4";
     }
+
+    // Calculate final price with correct precision
     if (field === "price" && value) {
       const price = parseFloat(value) || 0;
       const disc = parseFloat(discount) || 0;
-      updatedSizes[index].finalPrice = (price - (price * disc) / 100).toFixed(2);
+      const discountedPrice = price - (price * disc) / 100;
+
+      // Correct floating-point issues
+      const rounded = Math.round(discountedPrice * 100) / 100;
+      updatedSizes[index].finalPrice = rounded.toFixed(2);
     }
+
     setSizes(updatedSizes);
+
+    // Reset image/crop if size is updated and valid
     if (field === "size" && POSTER_SIZES[value]) {
       setSelectedSize(value);
       setCroppedPreview(null);
@@ -358,6 +353,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
 
   const addSize = () => {
     if (sizes.length === 0 || sizes.every((s) => s.size && s.price && POSTER_SIZES[s.size])) {
@@ -664,7 +660,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       return;
     }
 
-  const data = preparePosterData(form, posterId);
+    const data = preparePosterData(form, posterId);
 
     try {
       await onApproveTempPoster(data, posterId);
@@ -684,9 +680,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       collectionError,
       availableCollections,
       tags,
-      showNewCollectionModal,
-      newCollectionName,
-      newCollectionError,
       selectedCollections,
       sellerUsername,
       sellerName,
@@ -711,8 +704,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     handlers: {
       setError,
       setTags,
-      setShowNewCollectionModal,
-      setNewCollectionName,
       setSelectedCollections,
       setSellerUsername,
       setKeywords,
@@ -732,8 +723,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       suggestId,
       checkSellerUsername,
       insertUserId,
-      generateKeywordsLocal,
-      handleNewCollectionSubmit,
+      generateKeywords,
       handleSizeChange,
       addSize,
       removeSize,

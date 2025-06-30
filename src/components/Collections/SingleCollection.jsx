@@ -275,7 +275,7 @@ export default function SingleCollection() {
     });
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="d-flex justify-content-center align-items-center" style={{height:"calc(100svh - 65px)"}}><p className="text-center">Loading...</p></div>;
   if (error) return <p className="text-danger">{error}</p>;
   if (!collection) return <p>Collection not found</p>;
 

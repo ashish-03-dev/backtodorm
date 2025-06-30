@@ -236,25 +236,26 @@ const SectionManager = () => {
     const safeId = ensureString(id).trim();
     if (safeId && !posterImages[safeId]) {
       fetchFormPosterImage(safeId, firestore, setFormPosterImages, posterImages);
+
     }
   };
 
   return (
-    <Container className="mt-4">
-      <h2 className="mb-3">🏠 Section Management</h2>
+    <div className="p-4 p-md-5">
+
+      <h3 className="mb-4">🏠 Section Management</h3>
       <div className="row g-3 mb-3">
         <div className="col-md-5">
           <Form.Control
             type="text"
-            placeholder={`Search by ${
-              filter.homeSubTab === "collections"
+            placeholder={`Search by ${filter.homeSubTab === "collections"
                 ? "Collection"
                 : filter.homeSubTab === "sections"
-                ? "Section"
-                : filter.homeSubTab === "menus"
-                ? "Menu"
-                : "Standalone Collection"
-            } Name/ID`}
+                  ? "Section"
+                  : filter.homeSubTab === "menus"
+                    ? "Menu"
+                    : "Standalone Collection"
+              } Name/ID`}
             value={filter.search}
             onChange={(e) => setFilter((prev) => ({ ...prev, search: e.target.value }))}
             aria-label={`Search ${filter.homeSubTab}`}
@@ -323,7 +324,7 @@ const SectionManager = () => {
         )}
       </div>
       {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
-    </Container>
+    </div>
   );
 };
 

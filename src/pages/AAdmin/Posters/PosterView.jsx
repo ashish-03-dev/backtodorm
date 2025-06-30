@@ -32,82 +32,96 @@ const PosterView = ({ poster }) => {
 
   return (
     <Card>
-      <Card.Body>
-        <div className="text-center mb-3">
-          {imageSource && !imageError ? (
-            <Image
-              src={imageSource}
-              alt={poster.title || "Poster"}
-              fluid
-              style={{ maxHeight: "300px", objectFit: "contain" }}
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <Image
-              src={placeholderImage}
-              alt="Placeholder"
-              fluid
-              style={{ maxHeight: "300px", objectFit: "contain" }}
-            />
-          )}
-        </div>
-        <Card.Title className="mb-3">{poster.title || "Untitled"}</Card.Title>
-        <Card.Text>{poster.description || "No description available."}</Card.Text>
-        <ListGroup variant="flush">
-          <ListGroup.Item>
-            <strong>Sizes and Prices:</strong>{" "}
-            {Array.isArray(poster.sizes) && poster.sizes.length > 0 ? (
-              <ul>
-                {poster.sizes.map((size, index) => (
-                  <li key={index}>
-                    {size.size}:{" "}
-                    {poster.discount > 0 && size.finalPrice ? (
-                      <>
-                        <del>₹{size.price}</del>{" "}
-                        <strong>₹{size.finalPrice}</strong> ({poster.discount}% OFF)
-                      </>
-                    ) : (
-                      <strong>₹{size.price || "N/A"}</strong>
-                    )}
-                  </li>
-                ))}
-              </ul>
+      <Card.Body className="p-3">
+        <div className="row">
+          <div className="text-center col-md-6">
+            {imageSource && !imageError ? (
+              <Image
+                src={imageSource}
+                alt={poster.title || "Poster"}
+                fluid
+                style={{ maxHeight: "500px", objectFit: "contain" }}
+                onError={() => setImageError(true)}
+              />
             ) : (
-              "No sizes available"
+              <Image
+                src={placeholderImage}
+                alt="Placeholder"
+                fluid
+                style={{ height: "300px", objectFit: "contain" }}
+              />
             )}
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <strong>Collections:</strong>{" "}
-            {poster.collections?.length > 0 ? poster.collections.join(", ") : "None"}
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <strong>Tags:</strong>{" "}
-            {poster.tags?.length > 0 ? poster.tags.join(", ") : "None"}
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <strong>Keywords:</strong>{" "}
-            {poster.keywords?.length > 0 ? poster.keywords.join(", ") : "No items"}
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <strong>Seller:</strong> ({poster.sellerUsername})
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <strong>Status:</strong>{" "}
-            {(poster.status || "draft").charAt(0).toUpperCase() + (poster.status || "draft").slice(1)}
-            <strong>Active:</strong> {poster.isActive ? "Yes" : "No"}
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <small>
-              <strong>Created At:</strong>{" "}
-              {poster.createdAt ? new Date(poster.createdAt).toLocaleString() : "N/A"}
-            </small>
-          </ListGroup.Item>
-          <ListGroup.Item>
-            <small>
-              <strong>Poster:</strong> {poster.poster_id || poster.id || "N/A"}
-            </small>
-          </ListGroup.Item>
-        </ListGroup>
+          </div>
+          <div className="col-md-6">
+
+            <Card.Title className="mb-3">{poster.title || "Untitled"}</Card.Title>
+            <Card.Text>{poster.description || "No description available."}</Card.Text>
+            <ListGroup variant="flush">
+              <ListGroup.Item>
+                <strong>Sizes and Prices:</strong>{" "}
+                {Array.isArray(poster.sizes) && poster.sizes.length > 0 ? (
+                  <ul>
+                    {poster.sizes.map((size, index) => (
+                      <li key={index}>
+                        {size.size}:{" "}
+                        {poster.discount > 0 && size.finalPrice ? (
+                          <>
+                            <del>₹{size.price}</del>{" "}
+                            <strong>₹{size.finalPrice}</strong> ({poster.discount}% OFF)
+                          </>
+                        ) : (
+                          <strong>₹{size.price || "N/A"}</strong>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  "No sizes available"
+                )}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Collections:</strong>{" "}
+                {poster.collections?.length > 0 ? poster.collections.join(", ") : "None"}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Tags:</strong>{" "}
+                {poster.tags?.length > 0 ? poster.tags.join(", ") : "None"}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Keywords:</strong>{" "}
+                {poster.keywords?.length > 0 ? poster.keywords.join(", ") : "No items"}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <strong>Seller:</strong> ({poster.sellerUsername})
+              </ListGroup.Item>
+              <ListGroup.Item>
+                {/* {poster?.status && ( */}
+                <>
+                  <strong>Status:</strong>{" "}
+                  {/* {poster.status.charAt(0).toUpperCase() + poster.status.slice(1)} */}
+                  {typeof poster?.isActive === "boolean" && " | "}
+                </>
+                {/* // )} */}
+                {typeof poster?.isActive === "boolean" && (
+                  <>
+                    <strong>Active:</strong> {poster.isActive ? "Yes" : "No"}
+                  </>
+                )}
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <small>
+                  <strong>Created At:</strong>{" "}
+                  {poster.createdAt ? new Date(poster.createdAt).toLocaleString() : "N/A"}
+                </small>
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <small>
+                  <strong>Poster:</strong> {poster.poster_id || poster.id || "N/A"}
+                </small>
+              </ListGroup.Item>
+            </ListGroup>
+          </div>
+        </div>
       </Card.Body>
     </Card>
   );

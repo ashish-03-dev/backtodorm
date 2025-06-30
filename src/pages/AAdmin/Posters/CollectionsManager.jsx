@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Tabs, Tab, Modal, Spinner, Alert, Button, Form, Badge, ListGroup } from "react-bootstrap";
+import { Modal, Alert, Button, Form, Badge, ListGroup } from "react-bootstrap";
 import { collection, getDocs, setDoc, doc, deleteDoc, query, where } from "firebase/firestore";
 import { BiPlus, BiClipboard, BiTrash, BiImage } from "react-icons/bi";
-import PosterTable from "./PosterTable";
-import PosterFilter from "./PosterFilter";
-import PosterForm from "./PosterForm";
-import PosterView from "./PosterView";
-import { addPosterToFirebase, updatePosterInFirebase, approvePosterInFirebase, rejectPosterInFirebase, deletePosterInFirebase, submitPosterInFirebase } from "../firebaseUtils";
 import { useFirebase } from "../../../context/FirebaseContext";
-import { onSnapshot } from "firebase/firestore";
 
 // Debounce utility
 const debounce = (func, wait) => {
@@ -19,7 +13,7 @@ const debounce = (func, wait) => {
   };
 };
 
-const CollectionsManager = ({ onEdit, onView, onDelete, onApprove, onReject, onSubmit }) => {
+const CollectionsManager = () => {
   const { firestore } = useFirebase();
   const [collections, setCollections] = useState([]);
   const [filter, setFilter] = useState({ search: "" });
@@ -263,14 +257,14 @@ const CollectionsManager = ({ onEdit, onView, onDelete, onApprove, onReject, onS
       setCollections((prev) =>
         prev.some((c) => c.id === collectionId)
           ? prev.map((c) =>
-              c.id === collectionId
-                ? { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds }
-                : c
-            )
+            c.id === collectionId
+              ? { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds }
+              : c
+          )
           : [
-              ...prev,
-              { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds },
-            ]
+            ...prev,
+            { id: collectionId, name: formData.name.trim(), description: formData.description.trim(), posterIds },
+          ]
       );
       const newPosterIds = posterIds.filter((id) => !posterImages[id]);
       if (newPosterIds.length) {
@@ -556,4 +550,4 @@ const CollectionsManager = ({ onEdit, onView, onDelete, onApprove, onReject, onS
   );
 };
 
-export default  CollectionsManager;
+export default CollectionsManager;

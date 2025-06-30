@@ -124,8 +124,8 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="container mt-4">
-      <h2>👥 Admin Users</h2>
+    <div className="p-4 p-md-5">
+      <h3 className='mb-4'>👥 Admin Users</h3>
 
       {successMsg && <Alert variant="success">{successMsg}</Alert>}
       {errorMsg && <Alert variant="danger">{errorMsg}</Alert>}

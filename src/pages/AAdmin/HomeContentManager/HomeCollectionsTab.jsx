@@ -48,7 +48,6 @@ const HomeCollectionsTab = ({
           imageIds: d.data().imageIds || [],
         }));
         setCollections(collections);
-        console.log("Fetched homeCollections:", collections);
       } catch (err) {
         console.error("Fetch error:", err);
         setSubmissionError(

@@ -7,7 +7,7 @@ export default function HeroBanner() {
       <div className="container">
         <h1 className="display-4 fw-semibold">Transform Your Dorm with Art That Speaks</h1>
         <p className="lead text-muted">Curated posters for every vibe. Elevate your space today.</p>
-        <Link to="/collection/all-poster" className="btn btn-dark btn-lg mt-3">
+        <Link to="/all-posters" className="btn btn-dark btn-lg mt-3">
           Browse All Posters
         </Link>
       </div>

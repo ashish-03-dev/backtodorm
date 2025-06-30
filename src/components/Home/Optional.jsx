@@ -24,8 +24,7 @@ export default function YouMayAlsoLike() {
       try {
         const postersQuery = query(
           collection(firestore, 'posters'),
-          where('approved', '==', 'approved'),
-          where('isActive', '==', true),
+          where('isActive', '==', true),  
           orderBy('createdAt', 'desc'),
           limit(6)
         );

@@ -47,7 +47,13 @@ export default function AdminLayout() {
     <div className="bg-light p-3">
       <div className="d-flex gap-3" style={{ minHeight: "calc(100svh - 2rem)" }}>
         {!showContentOnMobile && (
-          <div className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`} style={{ minWidth: "300px", flexShrink: 0 }}>
+          <div className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`} style={{
+            position: "sticky",
+            top: "1rem",  
+            minWidth: "300px",
+            flexShrink: 0,
+            maxHeight: "calc(100svh - 2rem)"
+          }}>
             <div className="text-center p-4 bg-white shadow-sm">
               <h5 className="mb-0">🛠️ Admin Dashboard</h5>
             </div>
@@ -58,8 +64,8 @@ export default function AdminLayout() {
                   <li key={item.path} className="nav-item">
                     <div
                       className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(item.path)
-                          ? "text-primary bg-light"
-                          : "text-dark"
+                        ? "text-primary bg-light"
+                        : "text-dark"
                         }`}
                       onClick={() => handleSectionClick(item.path)}
                     >
@@ -77,9 +83,9 @@ export default function AdminLayout() {
         )}
 
         <div
-          className={`bg-white shadow-sm p-4 p-md-5 flex-grow-1 overflow-auto ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
+          className={`bg-white shadow-sm flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
             }`}
-          style={{ maxWidth: "100%", overflow: "auto" }}
+          style={{ maxWidth: "100%", overflow: "auto"}}
         >
           <Outlet />
         </div>

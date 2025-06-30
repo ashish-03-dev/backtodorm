@@ -19,52 +19,21 @@ const normalizeCollection = (text) => {
 // Add a new poster to tempPosters with Firestore-generated ID
 export const addPoster = async (firestore, posterData) => {
   try {
-    // Validate required fields
-    if (!posterData.title) throw new Error("Poster title is required");
-    if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0)
-      throw new Error("At least one valid size is required");
-    if (!posterData.sellerUsername) throw new Error("Seller username is required");
-
     // Create references
     const posterRef = doc(collection(firestore, "tempPosters"));
     const posterId = posterRef.id;
     const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
-    const collectionRefs = (posterData.collections || []).map((col) =>
-      doc(firestore, "collections", col.toLowerCase().replace(/\s+/g, "-"))
-    );
 
     // Run transaction
     await runTransaction(firestore, async (transaction) => {
       // Get seller and collection documents
       const sellerDoc = await transaction.get(sellerRef);
-      const collectionDocs = await Promise.all(collectionRefs.map((ref) => transaction.get(ref)));
 
       // Set poster document without posterId
       transaction.set(posterRef, {
         ...posterData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
-
-      // Update collections
-      collectionRefs.forEach((colRef, index) => {
-        const colDoc = collectionDocs[index];
-        const colId = colRef.id;
-        if (!colDoc.exists()) {
-          transaction.set(colRef, {
-            name: colId,
-            posterIds: [posterId],
-            createdAt: serverTimestamp(),
-          });
-        } else {
-          const posterIds = colDoc.data().posterIds || [];
-          if (!posterIds.includes(posterId)) {
-            transaction.update(colRef, {
-              posterIds: [...posterIds, posterId],
-              updatedAt: serverTimestamp(),
-            });
-          }
-        }
       });
 
       // Update seller document
@@ -87,7 +56,7 @@ export const addPoster = async (firestore, posterData) => {
       );
     });
 
-    return { success: true, id: posterId };
+    return { success: true};
   } catch (error) {
     return { success: false, error: error.message };
   }

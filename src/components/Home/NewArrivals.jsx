@@ -22,7 +22,6 @@ export default function NewArrivals() {
       try {
         const postersQuery = query(
           collection(firestore, 'posters'),
-          where('approved', '==', 'approved'),
           where('isActive', '==', true),
           orderBy('createdAt', 'desc'),
           limit(8)

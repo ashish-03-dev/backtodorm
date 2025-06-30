@@ -52,7 +52,7 @@ export default function Payouts() {
       )}
       <Card className="card shadow-sm p-4">
           <h5>Available Balance</h5>
-          <p className="display-6">₹{sellerData.pendingPayments?.toFixed(2)}</p>
+          <p className="display-6">₹{sellerData.pendingPayments.toFixed(2)}</p>
           <p className="text-muted">Funds available for payout</p>
           <Button
             variant="primary"

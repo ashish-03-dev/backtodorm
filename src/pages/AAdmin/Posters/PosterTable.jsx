@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button, Table, Image } from "react-bootstrap";
 import moment from "moment";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -11,9 +11,19 @@ const PosterTable = ({
   onUpload,
   onSetFrame,
 }) => {
+  const [uploadingPosterId, setUploadingPosterId] = useState(false);
   if (!posters || posters.length === 0) {
     return <p>No posters found.</p>;
   }
+
+  const handleUploadClick = async (posterId) => {
+    setUploadingPosterId(posterId);
+    try {
+      await onUpload(posterId); // Call the onView function passed from MyProducts
+    } finally {
+      setUploadingPosterId(null); // Reset loading state after view operation completes
+    }
+  };
 
   return (
     <Table striped bordered hover responsive className="mt-3">
@@ -60,7 +70,7 @@ const PosterTable = ({
                 >
                   View
                 </Button>
-                {poster.approved === "pending" && (
+                {poster.approved !== "approved" && (
                   <Button
                     variant="outline-success"
                     size="sm"
@@ -91,26 +101,25 @@ const PosterTable = ({
                     Reject
                   </Button>
                 )}
-                {onSetFrame && poster.approved === "approved" && (
+                {onSetFrame && poster.approved === "approved" && !poster.framedImageUrl && (
                   <Button
                     variant="outline-info"
                     size="sm"
                     onClick={() => onSetFrame(poster)}
                     title="Upload to CDN"
-                    disabled={poster.framedImageUrl}
                   >
-                    {poster.framedImageUrl ? "Framed" : "Set Frame"}
+                    Set Frame
                   </Button>
                 )}
                 {onUpload && poster.approved === "approved" && poster.framedImageUrl && (
                   <Button
                     variant="outline-info"
                     size="sm"
-                    onClick={() => onUpload(poster.id)}
+                    onClick={() => handleUploadClick(poster.id)}
                     title="Upload to CDN"
-                    disabled={poster.cdnUploaded}
+                    disabled={uploadingPosterId === poster.id}
                   >
-                    {poster.cdnUploaded ? "Uploaded" : "Upload to CDN"}
+                    {uploadingPosterId === poster.id ? "Uploading..." : "Upload"}
                   </Button>
                 )}
               </div>

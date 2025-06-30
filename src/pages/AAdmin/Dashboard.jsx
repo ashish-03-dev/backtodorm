@@ -24,8 +24,8 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="container mt-4">
-      <h1 className="mb-4">📊 Dashboard Overview</h1>
+    <div className="p-4 p-md-5">
+      <h3 className="mb-4">📊 Dashboard Overview</h3>
 
       {/* Metrics */}
       <div className="row">

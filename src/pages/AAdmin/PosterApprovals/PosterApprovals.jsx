@@ -120,9 +120,6 @@ const PosterApprovals = () => {
     try {
       const result = await approveTempPoster(firestore, storage, data, posterId, user);
       if (result.success) {
-        setTempPosters((prev) =>
-          prev.map((p) => (p.id === posterId ? { ...p, ...data, approved: "approved" } : p))
-        );
         setShowEditModal(false);
         setEditing(null);
       } else {
@@ -154,14 +151,8 @@ const PosterApprovals = () => {
     try {
       const approvePoster = httpsCallable(functions, "approvePoster");
       const result = await approvePoster({ posterId });
-      if (result.data.success) {
-        setTempPosters((prev) =>
-          prev.map((p) =>
-            p.id === posterId ? { ...p, cdnUploaded: true, cdnUrl: result.data.cdnUrl || p.cdnUrl } : p
-          )
-        );
-      } else {
-        setError("Failed to approve poster: " + (result.data.error || "Unknown error"));
+      if (!result.data.success) {
+        setError("Failed to upload poster: " + (result.data.error || "Unknown error"));
       }
     } catch (error) {
       setError(`Approval failed: ${error.message}`);
@@ -186,7 +177,7 @@ const PosterApprovals = () => {
   };
 
   const pendingList = applySearchFilter(
-    tempPosters.filter((p) => p.approved === "pending"),
+    tempPosters.filter((p) => !p.approved || p.approved === "pending"),
     filter.search
   );
 
@@ -209,8 +200,8 @@ const PosterApprovals = () => {
   }
 
   return (
-    <div className="container mt-4" style={{ maxWidth: "1400px" }}>
-      <h2 className="mb-3">🖼️ Poster Approvals</h2>
+    <div className="p-4 p-md-5">
+      <h3 className="mb-4">🖼️ Poster Approvals</h3>
       {error && (
         <Alert variant="danger" onClose={() => setError(null)} dismissible>
           {error}

@@ -239,8 +239,8 @@ const SiteSettings = () => {
   }
 
   return (
-    <div className="container mt-4">
-      <h2 className="mb-3">⚙️ Site Settings</h2>
+    <div className="p-4 p-md-5">
+      <h3 className="mb-4">⚙️ Site Settings</h3>
       {error && (
         <Alert variant="danger" onClose={() => setError("")} dismissible>
           {error}

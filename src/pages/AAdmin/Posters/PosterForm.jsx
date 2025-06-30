@@ -22,9 +22,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       collectionError,
       availableCollections,
       tags,
-      showNewCollectionModal,
-      newCollectionName,
-      newCollectionError,
       selectedCollections,
       sellerUsername,
       sellerName,
@@ -48,8 +45,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
     handlers: {
       setError,
       setTags,
-      setShowNewCollectionModal,
-      setNewCollectionName,
       setSelectedCollections,
       setSellerUsername,
       setKeywords,
@@ -63,8 +58,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       suggestId,
       checkSellerUsername,
       insertUserId,
-      generateKeywordsLocal,
-      handleNewCollectionSubmit,
+      generateKeywords,
       handleSizeChange,
       addSize,
       removeSize,
@@ -173,7 +167,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             />
             <Button
               variant="outline-secondary"
-              onClick={generateKeywordsLocal}
+              onClick={generateKeywords}
               aria-label="Generate keywords"
               disabled={uploading}
             >
@@ -193,15 +187,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               placeholder="Select collections..."
               isDisabled={uploading}
             />
-            <Button
-              variant="outline-primary"
-              onClick={() => setShowNewCollectionModal(true)}
-              title="Suggest new collection"
-              aria-label="Suggest new collection"
-              disabled={uploading}
-            >
-              + New
-            </Button>
           </div>
           {collectionError && <Form.Text className="text-danger">{collectionError}</Form.Text>}
         </Form.Group>
@@ -233,6 +218,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                 style={{ width: "120px" }}
                 disabled={uploading}
               />
+
               <Form.Control
                 type="text"
                 placeholder="Final Price"
@@ -405,7 +391,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
               {uploading ? "Uploading..." : poster ? "Update Poster" : "Submit Poster"}
             </Button>
           )}
-          {poster?.approved === "pending" && poster.source === "tempPosters" && (
+          {!poster || poster.source === "tempPosters" && poster?.approved !== "approved" && (
             <Button
               type="button"
               variant="success"
@@ -488,36 +474,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
         </Modal.Body>
       </Modal>
 
-      <Modal show={showNewCollectionModal} onHide={() => setShowNewCollectionModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Collection</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleNewCollectionSubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Collection Name</Form.Label>
-              <Form.Control
-                type="text"
-                value={newCollectionName}
-                onChange={(e) => setNewCollectionName(e.target.value)}
-                placeholder="Enter collection name"
-                required
-                isInvalid={!!newCollectionError}
-              />
-              {newCollectionError && (
-                <Form.Control.Feedback type="invalid">{newCollectionError}</Form.Control.Feedback>
-              )}
-            </Form.Group>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!newCollectionName.trim() || uploading}
-            >
-              Save Collection
-            </Button>
-          </Form>
-        </Modal.Body>
-      </Modal>
     </div>
   );
 };

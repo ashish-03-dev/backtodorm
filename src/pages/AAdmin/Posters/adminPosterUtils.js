@@ -8,22 +8,17 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from "firebase/storage";
 
-// Helper function to normalize text for keywords
-const normalizeText = (text) => {
-  if (!text) return [];
-  const lower = text.toLowerCase().trim();
-  const title = lower
-    .split(/\s+|-/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-  const hyphenated = lower.replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  return [...new Set([lower, title, hyphenated])].filter(Boolean);
-};
-
 // Helper function to normalize collections
 const normalizeCollection = (text) => {
   if (!text) return "";
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+};
+
+const denormalizeCollectionName = (id) => {
+  if (!id) return "";
+  return id
+    .replace(/-/g, " ")                // Replace hyphens with spaces
+    .replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalize each word
 };
 
 export const submitPoster = async (
@@ -237,85 +232,49 @@ export const approveTempPoster = async (firestore, storage, posterData, posterId
     const posterRef = doc(firestore, "tempPosters", posterId);
 
     await runTransaction(firestore, async (transaction) => {
-      // Step 1: Perform all reads upfront
-      // Read the existing poster
       const existingPoster = await transaction.get(posterRef);
       if (!existingPoster.exists()) throw new Error("Poster not found");
-      const oldCollections = existingPoster.data().collections || [];
 
-      // Determine collections to add/remove
-      const collectionsToRemove = oldCollections.filter(
-        (col) => !posterData.collections?.includes(col)
-      );
-      const collectionsToAdd = posterData.collections?.filter(
-        (col) => !oldCollections.includes(col)
-      ) || [];
+      const collectionsToAdd = posterData.collections || [];
 
-      // Read all collection documents
-      const collectionDocsToRemove = await Promise.all(
-        collectionsToRemove.map((col) =>
-          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
-        )
-      );
+      // Pre-normalize collections once
+      const normalizedCollections = collectionsToAdd.map((name) => ({
+        id: normalizeCollection(name),
+      }));
+
+      // Read all collection docs (normalized IDs)
       const collectionDocsToAdd = await Promise.all(
-        collectionsToAdd.map((col) =>
-          transaction.get(doc(firestore, "collections", normalizeCollection(col)))
+        normalizedCollections.map(({ id }) =>
+          transaction.get(doc(firestore, "collections", id))
         )
       );
 
-      // Read the seller document
-      const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
-      const sellerDoc = await transaction.get(sellerRef);
-
-      // Step 2: Perform all writes
-      // Update poster document
+      // Update the poster document
       transaction.update(posterRef, poster);
 
-      // Update collections to add
-      collectionsToAdd.forEach((col, index) => {
+      // Loop through and update each collection
+      normalizedCollections.forEach(({ id }, index) => {
         const colDoc = collectionDocsToAdd[index];
-        const colId = normalizeCollection(col);
+
+        const colRef = doc(firestore, "collections", id);
+
         if (!colDoc.exists()) {
-          transaction.set(doc(firestore, "collections", colId), {
-            name: colId,
-            posterIds: [posterId],
+          // New collection
+          transaction.set(colRef, {
+            name: denormalizeCollectionName(id),
+            posterIds: [posterData.posterId],
             createdAt: serverTimestamp(),
           });
         } else {
+          // Existing collection
           const posterIds = colDoc.data().posterIds || [];
-          if (!posterIds.includes(posterId)) {
-            transaction.update(doc(firestore, "collections", colId), {
-              posterIds: [...posterIds, posterId],
+          if (!posterIds.includes(posterData.posterId)) {
+            transaction.update(colRef, {
+              posterIds: [...posterIds, posterData.posterId],
             });
           }
         }
       });
-
-      // Update collections to remove
-      collectionsToRemove.forEach((col, index) => {
-        const colDoc = collectionDocsToRemove[index];
-        const colId = normalizeCollection(col);
-        if (colDoc.exists() && colDoc.data().posterIds) {
-          const posterIds = colDoc.data().posterIds || [];
-          transaction.update(doc(firestore, "collections", colId), {
-            posterIds: posterIds.filter((pid) => pid !== posterId),
-          });
-        }
-      });
-
-      // Update seller document
-      if (sellerDoc.exists()) {
-        const tempPosters = sellerDoc.data().tempPosters || [];
-        const updatedTempPosters = tempPosters.map((p) =>
-          p.id === posterId
-            ? { ...p, status: poster.approved || "pending" }
-            : p
-        );
-        transaction.update(sellerRef, {
-          tempPosters: updatedTempPosters,
-          updatedAt: serverTimestamp(),
-        });
-      }
     });
 
     return { success: true, id: posterId };
@@ -406,6 +365,7 @@ export const rejectPoster = async (firestore, storage, posterId) => {
     return { success: false, error: error.message };
   }
 };
+
 export const saveFramedImage = async (firestore, storage, posterId, imageData, user) => {
   if (!user) {
     return { success: false, error: "User not authenticated" };
@@ -443,12 +403,11 @@ export const saveFramedImage = async (firestore, storage, posterId, imageData, u
     });
 
     // Get download URL
-    const framedImageUrl = await getDownloadURL(framedImageRef);
+    const framedImageUrl = framedImageRef.fullPath; // e.g., "framedImages/poster123_1720000000000.png"
 
     // Update Firestore document
     const posterRef = doc(firestore, "tempPosters", posterId);
     await setDoc(posterRef, { framedImageUrl, frameSet: true }, { merge: true });
-
     return { success: true, framedImageUrl };
   } catch (error) {
     return { success: false, error: `Failed to save framed image: ${error.message}` };
@@ -463,7 +422,7 @@ export const saveFrame = async (firestore, storage, frameData, file, user) => {
     let fileName = "";
     if (file) {
       fileName = file.name;
-      const storageRef = ref(storage, `frames/${frameRef.id}/${fileName}`);
+      const storageRef = ref(storage, `frames/${fileName}`);
       await uploadBytes(storageRef, file);
       imageUrl = await getDownloadURL(storageRef);
     }
