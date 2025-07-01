@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom';
 import { doc, onSnapshot, query, collection, where } from 'firebase/firestore';
 import { useCartContext } from '../../context/CartContext';
 import '../../styles/trendingPosters.css';
+import { useFirebase } from '../../context/FirebaseContext';
 
-export default function SectionScroll({ sectionId, title, firestore }) {
+export default function SectionScroll({ sectionId, title }) {
+  const { firestore } = useFirebase();
   const { addToCart } = useCartContext();
   const [posters, setPosters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +24,7 @@ export default function SectionScroll({ sectionId, title, firestore }) {
     (idsToFetch) => {
       if (!firestore || !idsToFetch.length) {
         setHasMore(false);
-        return () => {};
+        return () => { };
       }
 
       const postersQuery = query(
@@ -41,9 +43,9 @@ export default function SectionScroll({ sectionId, title, firestore }) {
             const badges = Array.isArray(data.badges) ? data.badges : [];
             const minPriceSize = sizes.length
               ? sizes.reduce(
-                  (min, size) => (size.finalPrice < min.finalPrice ? size : min),
-                  sizes[0]
-                )
+                (min, size) => (size.finalPrice < min.finalPrice ? size : min),
+                sizes[0]
+              )
               : { price: 0, finalPrice: 0, size: '' };
 
             return {
