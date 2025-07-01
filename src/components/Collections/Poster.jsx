@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc } from "firebase/firestore";
 import { useFirebase } from '../../context/FirebaseContext';
 import { useCartContext } from '../../context/CartContext';
+import { BsTruck, BsWallet2, BsBoxArrowLeft } from 'react-icons/bs';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -208,19 +209,19 @@ export default function ProductDetail() {
               <h6 className="fw-semibold mb-3">Shipping & Returns</h6>
               <div className="d-flex flex-column gap-2">
                 <div className="d-flex align-items-center">
-                  <i className="bi bi-truck me-2 text-primary" style={{ fontSize: '1.2rem' }}></i>
+                  <BsTruck className="me-2 text-primary" style={{ fontSize: '1.2rem' }} />
                   <p className="mb-0 text-dark">
                     <strong>Delivery Charge:</strong> {deliveryCharge === 0 ? 'Free' : `₹${deliveryCharge.toLocaleString('en-IN')}`}
                   </p>
                 </div>
                 <div className="d-flex align-items-center">
-                  <i className="bi bi-wallet2 me-2 text-success" style={{ fontSize: '1.2rem' }}></i>
+                  <BsWallet2 className="me-2 text-success" style={{ fontSize: '1.2rem' }} />
                   <p className="mb-0 text-dark">
                     <strong>Free Delivery:</strong> On orders above ₹{freeDeliveryThreshold.toLocaleString('en-IN')}
                   </p>
                 </div>
                 <div className="d-flex align-items-center">
-                  <i className="bi bi-box-arrow-left me-2 text-muted" style={{ fontSize: '1.2rem' }}></i>
+                  <BsBoxArrowLeft className="me-2 text-muted" style={{ fontSize: '1.2rem' }} />
                   <p className="mb-0 text-muted small">
                     Ships in 2–4 days. 7-day return for damaged posters.{' '} View {' '}
                     <Link to="/return-policy" className="text-primary text-decoration-underline">

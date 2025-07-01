@@ -3,18 +3,33 @@ import NavLinks from "./Navlinks";
 import AccountDropdown from "./AccountDropDown";
 import CartSidebar from "./CartSidebar";
 import MobileSidebar from './MobileSidebar';
-import "bootstrap/dist/css/bootstrap.min.css";
 import { useFirebase } from "../../context/FirebaseContext";
 import { useNavigate } from "react-router-dom";
 import { useCartContext } from "../../context/CartContext";
+import { useSearch } from "../../context/SearchContext"; // Import useSearch
+import { FaBars } from 'react-icons/fa';
+import { BsCart, BsSearch } from 'react-icons/bs';
 
 export default function NavbarComponent() {
   const { cartItems } = useCartContext();
   const { user, logout } = useFirebase();
+  const { updateSearchState } = useSearch(); // Add useSearch hook
   const isLoggedIn = !!user;
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const navigate = useNavigate();
+
+  const handleSearchClick = () => {
+    // Reset search state before navigating
+    updateSearchState({
+      queryString: "",
+      results: [],
+      loading: false,
+      imagesLoading: false,
+      error: "",
+    });
+    navigate("/search");
+  };
 
   return (
     <>
@@ -29,7 +44,7 @@ export default function NavbarComponent() {
             onClick={() => setShowSidebar(true)}
             aria-label="Open Shop Categories"
           >
-            <i className="fas fa-bars fs-6"></i>
+            <FaBars />
           </button>
           <a className="navbar-brand fw-bold fs-4 mb-0 ms-md-4" href="/">
             <img
@@ -37,10 +52,10 @@ export default function NavbarComponent() {
               alt="backtodorm logo"
               style={{
                 width: "50px",
-                height: "50px",         // Ensure it's a square
+                height: "50px",
                 marginRight: "10px",
-                borderRadius: "50%",    // Makes it round
-                objectFit: "cover"      // Keeps aspect ratio nicely
+                borderRadius: "50%",
+                objectFit: "cover"
               }}
             />
             B. T. D.
@@ -53,11 +68,11 @@ export default function NavbarComponent() {
           <button
             className="btn px-3 mx-1 mx-md-2 align-items-center"
             type="button"
-            onClick={() => navigate("/search")}
+            onClick={handleSearchClick} // Use the new handler
             style={{ height: "35px", padding: "0 8px", lineHeight: '1' }}
             aria-label="Search Posters"
           >
-            <i className="bi bi-search fs-6"></i>
+            <BsSearch size={16} />
           </button>
 
           <AccountDropdown isLoggedIn={isLoggedIn} logout={logout} />
@@ -68,7 +83,7 @@ export default function NavbarComponent() {
             onClick={() => setShowCart(true)}
             style={{ height: "35px" }}
           >
-            <i className="bi bi-cart fs-5"></i>
+            <BsCart className="fs-5" />
             {cartItems.length > 0 && (
               <span
                 className="position-absolute bg-primary text-white d-flex align-items-center justify-content-center"

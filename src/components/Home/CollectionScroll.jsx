@@ -2,7 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { useFirebase } from "../../context/FirebaseContext"; // Adjust path as needed
-
+import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
+ 
 export default function HorizontalCollectionScroll({ title }) {
   const { firestore } = useFirebase();
   const [collections, setCollections] = useState([]);
@@ -118,7 +119,7 @@ export default function HorizontalCollectionScroll({ title }) {
             style={{ width: "40px", height: "40px", zIndex: 10 }}
             aria-label="Scroll left"
           >
-            <i className="bi bi-chevron-left fs-5"></i>
+          <BsChevronLeft className="fs-5" />
           </button>
           <button
             onClick={() => scroll("right")}
@@ -126,7 +127,7 @@ export default function HorizontalCollectionScroll({ title }) {
             style={{ width: "40px", height: "40px", zIndex: 10 }}
             aria-label="Scroll right"
           >
-            <i className="bi bi-chevron-right fs-5"></i>
+         <BsChevronRight className="fs-5" />
           </button>
         </>
       )}

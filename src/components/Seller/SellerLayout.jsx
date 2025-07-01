@@ -5,6 +5,7 @@ import { doc, onSnapshot, getDoc } from "firebase/firestore";
 import { ref, getDownloadURL } from "firebase/storage";
 import { Alert } from "react-bootstrap";
 import { deletePoster } from "./sellerUtils";
+import { BsHouse, BsUpload, BsImage, BsWallet2, BsChevronRight } from "react-icons/bs";
 
 export default function SellerLayout() {
   const { firestore, storage, user, userData } = useFirebase();
@@ -239,10 +240,10 @@ export default function SellerLayout() {
   };
 
   const navItems = [
-    { path: "/seller/dashboard", label: "Dashboard", icon: "bi-house" },
-    { path: "/seller/sell-poster", label: "Sell Your Poster", icon: "bi-upload" },
-    { path: "/seller/products", label: "My Products", icon: "bi-image" },
-    { path: "/seller/payouts", label: "Payouts", icon: "bi-wallet2" },
+    { path: "/seller/dashboard", label: "Dashboard", icon: BsHouse },
+    { path: "/seller/sell-poster", label: "Sell Your Poster", icon: BsUpload },
+    { path: "/seller/products", label: "My Products", icon: BsImage },
+    { path: "/seller/payouts", label: "Payouts", icon: BsWallet2 },
   ];
 
   if (error) {
@@ -264,9 +265,9 @@ export default function SellerLayout() {
             style={{
               position: "sticky",
               top: "calc(65px + 1rem)",
-               minWidth: "300px", 
-               flexShrink: 0,
-               maxHeight:"calc(100svh - 65px - 2rem)"
+              minWidth: "300px",
+              flexShrink: 0,
+              maxHeight: "calc(100svh - 65px - 2rem)",
             }}
           >
             <div className="text-center p-4 bg-white shadow-sm">
@@ -274,18 +275,18 @@ export default function SellerLayout() {
             </div>
             <div className="p-4 bg-white d-flex flex-column justify-content-between flex-grow-1 shadow-sm">
               <ul className="nav flex-column gap-2">
-                {navItems.map(({ path, label, icon }) => (
+                {navItems.map(({ path, label, icon: Icon }) => (
                   <li className="nav-item" key={path}>
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(path) ? "text-primary bg-light" : "text-dark"
+                      className={`nav-link d-flex justify-content-between align-items-center px-3 py-2 rounded sidebar-item ${isActive(path) ? "text-primary bg-light" : "text-dark"
                         }`}
                       onClick={() => handleSectionClick(path)}
                     >
-                      <span>
-                        <i className={`bi ${icon} me-2`}></i>
+                      <span className="d-flex align-items-center">
+                        <Icon className="me-2" />
                         {label}
                       </span>
-                      <i className="bi bi-chevron-right d-md-none"></i>
+                      <BsChevronRight className="d-md-none" />
                     </div>
                   </li>
                 ))}

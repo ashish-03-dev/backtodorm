@@ -2,6 +2,7 @@ import React from 'react';
 import { Offcanvas, Button, ListGroup, Image, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useCartContext } from '../../context/CartContext';
+import { BsDash, BsPlus, BsTrash, BsTruck, BsCartCheck } from 'react-icons/bs';
 import '../../styles/CartSidebar.css';
 
 export default function CartSidebar({ show, onClose }) {
@@ -191,7 +192,7 @@ export default function CartSidebar({ show, onClose }) {
                                 style={{ width: '30px', height: '30px', lineHeight: '1' }}
                                 aria-label={`Decrease quantity of collection ${item.collectionId}`}
                               >
-                                <i className="bi bi-dash fs-6"></i>
+                                <BsDash className="fs-6" />
                               </Button>
                               <span className="mx-2">{item.quantity || 1}</span>
                               <Button
@@ -204,7 +205,7 @@ export default function CartSidebar({ show, onClose }) {
                                 style={{ width: '30px', height: '30px', lineHeight: '1' }}
                                 aria-label={`Increase quantity of collection ${item.collectionId}`}
                               >
-                                <i className="bi bi-plus fs-6"></i>
+                                <BsPlus className="fs-6" />
                               </Button>
                             </div>
                           </div>
@@ -216,7 +217,7 @@ export default function CartSidebar({ show, onClose }) {
                             style={{ width: '30px', height: '30px', lineHeight: '1' }}
                             aria-label={`Remove collection ${item.collectionId} from cart`}
                           >
-                            <i className="bi bi-trash fs-6"></i>
+                            <BsTrash className="fs-6" />
                           </Button>
                         </>
                       ) : (
@@ -272,7 +273,7 @@ export default function CartSidebar({ show, onClose }) {
                                 style={{ width: '30px', height: '30px', lineHeight: '1' }}
                                 aria-label={`Decrease quantity of ${item.title || 'item'}`}
                               >
-                                <i className="bi bi-dash fs-6"></i>
+                                <BsDash className="fs-6" />
                               </Button>
                               <span className="mx-2">{item.quantity || 1}</span>
                               <Button
@@ -285,7 +286,7 @@ export default function CartSidebar({ show, onClose }) {
                                 style={{ width: '30px', height: '30px', lineHeight: '1' }}
                                 aria-label={`Increase quantity of ${item.title || 'item'}`}
                               >
-                                <i className="bi bi-plus fs-6"></i>
+                                <BsPlus className="fs-6" />
                               </Button>
                             </div>
                           </div>
@@ -298,7 +299,7 @@ export default function CartSidebar({ show, onClose }) {
                             aria-label={`Remove ${item.title || 'item'} from cart`}
                             title="Remove item"
                           >
-                            <i className="bi bi-trash fs-6"></i>
+                            <BsTrash className="fs-6" />
                           </Button>
                         </>
                       )}
@@ -319,7 +320,7 @@ export default function CartSidebar({ show, onClose }) {
                 </div>
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <span className="d-flex align-items-center">
-                    <i className="bi bi-truck me-2 text-primary" style={{ fontSize: '1rem' }}></i>
+                    <BsTruck className="me-2 text-primary" style={{ fontSize: '1rem' }} />
                     Delivery
                   </span>
                   {isFreeDelivery ? (
@@ -357,7 +358,7 @@ export default function CartSidebar({ show, onClose }) {
             disabled={cartItems.length === 0 || loading}
             style={{ height: '40px', lineHeight: '1' }}
           >
-            <i className="bi bi-cart-check me-2 fs-6"></i> Go to Checkout
+            <BsCartCheck className="me-2 fs-6" /> Go to Checkout
           </Button>
         </div>
       </Offcanvas>

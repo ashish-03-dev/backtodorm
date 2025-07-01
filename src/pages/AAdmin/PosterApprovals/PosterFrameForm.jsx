@@ -12,14 +12,6 @@ const POSTER_SIZES = {
   "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508 },
 };
 
-const SHADOW_OPTIONS = [
-  { title: "No Shadow", url: null, type: "none" },
-  { title: "Soft Shadow", url: "https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751282396/ChatGPT_Image_Jun_30_2025_04_47_54_PM_pd5bav.png", type: "image" },
-  { title: "Hard Shadow", url: "https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751281260/ChatGPT_Image_Jun_30_2025_04_15_39_PM_zrbauh.png", type: "image" },
-  { title: "Glow Effect", url: "gs://your-bucket/shadows/glow-effect.png", type: "image" },
-  { title: "Custom CSS Shadow", url: null, type: "css" },
-];
-
 const PosterFrameForm = ({ poster, onClose, onSave }) => {
   const { firestore, storage, user } = useFirebase();
   const validSizes = Object.keys(POSTER_SIZES);
@@ -30,11 +22,11 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
   const [frames, setFrames] = useState([]);
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [posterImage, setPosterImage] = useState(null);
-  const [selectedShadow, setSelectedShadow] = useState(SHADOW_OPTIONS[0]);
+  const [useCssShadow, setUseCssShadow] = useState(true); // Changed to true for default checked
   const [cssShadow, setCssShadow] = useState({
-    xOffset: 10,
-    yOffset: 10,
-    blurRadius: 20,
+    xOffset: -5,
+    yOffset: 5,
+    blurRadius: 10,
     spreadRadius: 0,
     color: "rgba(0, 0, 0, 0.5)",
   });
@@ -120,13 +112,10 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
 
         const posterImg = new Image();
         const frameImg = new Image();
-        const shadowImg = selectedShadow.type === "image" && selectedShadow.url ? new Image() : null;
         posterImg.crossOrigin = "Anonymous";
         frameImg.crossOrigin = "Anonymous";
-        if (shadowImg) shadowImg.crossOrigin = "Anonymous";
         posterImg.src = posterUrl;
         frameImg.src = frameUrl;
-        if (shadowImg) shadowImg.src = selectedShadow.url;
 
         await Promise.all([
           new Promise((resolve, reject) => {
@@ -143,15 +132,6 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
               reject(new Error("Failed to load frame image."));
             };
           }),
-          shadowImg
-            ? new Promise((resolve, reject) => {
-                shadowImg.onload = () => shadowImg.decode().then(resolve).catch(reject);
-                shadowImg.onerror = () => {
-                  setError("Failed to load shadow image. Check URL or Firebase Storage rules.");
-                  reject(new Error("Failed to load shadow image."));
-                };
-              })
-            : Promise.resolve(),
         ]);
 
         // Set canvas size to frame's natural resolution
@@ -186,17 +166,8 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
         // Save the context state to isolate shadow effects
         ctx.save();
 
-        // Draw shadow around poster if enabled
-        if (shadowImg && selectedShadow.type === "image" && selectedShadow.url) {
-          const shadowPadding = 30; // shadow padding in pixels around poster
-          const shadowX = posterX - shadowPadding;
-          const shadowY = posterY - shadowPadding;
-          const shadowWidth = finalPosterWidth + shadowPadding * 2;
-          const shadowHeight = finalPosterHeight + shadowPadding * 2;
-
-          ctx.drawImage(shadowImg, shadowX, shadowY, shadowWidth, shadowHeight);
-        } else if (selectedShadow.type === "css") {
-          // Apply CSS shadow only to the poster
+        // Apply CSS shadow if enabled
+        if (useCssShadow) {
           ctx.shadowColor = cssShadow.color;
           ctx.shadowOffsetX = cssShadow.xOffset;
           ctx.shadowOffsetY = cssShadow.yOffset;
@@ -215,14 +186,14 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
       }
     };
     drawCanvas();
-  }, [posterImage, selectedFrame, selectedShadow, cssShadow, size, poster, storage, isPosterValid]);
+  }, [posterImage, selectedFrame, useCssShadow, cssShadow, size, poster, storage, isPosterValid]);
 
   // Remove CSS shadow from posterContainerRef to prevent frame shadow
   useEffect(() => {
     if (posterContainerRef.current) {
       posterContainerRef.current.style.boxShadow = "none"; // No shadow on container
     }
-  }, [selectedShadow, cssShadow]);
+  }, [useCssShadow, cssShadow]);
 
   const handleSave = async () => {
     if (!canvasRef.current) {
@@ -328,23 +299,15 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
             </Form.Select>
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>Select Shadow</Form.Label>
-            <Form.Select
-              value={selectedShadow.title}
-              onChange={(e) => {
-                const newShadow = SHADOW_OPTIONS.find((option) => option.title === e.target.value);
-                setSelectedShadow(newShadow);
-              }}
-            >
-              {SHADOW_OPTIONS.map((option) => (
-                <option key={option.title} value={option.title}>
-                  {option.title}
-                </option>
-              ))}
-            </Form.Select>
+            <Form.Check
+              type="checkbox"
+              label="Apply CSS Shadow"
+              checked={useCssShadow}
+              onChange={(e) => setUseCssShadow(e.target.checked)}
+            />
           </Form.Group>
-          {selectedShadow.type === "css" && (
-            <div className="mb-3">
+          {/* {useCssShadow && ( */}
+            <div className="d-flex gap-2">
               <Form.Group className="mb-2">
                 <Form.Label>X-Offset (px)</Form.Label>
                 <Form.Control
@@ -385,16 +348,8 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
                   }
                 />
               </Form.Group>
-              <Form.Group className="mb-2">
-                <Form.Label>Shadow Color</Form.Label>
-                <Form.Control
-                  type="color"
-                  value={cssShadow.color}
-                  onChange={(e) => setCssShadow({ ...cssShadow, color: e.target.value })}
-                />
-              </Form.Group>
             </div>
-          )}
+          {/* )} */}
           <div className="mb-3">
             <strong>Current Size: </strong>
             {size} ({POSTER_SIZES[size].widthPx}x{POSTER_SIZES[size].heightPx}px)

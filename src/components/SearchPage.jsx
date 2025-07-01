@@ -127,7 +127,6 @@ export default function SearchPage() {
             }
 
             const poster = { id: docSnap.id, ...posterData };
-            const sellerName = poster.sellerUsername || "Unknown";
 
             const cheapestSize = posterData.sizes.reduce((best, size) => {
               const final = size.finalPrice ?? size.price ?? Infinity;
@@ -140,7 +139,6 @@ export default function SearchPage() {
 
             searchResults.push({
               ...poster,
-              sellerName,
               cheapestPrice,
               originalPrice,
               discount,
@@ -262,22 +260,21 @@ export default function SearchPage() {
           {results.map((poster) => (
             <div key={poster.id} className="col-6 col-md-3 mb-4">
               <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
-                <div className="card h-100 shadow-sm">
+                <div className="h-100 shadow-sm rounded-1">
                   <img
                     src={poster.imageUrl}
-                    className="card-img-top"
+                    className="card-img-top rounded-top-1"
                     alt={poster.title}
                     style={{ aspectRatio: "3/4", objectFit: "cover" }}
                   />
-                  <div className="card-body d-flex flex-column">
+                  <div className="p-3 d-flex flex-column" style={{minHeight:"0"}}>
                     <h6
-                      className="card-title text-truncate mb-1"
+                      className="text-truncate mb-2"
                       style={{ overflow: "hidden", whiteSpace: "nowrap" }}
                       title={poster.title}
                     >
                       {poster.title}
                     </h6>
-                    <p className="card-text text-muted mb-2">By {poster.sellerName}</p>
                     {poster.discount > 0 && poster.originalPrice > poster.cheapestPrice ? (
                       <div className="d-flex align-items-center">
                         <span className="text-danger fw-semibold me-2">

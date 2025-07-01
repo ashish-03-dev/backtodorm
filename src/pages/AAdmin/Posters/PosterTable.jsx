@@ -80,7 +80,7 @@ const PosterTable = ({
                 </Button>
                 {poster.approved !== "approved" && (
                   <Button
-                    variant="outline-success"
+                    variant="success"
                     size="sm"
                     onClick={() => onEdit(poster)}
                     title="Edit and Approve poster"
@@ -98,9 +98,9 @@ const PosterTable = ({
                     Edit
                   </Button>
                 )}
-                {onReject && poster.approved === "pending" && (
+                {onReject && poster.approved !== "approved" && (
                   <Button
-                    variant="outline-warning"
+                    variant="danger"
                     size="sm"
                     onClick={() => onReject(poster.id)}
                     title="Reject poster"

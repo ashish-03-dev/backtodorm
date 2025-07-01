@@ -121,7 +121,7 @@ const PosterView = ({ poster }) => {
               </ListGroup.Item>
               <ListGroup.Item>
                 <small>
-                  <strong>Poster:</strong> {poster.poster_id || poster.id || "N/A"}
+                  <strong>Poster:</strong> {poster.posterId || poster.id || "N/A"}
                 </small>
               </ListGroup.Item>
             </ListGroup>

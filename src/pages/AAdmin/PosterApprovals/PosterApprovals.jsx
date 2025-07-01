@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Spinner, Alert, Tabs, Tab } from "react-bootstrap";
+import { Modal, Spinner, Alert } from "react-bootstrap";
 import PosterTable from "../Posters/PosterTable";
 import PosterFilter from "../Posters/PosterFilter";
 import PosterForm from "./PosterForm";
 import PosterView from "../Posters/PosterView";
-import PosterFrameForm from '../PosterApprovals/PosterFrameForm';
+import PosterFrameForm from "../PosterApprovals/PosterFrameForm";
 import { useFirebase } from "../../../context/FirebaseContext";
 import { collection, onSnapshot } from "firebase/firestore";
 import { submitPoster, approveTempPoster, rejectPoster } from "../Posters/adminPosterUtils";
@@ -24,7 +24,6 @@ const PosterApprovals = () => {
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [framing, setFraming] = useState(null);
-  const [activeTab, setActiveTab] = useState("pending");
 
   // Fetch tempPosters with image URLs
   useEffect(() => {
@@ -42,7 +41,7 @@ const PosterApprovals = () => {
           id: doc.id,
           ...doc.data(),
           source: "tempPosters",
-          cdnUploaded: doc.data().cdnUploaded || false, // Track CDN upload status
+          cdnUploaded: doc.data().cdnUploaded || false,
           frameSet: doc.data().frameSet || false,
         }));
 
@@ -176,15 +175,7 @@ const PosterApprovals = () => {
     );
   };
 
-  const pendingList = applySearchFilter(
-    tempPosters.filter((p) => !p.approved || p.approved === "pending"),
-    filter.search
-  );
-
-  const approvedList = applySearchFilter(
-    tempPosters.filter((p) => p.approved === "approved"),
-    filter.search
-  );
+  const filteredPosters = applySearchFilter(tempPosters, filter.search);
 
   if (loading) {
     return (
@@ -207,41 +198,20 @@ const PosterApprovals = () => {
           {error}
         </Alert>
       )}
-      <Tabs
-        activeKey={activeTab}
-        onSelect={(k) => setActiveTab(k)}
-        id="poster-approvals-tabs"
-        className="mb-3"
-      >
-        <Tab eventKey="pending" title="Pending Posters">
-          <PosterFilter
-            filter={filter}
-            onFilterChange={setFilter}
-            onAdd={() => openEdit(null)}
-            hideApprovedFilter
-          />
-          <PosterTable
-            posters={pendingList}
-            onEdit={openEdit}
-            onView={openView}
-            onReject={rejectPosterHandler}
-          />
-        </Tab>
-        <Tab eventKey="approved" title="Approved Posters">
-          <PosterFilter
-            filter={filter}
-            onFilterChange={setFilter}
-            hideApprovedFilter
-          />
-          <PosterTable
-            posters={approvedList}
-            onEdit={openEdit}
-            onView={openView}
-            onUpload={uploadHandler}
-            onSetFrame={openFrame}
-          />
-        </Tab>
-      </Tabs>
+      <PosterFilter
+        filter={filter}
+        onFilterChange={setFilter}
+        onAdd={() => openEdit(null)}
+        hideApprovedFilter
+      />
+      <PosterTable
+        posters={filteredPosters}
+        onEdit={openEdit}
+        onView={openView}
+        onReject={rejectPosterHandler}
+        onUpload={uploadHandler}
+        onSetFrame={openFrame}
+      />
 
       <Modal
         show={showEditModal}

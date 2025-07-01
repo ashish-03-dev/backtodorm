@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
@@ -439,24 +440,26 @@ export const saveFrame = async (firestore, storage, frameData, file) => {
   }
 };
 
-export const updateFrame = async (firestore, storage, frameId, frameData, file, user) => {
+export const deleteFrame = async (firestore, storage, frameId, fileName) => {
   try {
-    if (!user) throw new Error("User not authenticated");
+    // Delete the frame document from Firestore
     const frameRef = doc(firestore, "frames", frameId);
-    let imageUrl = frameData.imageUrl || "";
-    if (file) {
-      const storageRef = ref(storage, `frames/${frameId}/${file.name}`);
-      await uploadBytes(storageRef, file);
-      imageUrl = await getDownloadURL(storageRef);
+    await deleteDoc(frameRef);
+
+    // Delete the associated image from Firebase Storage if fileName exists
+    if (fileName) {
+      const storageRef = ref(storage, `frames/${fileName}`);
+      await deleteObject(storageRef).catch((error) => {
+        // Log non-critical error if file doesn't exist in Storage
+        if (error.code !== "storage/object-not-found") {
+          throw error;
+        }
+      });
     }
-    await updateDoc(frameRef, {
-      ...frameData,
-      imageUrl,
-      updatedBy: user.uid,
-      updatedAt: new Date().toISOString(),
-    });
-    return { success: true, imageUrl };
+
+    return { success: true };
   } catch (error) {
+    console.error("Failed to delete frame:", error);
     return { success: false, error: error.message };
   }
 };

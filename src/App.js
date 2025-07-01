@@ -21,7 +21,7 @@ import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
-import FramesAdmin from "./pages/AAdmin/FramesAdmin";
+import FramesAdmin from "./pages/AAdmin/Frames/FramesAdmin";
 
 
 const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));

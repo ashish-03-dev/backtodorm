@@ -3,9 +3,9 @@ import { useCartContext } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useFirebase } from '../context/FirebaseContext';
 import { useAddress } from '../context/AddressContext';
-import { collection, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Form, Button, Alert, ListGroup, Card, Modal, Spinner } from 'react-bootstrap';
+import { BsTruck } from 'react-icons/bs';
 
 const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, setSelectedAddressId, setShowOverlay }) => {
   const [newAddress, setNewAddress] = useState({
@@ -427,7 +427,7 @@ const Checkout = () => {
                   </div>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="d-flex align-items-center">
-                      <i className="bi bi-truck me-2 text-primary" style={{ fontSize: '1rem' }}></i>
+                      <BsTruck className="me-2 text-primary" style={{ fontSize: '1rem' }} />
                       Delivery
                     </span>
                     <span>

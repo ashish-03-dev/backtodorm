@@ -57,22 +57,11 @@ const menusData = {
       id: 'collections',
       sections: [
         {
-          title: 'Collage Kit',
-          items: [
-            { link: '/collections/50-piece-collage-kit', name: '50-Piece Collage Kit', title: '50 Poster Set' },
-            { link: '/collections/30-piece-combo-set', name: '30-Piece Combo Set', title: '30 Poster Set' }
-          ]
-        },
-        {
           title: 'Explore ALL',
           items: [
             { link: '/collections/new-arrivals', name: 'New Arrivals', title: 'New Poster Splits' },
             { link: '/collections/best-selling', name: 'Best Selling', title: 'Top Selling Splits' },
-            { link: '/collections/fighter-jets', name: 'Fighter Jet Posters', title: 'Jet Poster Splits' },
             { link: '/collections/car-splits', name: 'Car Split Posters', title: 'Car Poster Splits' },
-            { link: '/collections/motivational-splits', name: 'Motivational Split Posters', title: 'Motivational Splits' },
-            { link: '/collections/spiritual-splits', name: 'Spiritual Split Posters', title: 'Spiritual Splits' },
-            { link: '/collections/bike-splits', name: 'Bike Split Posters', title: 'Bike Poster Splits' }
           ]
         },
         {
@@ -99,12 +88,8 @@ const menusData = {
         {
           title: 'Split by Pieces',
           items: [
-            { link: '/collections/2-piece', name: '2-Piece Split Posters', title: '2-Part Posters' },
             { link: '/collections/3-piece', name: '3-Piece Split Posters', title: '3-Part Posters' },
             { link: '/collections/5-panel', name: '5-Panel Split Posters', title: '5 Panel Poster Set' },
-            { link: '/collections/6-panel', name: '6-Panel Wall Art Set', title: '6 Panel Wall Set' },
-            { link: '/collections/7-piece', name: '7-Piece Poster Layout', title: '7-Part Poster Layout' },
-            { link: '/collections/9-piece', name: '9-Piece Epic Poster Split', title: '9-Part Epic Set' }
           ]
         }
       ],

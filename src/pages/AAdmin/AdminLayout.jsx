@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { BsHouse, BsCartCheck, BsFileText, BsImage, BsCheckCircle, BsCollection, BsPersonBadge, BsPeople, BsGear, BsPersonGear, BsQuestionCircle, BsHouseDoor, BsChevronRight } from "react-icons/bs";
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -29,18 +30,18 @@ export default function AdminLayout() {
   };
 
   const navItems = [
-    { path: "/admin/dashboard", label: "Dashboard", icon: "bi-house" },
-    { path: "/admin/orders", label: "Orders", icon: "bi-cart-check" },
-    { path: "/admin/home-content", label: "Home Content", icon: "bi-file-text" },
-    { path: "/admin/posters", label: "Posters", icon: "bi-image" },
-    { path: "/admin/poster-approvals", label: "Poster Approvals", icon: "bi-check-circle" },
-    { path: "/admin/frames", label: "Frames", icon: "bi-collection" },
-    { path: "/admin/sellers", label: "Sellers", icon: "bi-person-badge" },
-    { path: "/admin/users", label: "Users", icon: "bi-people" },
-    { path: "/admin/settings", label: "Site Settings", icon: "bi-gear" },
-    { path: "/admin/admin-users", label: "Admin Users", icon: "bi-person-gear" },
-    { path: "/admin/support", label: "Support", icon: "bi-question-circle" },
-    { path: "/", label: "Home", icon: "bi-house-door" },
+    { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
+    { path: "/admin/orders", label: "Orders", icon: BsCartCheck },
+    { path: "/admin/home-content", label: "Home Content", icon: BsFileText },
+    { path: "/admin/posters", label: "Posters", icon: BsImage },
+    { path: "/admin/poster-approvals", label: "Poster Approvals", icon: BsCheckCircle },
+    { path: "/admin/frames", label: "Frames", icon: BsCollection },
+    { path: "/admin/sellers", label: "Sellers", icon: BsPersonBadge },
+    { path: "/admin/users", label: "Users", icon: BsPeople },
+    { path: "/admin/settings", label: "Site Settings", icon: BsGear },
+    { path: "/admin/admin-users", label: "Admin Users", icon: BsPersonGear },
+    { path: "/admin/support", label: "Support", icon: BsQuestionCircle },
+    { path: "/", label: "Home", icon: BsHouseDoor },
   ];
 
   return (
@@ -49,7 +50,7 @@ export default function AdminLayout() {
         {!showContentOnMobile && (
           <div className={`bg-light d-flex flex-column gap-3 ${isMobile ? "flex-grow-1" : ""}`} style={{
             position: "sticky",
-            top: "1rem",  
+            top: "1rem",
             minWidth: "300px",
             flexShrink: 0,
             maxHeight: "calc(100svh - 2rem)"
@@ -63,17 +64,15 @@ export default function AdminLayout() {
                 {navItems.map((item) => (
                   <li key={item.path} className="nav-item">
                     <div
-                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(item.path)
-                        ? "text-primary bg-light"
-                        : "text-dark"
+                      className={`nav-link d-flex justify-content-between px-3 py-2 rounded sidebar-item ${isActive(item.path) ? "text-primary bg-light" : "text-dark"
                         }`}
                       onClick={() => handleSectionClick(item.path)}
                     >
-                      <span>
-                        <i className={`bi ${item.icon} me-2`}></i>
+                      <span className="d-flex align-items-center">
+                        <item.icon className="me-2" />
                         {item.label}
                       </span>
-                      <i className="bi bi-chevron-right d-md-none"></i>
+                      <BsChevronRight className="d-md-none" />
                     </div>
                   </li>
                 ))}
@@ -85,7 +84,7 @@ export default function AdminLayout() {
         <div
           className={`bg-white shadow-sm flex-grow-1 ${showContentOnMobile ? "d-block d-md-block" : "d-none d-md-block"
             }`}
-          style={{ maxWidth: "100%", overflow: "auto"}}
+          style={{ maxWidth: "100%", overflow: "auto" }}
         >
           <Outlet />
         </div>

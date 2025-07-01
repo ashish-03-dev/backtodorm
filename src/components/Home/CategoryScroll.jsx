@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import '../../styles/CategoryScroll.css';
+import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 
 // Static data defined within the component
 const collectionsData = [
@@ -22,7 +23,7 @@ const collectionsData = [
     title: 'Winter Collection',
     link: '/collections/collection2',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750973995/A33width_550_qxr5tr.webp',
-  },  {
+  }, {
     id: 'collection4',
     title: 'Movies',
     link: '/collections/collection3',
@@ -39,7 +40,7 @@ const collectionsData = [
     title: 'Music',
     link: '/collections/collection2',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1749984208/image2_b6xais.webp',
-  },  {
+  }, {
     id: 'collection7',
     title: 'Video Game',
     link: '/collections/collection3',
@@ -56,7 +57,7 @@ const collectionsData = [
     title: 'Cricket',
     link: '/collections/collection2',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098675/image4_pegth2.webp',
-  },  {
+  }, {
     id: 'collection10',
     title: 'Football',
     link: '/collections/collection3',
@@ -96,7 +97,7 @@ export default function ShopByCollection() {
             style={{ width: '40px', height: '40px', zIndex: 10 }}
             aria-label="Scroll left"
           >
-            <i className="bi bi-chevron-left fs-5" />
+            <BsChevronLeft className="fs-5" />
           </button>
           <button
             onClick={() => scrollRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
@@ -104,7 +105,7 @@ export default function ShopByCollection() {
             style={{ width: '40px', height: '40px', zIndex: 10 }}
             aria-label="Scroll right"
           >
-            <i className="bi bi-chevron-right fs-5" />
+            <BsChevronRight className="fs-5" />
           </button>
         </>
       )}

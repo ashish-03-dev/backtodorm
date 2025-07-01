@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebase } from '../../context/FirebaseContext';
 import { doc, getDoc } from 'firebase/firestore';
+import { BsPerson, BsBoxArrowInRight, BsPersonCircle, BsBoxSeam, BsShieldLock, BsShop, BsBriefcase, BsQuestionCircle, BsBoxArrowRight } from 'react-icons/bs';
 
 export default function AccountDropdown({ isLoggedIn, logout }) {
   const { user, firestore, userData } = useFirebase();
@@ -43,7 +44,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
         style={{ height: '35px', lineHeight: '1' }}
         aria-label="Account Menu"
       >
-        <i className="bi bi-person fs-4"></i>
+        <BsPerson className="fs-4" />
       </button>
 
       {showDropdown && (
@@ -51,9 +52,8 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
       )}
 
       <div
-        className={`fullwidth-dropdown p-4 bg-white border-top shadow rounded-bottom ${
-          showDropdown ? 'show slide-down d-block' : 'd-none'
-        }`}
+        className={`fullwidth-dropdown p-4 bg-white border-top shadow rounded-bottom ${showDropdown ? 'show slide-down d-block' : 'd-none'
+          }`}
       >
         <div className="mb-2 fw-semibold text-secondary small">My Account</div>
 
@@ -63,7 +63,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
             onClick={() => handleNavigation('/login')}
             style={{ cursor: 'pointer' }}
           >
-            <i className="bi bi-box-arrow-in-right me-2"></i> Login
+            <BsBoxArrowInRight className="me-2" /> Login
           </div>
         ) : (
           <>
@@ -72,14 +72,14 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
               onClick={() => handleNavigation('/account')}
               style={{ cursor: 'pointer' }}
             >
-              <i className="bi bi-person-circle me-2"></i> Account
+              <BsPersonCircle className="me-2" /> Account
             </div>
             <div
               className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
               onClick={() => handleNavigation('/account/orders')}
               style={{ cursor: 'pointer' }}
             >
-              <i className="bi bi-box-seam me-2"></i> Orders
+              <BsBoxSeam className="me-2" /> Orders
             </div>
             {isAdmin && (
               <div
@@ -87,7 +87,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
                 onClick={() => handleNavigation('/admin')}
                 style={{ cursor: 'pointer' }}
               >
-                <i className="bi bi-shield-lock me-2"></i> Admin Dashboard
+                <BsShieldLock className="me-2" /> Admin Dashboard
               </div>
             )}
             {userData?.isSeller ? (
@@ -96,7 +96,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
                 onClick={() => handleNavigation('/seller')}
                 style={{ cursor: 'pointer' }}
               >
-                <i className="bi bi-shop me-2"></i> Seller Dashboard
+                <BsShop className="me-2" /> Seller Dashboard
               </div>
             ) : (
               <div
@@ -104,7 +104,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
                 onClick={() => handleNavigation('/account/become-seller')}
                 style={{ cursor: 'pointer' }}
               >
-                <i className="bi bi-briefcase me-2"></i> Sell Your Design
+                <BsBriefcase className="me-2" /> Sell Your Design
               </div>
             )}
             <div
@@ -112,7 +112,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
               onClick={() => handleNavigation('/account/help-centre')}
               style={{ cursor: 'pointer' }}
             >
-              <i className="bi bi-question-circle me-2"></i> Help Centre
+              <BsQuestionCircle className="me-2" /> Help Centre
             </div>
             <div
               style={{
@@ -135,7 +135,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
                 textAlign: 'left',
               }}
             >
-              <i className="bi bi-box-arrow-right me-2"></i> Logout
+              <BsBoxArrowRight className="me-2" /> Logout
             </button>
           </>
         )}

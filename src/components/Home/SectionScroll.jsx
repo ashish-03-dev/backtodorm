@@ -5,6 +5,7 @@ import { doc, onSnapshot, query, collection, where } from 'firebase/firestore';
 import { useCartContext } from '../../context/CartContext';
 import '../../styles/trendingPosters.css';
 import { useFirebase } from '../../context/FirebaseContext';
+import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 
 export default function SectionScroll({ sectionId, title }) {
   const { firestore } = useFirebase();
@@ -267,7 +268,7 @@ export default function SectionScroll({ sectionId, title }) {
             style={{ width: '40px', height: '40px', zIndex: 10 }}
             aria-label="Scroll left"
           >
-            <i className="bi bi-chevron-left fs-5" />
+            <BsChevronLeft className="fs-5" />
           </button>
           <button
             onClick={() => scroll('right')}
@@ -275,7 +276,7 @@ export default function SectionScroll({ sectionId, title }) {
             style={{ width: '40px', height: '40px', zIndex: 10 }}
             aria-label="Scroll right"
           >
-            <i className="bi bi-chevron-right fs-5" />
+            <BsChevronRight className="fs-5" />
           </button>
         </>
       )}
