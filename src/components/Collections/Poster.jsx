@@ -14,6 +14,7 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedFinish, setSelectedFinish] = useState("Gloss");
 
   useEffect(() => {
     if (!firestore) {
@@ -35,13 +36,19 @@ export default function ProductDetail() {
 
         const posterData = posterSnap.data();
         if (posterData.approved !== "approved" || !posterData.isActive) {
-          setError("Poster is not available.");
+          setError("This poster is not available for purchase.");
           setLoading(false);
           return;
         }
 
         const sizes = Array.isArray(posterData.sizes) ? posterData.sizes : [];
-        const defaultSize = sizes.length > 0 ? sizes[0].size : null;
+        if (sizes.length === 0) {
+          setError("No sizes available for this poster.");
+          setLoading(false);
+          return;
+        }
+
+        const defaultSize = sizes[0].size || null;
 
         setPoster({
           id: posterSnap.id,
@@ -50,10 +57,10 @@ export default function ProductDetail() {
           description: posterData.description || "No description available.",
           discount: posterData.discount || 0,
           sizes: sizes.map(size => ({
-            size: size.size,
-            price: size.price || 0,
-            finalPrice: size.finalPrice || size.price || 0,
-            discount: size.discount || posterData.discount || 0,
+            size: size.size || "N/A",
+            price: Number.isFinite(size.price) ? size.price : 0,
+            finalPrice: Number.isFinite(size.finalPrice) ? size.finalPrice : size.price || 0,
+            discount: Number.isFinite(size.discount) ? size.discount : posterData.discount || 0,
           })),
           seller: posterData.seller || "Unknown",
         });
@@ -75,15 +82,25 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!selectedSize) {
-      alert("Please select a size.");
+      setError("Please select a size.");
+      return;
+    }
+    if (!selectedFinish) {
+      setError("Please select a finish.");
       return;
     }
 
     const selectedSizeObj = poster.sizes.find(s => s.size === selectedSize) || {};
+    if (!selectedSizeObj.size || selectedSizeObj.price === null || selectedSizeObj.finalPrice === null) {
+      setError("Invalid size or pricing information.");
+      return;
+    }
+
     const cartItem = {
       posterId: poster.id,
       title: poster.title,
       size: selectedSize,
+      finish: selectedFinish,
       price: selectedSizeObj.price || 0,
       finalPrice: selectedSizeObj.finalPrice || selectedSizeObj.price || 0,
       discount: selectedSizeObj.discount || poster.discount || 0,
@@ -91,25 +108,46 @@ export default function ProductDetail() {
       image: poster.image,
     };
 
+    console.log("Adding to cart:", {
+      posterId: cartItem.posterId,
+      title: cartItem.title,
+      size: cartItem.size,
+      finish: cartItem.finish,
+      price: cartItem.price,
+      finalPrice: cartItem.finalPrice,
+      discount: cartItem.discount,
+    });
+
     try {
       addToCart(cartItem);
+      setError(null);
     } catch (err) {
       console.error("Error adding to cart:", err);
-      alert("Failed to add item to cart.");
+      setError("Failed to add item to cart. Please try again.");
     }
   };
 
   const handleBuyNow = () => {
     if (!selectedSize) {
-      alert("Please select a size.");
+      setError("Please select a size.");
+      return;
+    }
+    if (!selectedFinish) {
+      setError("Please select a finish.");
       return;
     }
 
     const selectedSizeObj = poster.sizes.find(s => s.size === selectedSize) || {};
+    if (!selectedSizeObj.size || selectedSizeObj.price === null || selectedSizeObj.finalPrice === null) {
+      setError("Invalid size or pricing information.");
+      return;
+    }
+
     const item = {
       posterId: poster.id,
       title: poster.title,
       size: selectedSize,
+      finish: selectedFinish,
       price: selectedSizeObj.price || 0,
       finalPrice: selectedSizeObj.finalPrice || selectedSizeObj.price || 0,
       discount: selectedSizeObj.discount || poster.discount || 0,
@@ -117,12 +155,23 @@ export default function ProductDetail() {
       image: poster.image,
     };
 
+    console.log("Proceeding to buy now:", {
+      posterId: item.posterId,
+      title: item.title,
+      size: item.size,
+      finish: item.finish,
+      price: item.price,
+      finalPrice: item.finalPrice,
+      discount: item.discount,
+    });
+
     try {
       buyNow(item);
       navigate('/checkout');
+      setError(null);
     } catch (err) {
       console.error("Error processing buy now:", err);
-      alert("Failed to proceed to checkout.");
+      setError("Failed to proceed to checkout. Please try again.");
     }
   };
 
@@ -164,6 +213,17 @@ export default function ProductDetail() {
 
         <div className="col-md-6 px-4 pt-4 pt-md-5 pb-4 d-flex flex-column justify-content-between">
           <div>
+            {error && (
+              <div className="alert alert-danger alert-dismissible fade show" role="alert">
+                {error}
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setError(null)}
+                  aria-label="Close"
+                ></button>
+              </div>
+            )}
             <h3>{poster.title}</h3>
             <p className="mb-4">{poster.description}</p>
 
@@ -192,7 +252,7 @@ export default function ProductDetail() {
                 {poster.sizes.map(({ size }) => (
                   <button
                     key={size}
-                    className={`btn border  ${selectedSize === size ? 'border-primary text-primary' : ''}`}
+                    className={`btn border ${selectedSize === size ? 'border-primary text-primary' : ''}`}
                     onClick={() => handleSizeChange(size)}
                     aria-label={`Select size ${size}`}
                   >
@@ -201,7 +261,21 @@ export default function ProductDetail() {
                 ))}
               </div>
             </div>
-
+            <div className="mb-4">
+              <h6 className="fw-semibold mb-2">Select Finish</h6>
+              <div className="d-flex gap-2">
+                {['Gloss', 'Matte'].map((finish) => (
+                  <button
+                    key={finish}
+                    className={`btn border ${selectedFinish === finish ? 'border-primary text-primary' : ''}`}
+                    onClick={() => setSelectedFinish(finish)}
+                    aria-label={`Select finish ${finish}`}
+                  >
+                    {finish}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div>
@@ -223,7 +297,7 @@ export default function ProductDetail() {
                 <div className="d-flex align-items-center">
                   <BsBoxArrowLeft className="me-2 text-muted" style={{ fontSize: '1.2rem' }} />
                   <p className="mb-0 text-muted small">
-                    Ships in 2–4 days. 7-day return for damaged posters.{' '} View {' '}
+                    Ships in 2–4 days. 7-day return for damaged posters.{' '}
                     <Link to="/return-policy" className="text-primary text-decoration-underline">
                       Return Policy
                     </Link>
@@ -237,6 +311,7 @@ export default function ProductDetail() {
                 className="btn btn-dark btn-lg"
                 onClick={handleAddToCart}
                 aria-label="Add to cart"
+                disabled={!selectedSize || !selectedFinish}
               >
                 🛒 Add to Cart
               </button>
@@ -244,6 +319,7 @@ export default function ProductDetail() {
                 className="btn btn-outline-dark btn-lg"
                 onClick={handleBuyNow}
                 aria-label="Buy now"
+                disabled={!selectedSize || !selectedFinish}
               >
                 Buy Now
               </button>

@@ -22,6 +22,8 @@ import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
 import FramesAdmin from "./pages/AAdmin/Frames/FramesAdmin";
+import CollectionsPacks from "./pages/AAdmin/CollectionsPacks/CollectionsPacks";
+import CollectionsPacksPage from "./components/Collections/CollectionsPacksPage";
 
 
 const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
@@ -55,6 +57,7 @@ function App() {
         <Route path="/" element={<HomeLayout />}>
           <Route index element={<MainLanding />} />
           <Route path="all-posters" element={<AllPosters />} />
+          <Route path="collections-packs" element={<CollectionsPacksPage />} />
           <Route path="collections/:collectionId" element={<CollectionDetail />} />
           <Route path="collection/:collectionId" element={<SingleCollection />} />
           <Route path="poster/:id" element={<Poster />} />
@@ -82,6 +85,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="orders" element={<Orders />} />
           <Route path="home-content" element={<SectionManager />} />
+          <Route path="collections-packs" element={<CollectionsPacks />} />
           <Route path="sellers" element={<Sellers />} />
           <Route path="posters" element={<Posters />} />
           <Route path="poster-approvals" element={<PosterApprovals />} />

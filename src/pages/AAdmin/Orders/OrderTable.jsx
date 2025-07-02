@@ -70,6 +70,7 @@ const OrderTable = ({
                     size="sm"
                     onClick={() => {
                       handleShowDetail(order);
+                      console.log(order.items)
                       setShowDetailModal(true);
                     }}
                     disabled={submitting}

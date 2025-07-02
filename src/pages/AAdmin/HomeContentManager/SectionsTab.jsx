@@ -1,19 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import PropTypes from "prop-types";
 import { ListGroup, Button, Modal, Form, Alert } from "react-bootstrap";
-import { BiPlus, BiClipboard, BiTrash, BiImage, BiRefresh } from "react-icons/bi";
-import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { BiPlus, BiClipboard, BiTrash, BiRefresh } from "react-icons/bi";
+import { collection, query, where, orderBy, limit, getDocs, doc, setDoc, updateDoc } from "firebase/firestore";
 import { useFirebase } from "../../../context/FirebaseContext";
 
 const SectionsTab = ({
   sections,
   setSections,
   filter,
-  posterImages,
   validateForm,
   handleSubmit,
   handleDelete,
-  handleFetchImage,
 }) => {
   const { firestore } = useFirebase();
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -22,10 +20,8 @@ const SectionsTab = ({
   const [selectedItem, setSelectedItem] = useState(null);
   const [formData, setFormData] = useState({ id: "", posterIds: [""] });
   const [formErrors, setFormErrors] = useState({});
-  const [formPosterImages, setFormPosterImages] = useState({});
   const [updateError, setUpdateError] = useState(null);
 
-  // Define section update rules
   const sectionUpdateRules = {
     trending: [
       { field: "orderCount", direction: "desc" },
@@ -41,28 +37,23 @@ const SectionsTab = ({
     ],
   };
 
-  // Ensure sections is an array
-  const safeSections = Array.isArray(sections) ? sections : [];
-  const filteredSections = safeSections.filter((section) =>
-    (section?.id || "").toLowerCase().includes((filter?.search || "").toLowerCase())
-  );
+  const filteredSections = Array.isArray(sections)
+    ? sections.filter((section) =>
+        (section?.id || "").toLowerCase().includes((filter?.search || "").toLowerCase())
+      )
+    : [];
   const isFiltering = !!(filter?.search || "").trim();
 
-  const handleInitializeOrderCounts = async () => {
+  const handleInitializeOrderCounts = useCallback(async () => {
     if (!firestore) {
       setUpdateError("Firestore is not available.");
       return;
     }
-
     try {
       const snapshot = await getDocs(collection(firestore, "posters"));
       const updates = snapshot.docs.map((docRef) =>
-        getDoc(doc(firestore, "posters", docRef.id)).then((posterDoc) => {
-          const data = posterDoc.data();
-          if (data && data.orderCount === undefined) {
-            return updateDoc(doc(firestore, "posters", docRef.id), { orderCount: 0 });
-          }
-          return Promise.resolve();
+        updateDoc(doc(firestore, "posters", docRef.id), {
+          orderCount: docRef.data().orderCount ?? 0,
         })
       );
       await Promise.all(updates);
@@ -71,207 +62,159 @@ const SectionsTab = ({
       console.error("Error initializing order counts:", err);
       setUpdateError(`Failed to initialize order counts: ${err.message}`);
     }
-  };
+  }, [firestore]);
 
-  const handleUpdateSection = async (sectionId) => {
-    if (!firestore) {
-      setUpdateError("Firestore is not available.");
-      return;
-    }
-
-    try {
-      const rules = sectionUpdateRules[sectionId] || sectionUpdateRules.default;
-      const queryConstraints = [
-        collection(firestore, "posters"),
-        where("isActive", "==", true),
-        ...rules.map((rule) => orderBy(rule.field, rule.direction)),
-        limit(20),
-      ];
-
-      const postersQuery = query(...queryConstraints);
-      const snapshot = await getDocs(postersQuery);
-      const posterDocs = await Promise.all(
-        snapshot.docs.map((docRef) => getDoc(doc(firestore, "posters", docRef.id)))
-      );
-
-      const posterIds = posterDocs
-        .filter((doc) => doc.exists())
-        .map((doc) => ({
-          id: doc.id,
-          orderCount: doc.data().orderCount || 0,
-          createdAt: doc.data().createdAt && typeof doc.data().createdAt.toMillis === "function"
-            ? doc.data().createdAt.toMillis()
-            : 0,
-        }))
-        .sort((a, b) => {
-          for (const rule of rules) {
-            const field = rule.field;
-            const direction = rule.direction === "desc" ? -1 : 1;
-            if (field === "orderCount") {
-              if (a.orderCount !== b.orderCount) {
-                return (a.orderCount - b.orderCount) * direction;
-              }
-            } else if (field === "createdAt") {
-              if (a.createdAt !== b.createdAt) {
-                return (a.createdAt - b.createdAt) * direction;
-              }
-            } else if (field === "__name__") {
-              return a.id.localeCompare(b.id) * direction;
-            }
-          }
-          return 0;
-        })
-        .map((item) => item.id);
-
-      if (posterIds.length === 0) {
-        setUpdateError(`No active posters found for section ${sectionId}.`);
+  const handleUpdateSection = useCallback(
+    async (sectionId) => {
+      if (!firestore) {
+        setUpdateError("Firestore is not available.");
         return;
       }
+      try {
+        const rules = sectionUpdateRules[sectionId] || sectionUpdateRules.default;
+        const queryConstraints = [
+          collection(firestore, "posters"),
+          where("isActive", "==", true),
+          ...rules.map((rule) => orderBy(rule.field, rule.direction)),
+          limit(20),
+        ];
 
-      const sectionsDocRef = doc(firestore, "homeSections", "sections");
-      const sectionsDoc = await getDocs(collection(firestore, "homeSections"));
-      const sectionList = sectionsDoc.docs.find((d) => d.id === "sections")?.data().sectionList || [];
-      const updatedSection = { id: sectionId, posterIds };
-      const updatedSectionList = sectionList.some((s) => s.id === sectionId)
-        ? sectionList.map((s) => (s.id === sectionId ? updatedSection : s))
-        : [...sectionList, updatedSection];
+        const postersQuery = query(...queryConstraints);
+        const snapshot = await getDocs(postersQuery);
+        const posterIds = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            orderCount: doc.data().orderCount ?? 0,
+            createdAt: doc.data().createdAt?.toMillis?.() ?? 0,
+          }))
+          .sort((a, b) => {
+            for (const rule of rules) {
+              const direction = rule.direction === "desc" ? -1 : 1;
+              if (rule.field === "orderCount" && a.orderCount !== b.orderCount) {
+                return (a.orderCount - b.orderCount) * direction;
+              }
+              if (rule.field === "createdAt" && a.createdAt !== b.createdAt) {
+                return (a.createdAt - b.createdAt) * direction;
+              }
+              if (rule.field === "__name__") {
+                return a.id.localeCompare(b.id) * direction;
+              }
+            }
+            return 0;
+          })
+          .map((item) => item.id);
 
-      await setDoc(sectionsDocRef, { sectionList: updatedSectionList });
-      setSections(updatedSectionList.map((item) => ({ ...item, type: "section" })));
-      setUpdateError(null);
-    } catch (err) {
-      console.error(`Error updating section ${sectionId}:`, err);
-      setUpdateError(`Failed to update section ${sectionId}: ${err.message}`);
+        if (!posterIds.length) {
+          setUpdateError(`No active posters found for section ${sectionId}.`);
+          return;
+        }
+
+        const sectionsDocRef = doc(firestore, "homeSections", "sections");
+        const sectionsSnapshot = await getDocs(collection(firestore, "homeSections"));
+        const sectionList =
+          sectionsSnapshot.docs.find((d) => d.id === "sections")?.data().sectionList || [];
+        const updatedSection = { id: sectionId, posterIds };
+        const updatedSectionList = sectionList.some((s) => s.id === sectionId)
+          ? sectionList.map((s) => (s.id === sectionId ? updatedSection : s))
+          : [...sectionList, updatedSection];
+
+        await setDoc(sectionsDocRef, { sectionList: updatedSectionList });
+        setSections(updatedSectionList.map((item) => ({ ...item, type: "section" })));
+        setUpdateError(null);
+      } catch (err) {
+        console.error(`Error updating section ${sectionId}:`, err);
+        setUpdateError(`Failed to update section ${sectionId}: ${err.message}`);
+      }
+    },
+    [firestore, setSections]
+  );
+
+  const handleShowDetail = useCallback((item) => {
+    if (item) {
+      setSelectedItem(item);
+      setShowDetailModal(true);
     }
-  };
+  }, []);
 
-  const handleShowDetail = (item) => {
-    if (!item) return;
-    setSelectedItem(item);
-    setShowDetailModal(true);
-  };
-
-  const handleEdit = (item = null) => {
+  const handleEdit = useCallback((item = null) => {
     setSelectedItem(item);
     setFormData({
       id: item?.id || "",
       posterIds: item?.posterIds?.length ? item.posterIds : [""],
     });
     setFormErrors({});
-    const initialImages = {};
-    if (item?.posterIds?.length) {
-      item.posterIds.forEach((id) => {
-        if (posterImages?.[id] !== undefined) initialImages[id] = posterImages[id];
-      });
-    }
-    setFormPosterImages(initialImages);
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleDeleteModal = (item) => {
+  const handleDeleteModal = useCallback((item) => {
     if (item.id === "trending") {
       setUpdateError("The 'trending' section cannot be deleted as it is managed automatically.");
       return;
     }
     setSelectedItem(item);
     setShowDeleteModal(true);
-  };
+  }, []);
 
-  const handleAddImage = () => {
+  const handleAddImage = useCallback(() => {
     setFormData((prev) => ({
       ...prev,
       posterIds: [...prev.posterIds, ""],
     }));
-  };
+  }, []);
 
-  const handleRemoveImage = (index) => {
+  const handleRemoveImage = useCallback((index) => {
     setFormData((prev) => ({
       ...prev,
       posterIds: prev.posterIds.filter((_, i) => i !== index),
     }));
     setFormErrors((prev) => ({
       ...prev,
-      posterIds: prev.posterIds?.filter((_, i) => i !== index),
+      posterIds: prev.posterIds?.filter((_, i) => i !== index) || [],
     }));
-    setFormPosterImages((prev) => {
-      const newImages = { ...prev };
-      const id = formData.posterIds[index];
-      delete newImages[id];
-      return newImages;
-    });
-  };
+  }, []);
 
-  const handleImageChange = async (index, value) => {
-    const oldId = formData.posterIds[index];
+  const handleImageChange = useCallback((index, value) => {
     setFormData((prev) => ({
       ...prev,
-      posterIds: prev.posterIds.map((id, i) => (i === index ? value : id)),
+      posterIds: prev.posterIds.map((id, i) => (i === index ? value.trim() : id)),
     }));
-    if (value.trim()) {
-      if (posterImages?.[value] !== undefined) {
-        setFormPosterImages((prev) => ({ ...prev, [value]: posterImages[value] }));
-      } else {
-        try {
-          const posterDoc = await getDoc(doc(firestore, "posters", value.trim()));
-          if (posterDoc.exists() && posterDoc.data().imageUrl) {
-            setFormPosterImages((prev) => ({ ...prev, [value]: posterDoc.data().imageUrl }));
-            handleFetchImage(value.trim(), setFormPosterImages);
-          } else {
-            setFormPosterImages((prev) => ({ ...prev, [value]: null }));
-          }
-        } catch (err) {
-          console.error(`Error fetching poster ${value}:`, err);
-          setFormPosterImages((prev) => ({ ...prev, [value]: null }));
+    setFormErrors((prev) => ({
+      ...prev,
+      posterIds: prev.posterIds?.map((err, i) => (i === index ? null : err)) || [],
+    }));
+  }, []);
+
+  const handlePasteClipboard = useCallback(
+    async (index) => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text.trim()) {
+          await handleImageChange(index, text.trim());
+        } else {
+          alert("Clipboard is empty.");
         }
+      } catch {
+        alert("Failed to paste from clipboard.");
       }
-    }
-    if (oldId) {
-      setFormPosterImages((prev) => {
-        const newImages = { ...prev };
-        delete newImages[oldId];
-        return newImages;
-      });
-    }
-  };
+    },
+    [handleImageChange]
+  );
 
-  const handlePasteClipboard = async (index) => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text.trim()) {
-        handleImageChange(index, text.trim());
-        setFormErrors((prev) => ({
-          ...prev,
-          posterIds: prev.posterIds?.map((err, i) => (i === index ? null : err)),
-        }));
-      } else {
-        alert("Clipboard is empty.");
+  const handleFormSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      const errors = await validateForm(formData, selectedItem, sections);
+      setFormErrors(errors);
+      if (!Object.keys(errors).length) {
+        await handleSubmit(formData, selectedItem);
+        setShowEditModal(false);
       }
-    } catch {
-      alert("Failed to paste from clipboard.");
-    }
-  };
-
-  const handleViewImage = (id) => {
-    const imageUrl = formPosterImages[id] || posterImages?.[id];
-    if (id && imageUrl) {
-      window.open(imageUrl, "_blank", "noopener,noreferrer");
-    } else if (id && formPosterImages[id] !== null) {
-      alert("Invalid ID: No image found.");
-    }
-  };
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    const errors = await validateForm(formData, selectedItem);
-    setFormErrors(errors);
-    if (!Object.keys(errors).length) {
-      await handleSubmit(formData, selectedItem);
-      setShowEditModal(false);
-    }
-  };
+    },
+    [formData, selectedItem, sections, validateForm, handleSubmit]
+  );
 
   return (
-    <div className="border rounded p-3" style={{ maxHeight: "600px", overflowY: "auto" }}>
+    <div style={{ maxHeight: "600px", overflowY: "auto" }}>
       <div className="d-flex justify-content-end mb-3 gap-2">
         <Button
           variant="primary"
@@ -291,7 +234,11 @@ const SectionsTab = ({
         </Button>
       </div>
       {updateError && (
-        <Alert variant={updateError.includes("Successfully") ? "success" : "danger"} onClose={() => setUpdateError(null)} dismissible>
+        <Alert
+          variant={updateError.includes("Successfully") ? "success" : "danger"}
+          onClose={() => setUpdateError(null)}
+          dismissible
+        >
           {updateError}
         </Alert>
       )}
@@ -305,15 +252,14 @@ const SectionsTab = ({
               <div>
                 <strong>{section.id}</strong>
                 <div className="text-muted small">
-                  Posters: {section?.posterIds?.length || 0}
+                  Posters: {section.posterIds?.length || 0}
                   {section.id === "trending" && " (Managed Automatically)"}
                 </div>
               </div>
-              <div>
+              <div className="d-flex gap-2">
                 <Button
                   variant="outline-primary"
                   size="sm"
-                  className="me-2"
                   onClick={() => handleShowDetail(section)}
                   aria-label={`View section ${section.id}`}
                 >
@@ -322,7 +268,6 @@ const SectionsTab = ({
                 <Button
                   variant="outline-secondary"
                   size="sm"
-                  className="me-2"
                   onClick={() => handleEdit(section)}
                   aria-label={`Edit section ${section.id}`}
                 >
@@ -331,7 +276,6 @@ const SectionsTab = ({
                 <Button
                   variant="outline-primary"
                   size="sm"
-                  className="me-2"
                   onClick={() => handleUpdateSection(section.id)}
                   aria-label={`Update section ${section.id}`}
                   disabled={!firestore || (!sectionUpdateRules[section.id] && !sectionUpdateRules.default)}
@@ -357,6 +301,7 @@ const SectionsTab = ({
         )}
       </ListGroup>
       <Modal
+        size="lg"
         show={showDetailModal}
         onHide={() => setShowDetailModal(false)}
         aria-labelledby="section-detail-modal-title"
@@ -378,24 +323,8 @@ const SectionsTab = ({
               <ListGroup>
                 {selectedItem.posterIds?.length > 0 ? (
                   selectedItem.posterIds.map((id, i) => (
-                    <ListGroup.Item
-                      key={i}
-                      className="d-flex justify-content-between align-items-center"
-                    >
-                      <span>
-                        <strong>ID:</strong> {id}
-                      </span>
-                      {posterImages?.[id] && (
-                        <Button
-                          variant="outline-primary"
-                          size="sm"
-                          onClick={() => handleViewImage(id)}
-                          title="View image"
-                          aria-label={`View image for poster ${id}`}
-                        >
-                          <BiImage />
-                        </Button>
-                      )}
+                    <ListGroup.Item key={i}>
+                      <strong>ID:</strong> {id}
                     </ListGroup.Item>
                   ))
                 ) : (
@@ -450,12 +379,7 @@ const SectionsTab = ({
                       placeholder="Poster ID (e.g., 20-bts--k-pop-set--polaroid-175005907974)"
                       value={id}
                       onChange={(e) => handleImageChange(index, e.target.value)}
-                      isInvalid={
-                        !!formErrors.posterIds?.[index] ||
-                        (id.trim() &&
-                          !formPosterImages[id] &&
-                          formPosterImages[id] !== null)
-                      }
+                      isInvalid={!!formErrors.posterIds?.[index]}
                       aria-describedby={`section-poster-error-${index}`}
                     />
                     <Button
@@ -465,19 +389,6 @@ const SectionsTab = ({
                       aria-label="Paste poster ID from clipboard"
                     >
                       <BiClipboard />
-                    </Button>
-                    <Button
-                      variant="outline-primary"
-                      onClick={() => handleViewImage(id)}
-                      title="View image"
-                      disabled={
-                        !id.trim() ||
-                        formPosterImages[id] === null ||
-                        !formPosterImages[id]
-                      }
-                      aria-label={`View image for poster ${id}`}
-                    >
-                      {formPosterImages[id] === null ? "Loading..." : <BiImage />}
                     </Button>
                     <Button
                       variant="outline-danger"
@@ -492,19 +403,14 @@ const SectionsTab = ({
                     type="invalid"
                     id={`section-poster-error-${index}`}
                   >
-                    {formErrors.posterIds?.[index] ||
-                      (id.trim() &&
-                        !formPosterImages[id] &&
-                        formPosterImages[id] !== null
-                        ? "Invalid Poster ID"
-                        : "")}
+                    {formErrors.posterIds?.[index]}
                   </Form.Control.Feedback>
                 </div>
               ))}
               <Button
                 variant="outline-primary"
                 size="sm"
-                onClick={() => handleAddImage()}
+                onClick={handleAddImage}
                 className="mt-2"
                 aria-label="Add poster"
               >
@@ -558,23 +464,14 @@ SectionsTab.propTypes = {
       posterIds: PropTypes.arrayOf(PropTypes.string),
       type: PropTypes.string,
     })
-  ),
+  ).isRequired,
   setSections: PropTypes.func.isRequired,
   filter: PropTypes.shape({
     search: PropTypes.string,
-  }),
-  posterImages: PropTypes.object,
+  }).isRequired,
   validateForm: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
   handleDelete: PropTypes.func.isRequired,
-  handleFetchImage: PropTypes.func.isRequired,
-  firestore: PropTypes.object,
-};
-
-SectionsTab.defaultProps = {
-  sections: [],
-  filter: { search: "" },
-  posterImages: {},
 };
 
 export default SectionsTab;

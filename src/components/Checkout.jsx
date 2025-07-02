@@ -5,7 +5,7 @@ import { useFirebase } from '../context/FirebaseContext';
 import { useAddress } from '../context/AddressContext';
 import { httpsCallable } from 'firebase/functions';
 import { Form, Button, Alert, ListGroup, Card, Modal, Spinner } from 'react-bootstrap';
-import { BsTruck } from 'react-icons/bs';
+import { BsTruck, BsTrash } from 'react-icons/bs';
 
 const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, setSelectedAddressId, setShowOverlay }) => {
   const [newAddress, setNewAddress] = useState({
@@ -111,7 +111,6 @@ const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, set
             />
           </Form.Group>
           <Form.Group className='mt-4'>
-
             <Button type="submit" variant="primary" size="sm" className="me-2">Save</Button>
             <Button variant="outline-secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
           </Form.Group>
@@ -127,7 +126,6 @@ const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowF
       <Modal.Header closeButton>
         <Modal.Title>Select Address</Modal.Title>
       </Modal.Header>
-
       <Modal.Body>
         <ListGroup variant="flush">
           {addresses.length === 0 && (
@@ -135,7 +133,6 @@ const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowF
               No saved addresses found.
             </ListGroup.Item>
           )}
-
           {addresses.map((addr) => (
             <ListGroup.Item
               key={addr.id}
@@ -179,7 +176,7 @@ const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowF
 const Checkout = () => {
   const { user, firestore, userData, authLoading, loadingUserData, functions } = useFirebase();
   const { addresses, getAddressList, addAddress, loading: addressLoading } = useAddress();
-  const { cartItems = [], buyNowItem, setCartItems, setBuyNowItem, loading: cartLoading, deliveryCharge = 0, freeDeliveryThreshold = 0 } = useCartContext();
+  const { cartItems = [], buyNowItem, setCartItems, setBuyNowItem, removeFromCart, loading: cartLoading, deliveryCharge = 0, freeDeliveryThreshold = 0 } = useCartContext();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -241,6 +238,20 @@ const Checkout = () => {
     setShowPayment(false);
   };
 
+  const handleRemoveItem = (item) => {
+    const isCollection = item.type === 'collection';
+    const id = isCollection ? item.collectionId : item.posterId;
+    const size = isCollection ? '' : item.size;
+    const finish = item.finish || 'Gloss';
+
+    removeFromCart(id, size, finish, isCollection);
+
+    // If the removed item is the buyNowItem, clear it
+    if (buyNowItem && buyNowItem.id === item.id) {
+      setBuyNowItem(null);
+    }
+  };
+
   const handleProceedToPayment = (e) => {
     e.preventDefault();
     if (!user) return setError('You must be logged in.');
@@ -264,6 +275,7 @@ const Checkout = () => {
         total: parseFloat(totalPrice),
         items: items.map(item => ({
           type: item.type || 'poster',
+          finish: item.finish || 'Gloss', // Include finish for collections and standalone posters
           ...(item.type === 'collection' ? {
             collectionId: item.collectionId || 'unknown',
             quantity: item.quantity || 1,
@@ -383,7 +395,7 @@ const Checkout = () => {
               ) : (
                 <ListGroup variant="flush">
                   {items.map((item, index) => (
-                    <ListGroup.Item key={`${item.posterId || item.collectionId}-${item.size || 'collection'}-${index}`} className="py-2">
+                    <ListGroup.Item key={`${item.posterId || item.collectionId}-${item.size || 'collection'}-${item.finish || 'Gloss'}-${index}`} className="py-2">
                       <div className="d-flex align-items-center">
                         <img
                           src={item.image || (item.posters && item.posters[0]?.image) || 'https://via.placeholder.com/50'}
@@ -391,18 +403,34 @@ const Checkout = () => {
                           style={{ width: '50px', height: '50px', objectFit: 'cover', marginRight: '10px' }}
                         />
                         <div className="flex-grow-1">
-                          <h6>{item.type === 'collection' ? `Collection: ${item.collectionId || 'Untitled'}` : `${item.title || 'Untitled'} (${item.size || 'N/A'})`}</h6>
+                          <h6>
+                            {item.type === 'collection'
+                              ? `Collection: ${item.collectionId || 'Untitled'} (Finish: ${item.finish || 'Gloss'})`
+                              : `${item.title || 'Untitled'} (${item.size || 'N/A'}, Finish: ${item.finish || 'Gloss'})`}
+                          </h6>
                           <p className="mb-0">Quantity: {item.quantity || 1}</p>
                           {item.type !== 'collection' && item.discount > 0 && <p className="mb-0 text-success">Discount: {item.discount}%</p>}
                           {item.type === 'collection' && item.collectionDiscount > 0 && <p className="mb-0 text-success">Collection Discount: {item.collectionDiscount}%</p>}
                         </div>
-                        <p>
-                          ₹{(
-                            item.type === 'collection'
-                              ? (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1) * (1 - (item.collectionDiscount || 0) / 100)
-                              : (item.finalPrice || item.price || 0) * (item.quantity || 1)
-                          ).toLocaleString('en-IN')}
-                        </p>
+                        <div className="d-flex align-items-center">
+                          <p className="me-3 mb-0">
+                            ₹{(
+                              item.type === 'collection'
+                                ? (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1) * (1 - (item.collectionDiscount || 0) / 100)
+                                : (item.finalPrice || item.price || 0) * (item.quantity || 1)
+                            ).toLocaleString('en-IN')}
+                          </p>
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => handleRemoveItem(item)}
+                            className="d-flex align-items-center justify-content-center"
+                            style={{ width: '30px', height: '30px', lineHeight: '1' }}
+                            aria-label={`Remove ${item.title || item.collectionId || 'item'} from cart`}
+                          >
+                            <BsTrash className="fs-6" />
+                          </Button>
+                        </div>
                       </div>
                       {item.type === 'collection' && (
                         <ul className="mt-2 ps-3 small text-muted">
@@ -497,52 +525,56 @@ const Checkout = () => {
             </Card.Body>
           </Card>
           {showPayment && (
-            <Card>
-              <Card.Body className="p-3">
-                <h4 className="mb-2">Payment Options</h4>
-                <Card className="p-2 mb-2">
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Subtotal</span>
-                    <span>₹{subtotal.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Delivery</span>
-                    <span>
-                      {isFreeDelivery ? (
-                        <>
-                          <span className="text-decoration-line-through text-muted me-1">
-                            ₹{deliveryCharge.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-success">Free</span>
-                        </>
-                      ) : (
-                        `₹${finalDeliveryCharge.toLocaleString('en-IN')}`
-                      )}
-                    </span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Total</span>
-                    <span>₹{totalPrice.toLocaleString('en-IN')}</span>
-                  </div>
-                  <p className="text-muted mt-1 mb-0">Pay via Razorpay</p>
-                </Card>
-                <Button
-                  variant="success"
-                  className="w-100"
-                  onClick={handlePayNow}
-                  disabled={paymentProcessing || items.length === 0 || cartLoading}
-                >
-                  {paymentProcessing ? (
-                    <>
-                      <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Pay Now'
-                  )}
-                </Button>
-              </Card.Body>
-            </Card>
+            <div className="border rounded p-3 mb-3">
+              <h4 className="mb-3">Payment Options</h4>
+
+              <div className="border rounded p-2 mb-3">
+                <div className="d-flex justify-content-between mb-1">
+                  <span>Subtotal</span>
+                  <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="d-flex justify-content-between mb-1">
+                  <span>Delivery</span>
+                  <span>
+                    {isFreeDelivery ? (
+                      <>
+                        <span className="text-decoration-line-through text-muted me-1">
+                          ₹{deliveryCharge.toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-success">Free</span>
+                      </>
+                    ) : (
+                      `₹${finalDeliveryCharge.toLocaleString('en-IN')}`
+                    )}
+                  </span>
+                </div>
+                <div className="d-flex justify-content-between mb-1">
+                  <span>Total</span>
+                  <span>₹{totalPrice.toLocaleString('en-IN')}</span>
+                </div>
+                <p className="text-muted mt-2 mb-0">Pay via Razorpay</p>
+              </div>
+
+              <button
+                className="btn btn-success w-100"
+                onClick={handlePayNow}
+                disabled={paymentProcessing || items.length === 0 || cartLoading}
+              >
+                {paymentProcessing ? (
+                  <>
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"
+                    ></span>
+                    Processing...
+                  </>
+                ) : (
+                  'Pay Now'
+                )}
+              </button>
+            </div>
+
           )}
           <AddressOverlay
             show={showOverlay}

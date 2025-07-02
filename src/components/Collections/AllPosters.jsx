@@ -2,11 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
-import { useCartContext } from '../../context/CartContext';
 
 export default function AllPosters() {
   const { firestore } = useFirebase();
-  const { addToCart } = useCartContext();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -80,7 +78,7 @@ export default function AllPosters() {
           fetchPosters(lastDoc);
         }
       },
-      { threshold: 0.1, rootMargin: '800px' } // Trigger when 800px from bottom
+      { threshold: 0.1, rootMargin: '800px' }
     );
 
     if (loadMoreRef.current) {
@@ -94,33 +92,6 @@ export default function AllPosters() {
     };
   }, [hasMore, loading, loadingMore, lastDoc]);
 
-  const handleAddToCart = (poster) => {
-    if (!poster.sizes || poster.sizes.length === 0) {
-      alert('No sizes available for this poster.');
-      return;
-    }
-
-    const defaultSize = poster.sizes[0].size;
-    const selectedSizeObj = poster.sizes[0] || {};
-    const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
-
-    const cartItem = {
-      posterId: poster.id,
-      title: poster.title,
-      size: defaultSize,
-      price: displayPrice,
-      image: poster.image,
-      seller: poster.seller,
-    };
-
-    try {
-      addToCart(cartItem);
-    } catch (err) {
-      console.error('Error adding to cart:', err);
-      alert('Failed to add to cart.');
-    }
-  };
-
   const SkeletonCard = () => (
     <div className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch">
       <div className="border rounded shadow-sm w-100 bg-white overflow-hidden d-flex flex-column">
@@ -131,7 +102,6 @@ export default function AllPosters() {
         <div className="p-3 text-center">
           <div className="bg-gray-200 h-4 w-3/4 mx-auto mb-2 animate-pulse" />
           <div className="bg-gray-200 h-4 w-1/2 mx-auto mb-2 animate-pulse" />
-          <div className="bg-gray-200 h-8 w-full rounded animate-pulse" />
         </div>
       </div>
     </div>
@@ -213,15 +183,6 @@ export default function AllPosters() {
                     </p>
                   </div>
                 </Link>
-                <div className="px-3 pb-3 text-center">
-                  <button
-                    onClick={() => handleAddToCart(poster)}
-                    className="btn btn-dark btn-sm rounded-pill px-4"
-                    aria-label={`Add ${poster.title} to cart`}
-                  >
-                    Add to Cart
-                  </button>
-                </div>
               </div>
             </div>
           ))}

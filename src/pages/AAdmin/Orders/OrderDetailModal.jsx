@@ -14,7 +14,10 @@ const OrderDetailModal = ({ show, onHide, order }) => {
           <Card.Body>
             <h5>Customer Information</h5>
             <p><strong>Name:</strong> {order.customerName}</p>
-            <p><strong>Shipping Address:</strong> {order.shippingAddress?.address}, {order.shippingAddress?.locality}, {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pincode}</p>
+            <p>
+              <strong>Shipping Address:</strong> {order.shippingAddress?.address}, {order.shippingAddress?.locality},{' '}
+              {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pincode}
+            </p>
             {order.shippingAddress?.landmark && <p><strong>Landmark:</strong> {order.shippingAddress.landmark}</p>}
           </Card.Body>
         </Card>
@@ -34,13 +37,19 @@ const OrderDetailModal = ({ show, onHide, order }) => {
                       <h6>{item.type === 'poster' ? item.posterTitle : `Collection: ${item.collectionTitle}`}</h6>
                       <p className="mb-0">Quantity: {item.quantity || 1}</p>
                       <p className="mb-0">Size: {item.size || 'N/A'}</p>
+                      <p className="mb-0">Finish: {item.finish || 'N/A'}</p> {/* Added finish for top-level item */}
                       {item.discount > 0 && <p className="mb-0 text-success">Discount: {item.discount}%</p>}
-                      {item.collectionDiscount > 0 && <p className="mb-0 text-success">Collection Discount: {item.collectionDiscount}%</p>}
+                      {item.collectionDiscount > 0 && (
+                        <p className="mb-0 text-success">Collection Discount: {item.collectionDiscount}%</p>
+                      )}
                     </div>
                     <p>
-                      ₹{(
+                      ₹
+                      {(
                         item.type === 'collection'
-                          ? (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1) * (1 - (item.collectionDiscount || 0) / 100)
+                          ? (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) *
+                            (item.quantity || 1) *
+                            (1 - (item.collectionDiscount || 0) / 100)
                           : (item.finalPrice || item.price || 0) * (item.quantity || 1)
                       ).toLocaleString('en-IN')}
                     </p>
@@ -49,7 +58,8 @@ const OrderDetailModal = ({ show, onHide, order }) => {
                     <ul className="mt-2 ps-3 small text-muted">
                       {(item.posters || []).map((poster, i) => (
                         <li key={i}>
-                          {poster.title || 'Untitled'} ({poster.size || 'N/A'}) - ₹{(poster.finalPrice || poster.price || 0).toLocaleString('en-IN')}
+                          {poster.title || 'Untitled'} ({poster.size || 'N/A'}, Finish: {poster.finish || 'N/A'}) - ₹
+                          {(poster.finalPrice || poster.price || 0).toLocaleString('en-IN')}
                           {poster.discount > 0 && <span className="text-success ms-1">({poster.discount}% off)</span>}
                         </li>
                       ))}
@@ -74,9 +84,7 @@ const OrderDetailModal = ({ show, onHide, order }) => {
             </p>
             <p>
               <strong>Pricing Verified:</strong>{' '}
-              <Badge bg={order.verified ? 'success' : 'danger'}>
-                {order.verified ? 'Verified' : 'Unverified'}
-              </Badge>
+              <Badge bg={order.verified ? 'success' : 'danger'}>{order.verified ? 'Verified' : 'Unverified'}</Badge>
             </p>
             {order.issues && order.issues.length > 0 && (
               <>
@@ -95,7 +103,11 @@ const OrderDetailModal = ({ show, onHide, order }) => {
                 <h5>Supplier Information</h5>
                 <p><strong>Supplier Name:</strong> {order.supplierInfo?.supplierName}</p>
                 <p><strong>Supplier Order ID:</strong> {order.supplierInfo?.supplierOrderId}</p>
-                <p><strong>Supplier Address:</strong> {order.supplierInfo?.address?.address}, {order.supplierInfo?.address?.city}, {order.supplierInfo?.address?.state} - {order.supplierInfo?.address?.pincode}</p>
+                <p>
+                  <strong>Supplier Address:</strong> {order.supplierInfo?.address?.address},{' '}
+                  {order.supplierInfo?.address?.city}, {order.supplierInfo?.address?.state} -{' '}
+                  {order.supplierInfo?.address?.pincode}
+                </p>
               </>
             )}
           </Card.Body>

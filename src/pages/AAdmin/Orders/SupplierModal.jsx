@@ -14,21 +14,14 @@ const SupplierModal = ({ show, onHide, supplierData, setSupplierData, submitting
     }
   };
 
-  const handleAddressChange = (field, value) => {
-    setSupplierData((prev) => ({
-      ...prev,
-      address: { ...prev.address, [field]: value }
-    }));
-  };
-
   const addressFields = [
-    { key: 'name', label: 'Name', required: true },
-    { key: 'address', label: 'Address', required: true },
-    { key: 'locality', label: 'Locality', required: true },
-    { key: 'city', label: 'City', required: true },
-    { key: 'state', label: 'State', required: true },
-    { key: 'pincode', label: 'Pincode', required: true },
-    { key: 'landmark', label: 'Landmark (optional)', required: false },
+    { key: 'name', label: 'Name' },
+    { key: 'address', label: 'Address' },
+    { key: 'locality', label: 'Locality' },
+    { key: 'city', label: 'City' },
+    { key: 'state', label: 'State' },
+    { key: 'pincode', label: 'Pincode' },
+    { key: 'landmark', label: 'Landmark' },
   ];
 
   return (
@@ -61,20 +54,18 @@ const SupplierModal = ({ show, onHide, supplierData, setSupplierData, submitting
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Shipping Address</Form.Label>
-            {addressFields.map(({ key, label, required }) => (
+            {addressFields.map(({ key, label }) => (
               <div key={key} className="mb-2 d-flex align-items-center">
                 <Form.Control
-                  value={supplierData.address[key]}
-                  onChange={(e) => handleAddressChange(key, e.target.value)}
+                  value={supplierData.address[key] || ''}
                   placeholder={label}
-                  required={required}
-                  disabled={submitting}
+                  disabled
                   className="me-2"
                 />
                 <Button
                   variant="outline-secondary"
                   size="sm"
-                  onClick={() => copyToClipboard(supplierData.address[key], key)}
+                  onClick={() => copyToClipboard(supplierData.address[key] || '', key)}
                   disabled={submitting || !supplierData.address[key]}
                 >
                   {copiedFields[key] ? 'Copied' : 'Copy'}

@@ -19,8 +19,8 @@ export const CartProvider = ({ children }) => {
       const savedCart = localStorage.getItem('cartItems');
       const parsedCart = savedCart ? JSON.parse(savedCart) : [];
       return parsedCart.filter(item =>
-        (item.type === 'poster' && item.posterId && item.size && item.title && item.price !== null && item.finalPrice !== null) ||
-        (item.type === 'collection' && item.collectionId && item.posters?.length > 0)
+        (item.type === 'poster' && item.posterId && item.size && item.title && item.price !== null && item.finalPrice !== null && item.finish) ||
+        (item.type === 'collection' && item.collectionId && item.finish && item.posters?.length > 0 && item.posters.every(p => p.posterId && p.size && p.title && p.price !== null && p.finalPrice !== null))
       );
     } catch (error) {
       console.error('Error parsing cartItems from localStorage:', error);
@@ -42,8 +42,8 @@ export const CartProvider = ({ children }) => {
           parsedCart = JSON.parse(savedCart);
         }
         const filteredCart = parsedCart.filter(item =>
-          (item.type === 'poster' && item.posterId && item.size && item.title && item.price !== null && item.finalPrice !== null) ||
-          (item.type === 'collection' && item.collectionId && item.posters?.length > 0)
+          (item.type === 'poster' && item.posterId && item.size && item.title && item.price !== null && item.finalPrice !== null && item.finish) ||
+          (item.type === 'collection' && item.collectionId && item.finish && item.posters?.length > 0 && item.posters.every(p => p.posterId && p.size && p.title && p.price !== null && p.finalPrice !== null))
         );
         setCartItems(filteredCart);
 
@@ -88,8 +88,8 @@ export const CartProvider = ({ children }) => {
         id: doc.id,
         ...doc.data(),
       })).filter(item =>
-        (item.type === 'poster' && item.posterId && item.size && item.title && item.price !== null && item.finalPrice !== null) ||
-        (item.type === 'collection' && item.collectionId && item.posters?.length > 0)
+        (item.type === 'poster' && item.posterId && item.size && item.title && item.price !== null && item.finalPrice !== null && item.finish) ||
+        (item.type === 'collection' && item.collectionId && item.finish && item.posters?.length > 0 && item.posters.every(p => p.posterId && p.size && p.title && p.price !== null && p.finalPrice !== null))
       );
       setCartItems(firestoreCart);
       try {
@@ -111,10 +111,11 @@ export const CartProvider = ({ children }) => {
       itemType: item.type,
       id: isCollection ? item.collectionId : item.posterId,
       discount: isCollection ? item.posters.map(p => p.discount) : item.discount,
+      finish: isCollection ? item.finish : item.finish,
     });
 
     if (isCollection) {
-      if (!item.collectionId || !Array.isArray(item.posters) || item.posters.length === 0) {
+      if (!item.collectionId || !item.finish || !Array.isArray(item.posters) || item.posters.length === 0) {
         console.error('Invalid collection data:', item);
         return false;
       }
@@ -125,7 +126,7 @@ export const CartProvider = ({ children }) => {
         }
       }
     } else {
-      if (!item?.posterId || !item?.size || !item?.title || item.price === null || item.finalPrice === null) {
+      if (!item?.posterId || !item?.size || !item?.title || item.price === null || item.finalPrice === null || !item.finish) {
         console.error('Invalid poster data:', item);
         return false;
       }
@@ -133,12 +134,16 @@ export const CartProvider = ({ children }) => {
 
     setCartItems((prev) => {
       let updatedCart = [...prev];
-      const cartItemId = isCollection ? `collection-${item.collectionId}` : `poster-${item.posterId}-${item.size}`;
+      const cartItemId = isCollection
+        ? `collection-${item.collectionId}-${item.finish || 'Gloss'}`
+        : `poster-${item.posterId}-${item.size}-${item.finish || 'Gloss'}`;
+
       if (isCollection) {
         const cartItem = {
           id: cartItemId,
           type: 'collection',
           collectionId: item.collectionId,
+          finish: item.finish || 'Gloss',
           quantity: 1,
           collectionDiscount,
           posters: item.posters.map(poster => ({
@@ -171,6 +176,7 @@ export const CartProvider = ({ children }) => {
           posterId: item.posterId,
           title: item.title,
           size: item.size,
+          finish: item.finish || 'Gloss',
           price: item.price,
           finalPrice: item.finalPrice,
           discount: item.discount || 0,
@@ -200,7 +206,10 @@ export const CartProvider = ({ children }) => {
     });
 
     if (user && firestore) {
-      const cartItemId = isCollection ? `collection-${item.collectionId}` : `poster-${item.posterId}-${item.size}`;
+      const cartItemId = isCollection
+        ? `collection-${item.collectionId}-${item.finish || 'Gloss'}`
+        : `poster-${item.posterId}-${item.size}-${item.finish || 'Gloss'}`;
+
       const cartDocRef = doc(firestore, `users/${user.uid}/cart`, cartItemId);
       try {
         const existingItem = cartItems.find(
@@ -211,6 +220,7 @@ export const CartProvider = ({ children }) => {
           ...(isCollection
             ? {
                 collectionId: item.collectionId,
+                finish: item.finish || 'Gloss',
                 quantity: (existingItem?.quantity || 0) + 1,
                 collectionDiscount,
                 posters: item.posters.map(poster => ({
@@ -228,6 +238,7 @@ export const CartProvider = ({ children }) => {
                 posterId: item.posterId,
                 title: item.title,
                 size: item.size,
+                finish: item.finish || 'Gloss',
                 price: item.price,
                 finalPrice: item.finalPrice,
                 discount: item.discount || 0,
@@ -250,10 +261,11 @@ export const CartProvider = ({ children }) => {
       itemType: item.type,
       id: isCollection ? item.collectionId : item.posterId,
       discount: isCollection ? item.posters.map(p => p.discount) : item.discount,
+      finish: isCollection ? item.finish : item.finish,
     });
 
     if (isCollection) {
-      if (!item.collectionId || !Array.isArray(item.posters) || item.posters.length === 0) {
+      if (!item.collectionId || !item.finish || !Array.isArray(item.posters) || item.posters.length === 0) {
         console.error('Invalid buy now collection:', item);
         return false;
       }
@@ -266,6 +278,7 @@ export const CartProvider = ({ children }) => {
       setBuyNowItem({
         type: 'collection',
         collectionId: item.collectionId,
+        finish: item.finish || 'Gloss',
         quantity: 1,
         collectionDiscount,
         posters: item.posters.map(poster => ({
@@ -280,7 +293,7 @@ export const CartProvider = ({ children }) => {
         })),
       });
     } else {
-      if (!item?.posterId || !item?.size || !item?.title || item.price === null || item.finalPrice === null) {
+      if (!item?.posterId || !item?.size || !item?.title || item.price === null || item.finalPrice === null || !item.finish) {
         console.error('Invalid buy now poster:', item);
         return false;
       }
@@ -289,6 +302,7 @@ export const CartProvider = ({ children }) => {
         posterId: item.posterId,
         title: item.title,
         size: item.size,
+        finish: item.finish || 'Gloss',
         price: item.price,
         finalPrice: item.finalPrice,
         discount: item.discount || 0,
@@ -300,8 +314,11 @@ export const CartProvider = ({ children }) => {
     return true;
   };
 
-  const removeFromCart = async (itemId, size, isCollection = false) => {
-    const cartItemId = isCollection ? `collection-${itemId}` : `poster-${itemId}-${size}`;
+  const removeFromCart = async (itemId, size, finish = "Gloss", isCollection = false) => {
+    const cartItemId = isCollection
+      ? `collection-${itemId}-${finish}`
+      : `poster-${itemId}-${size}-${finish}`;
+
     setCartItems((prev) => {
       const updatedCart = prev.filter((item) => item.id !== cartItemId);
       try {
@@ -324,9 +341,12 @@ export const CartProvider = ({ children }) => {
     return true;
   };
 
-  const updateQuantity = async (itemId, size, newQuantity, isCollection = false) => {
+  const updateQuantity = async (itemId, size, finish = "Gloss", newQuantity, isCollection = false) => {
     if (newQuantity < 1) return false;
-    const cartItemId = isCollection ? `collection-${itemId}` : `poster-${itemId}-${size}`;
+    const cartItemId = isCollection
+      ? `collection-${itemId}-${finish}`
+      : `poster-${itemId}-${size}-${finish}`;
+
     setCartItems((prev) => {
       const updatedCart = prev.map((item) =>
         item.id === cartItemId

@@ -2,11 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
-import { useCartContext } from '../../context/CartContext';
 
 export default function NewArrivals() {
   const { firestore } = useFirebase();
-  const { addToCart } = useCartContext();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -57,33 +55,6 @@ export default function NewArrivals() {
 
     fetchPosters();
   }, [firestore]);
-
-  const handleAddToCart = (poster) => {
-    if (!poster.sizes || poster.sizes.length === 0) {
-      alert('No sizes available for this poster.');
-      return;
-    }
-
-    const defaultSize = poster.sizes[0].size;
-    const selectedSizeObj = poster.sizes[0] || {};
-    const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
-
-    const cartItem = {
-      posterId: poster.id,
-      title: poster.title,
-      size: defaultSize,
-      price: displayPrice,
-      image: poster.image,
-      seller: poster.seller,
-    };
-
-    try {
-      addToCart(cartItem);
-    } catch (err) {
-      console.error('Error adding to cart:', err);
-      alert('Failed to add to cart.');
-    }
-  };
 
   if (loading) {
     return (
@@ -156,22 +127,13 @@ export default function NewArrivals() {
                     </p>
                   </div>
                 </Link>
-                <div className="px-3 pb-3 text-center">
-                  <button
-                    onClick={() => handleAddToCart(poster)}
-                    className="btn btn-dark btn-sm rounded-pill px-4"
-                    aria-label={`Add ${poster.title} to cart`}
-                  >
-                    Add to Cart
-                  </button>
-                </div>
               </div>
             </div>
           ))}
         </div>
 
         <div className="text-center mt-5">
-          <Link to="/posters" className="btn btn-outline-dark btn-lg">
+          <Link to="/all-posters" className="btn btn-outline-dark">
             View All
           </Link>
         </div>

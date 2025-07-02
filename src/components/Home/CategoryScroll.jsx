@@ -7,72 +7,66 @@ import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 // Static data defined within the component
 const collectionsData = [
   {
-    id: 'collection1',
-    title: 'Custom Poster',
-    link: '/custom-poster',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098721/image3_qntdnn.webp',
-  },
-  {
     id: 'collection2',
     title: 'Summer Collection',
-    link: '/collections/collection1',
+    link: '/collections/summer-collection',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098725/image1_a4ytcc.webp',
   },
   {
     id: 'collection3',
     title: 'Winter Collection',
-    link: '/collections/collection2',
+    link: '/collections/winter-collection',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750973995/A33width_550_qxr5tr.webp',
   }, {
     id: 'collection4',
     title: 'Movies',
-    link: '/collections/collection3',
+    link: '/collections/movies',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098632/image1_pcjx4w.webp',
   },
   {
     id: 'collection5',
     title: 'TV Series',
-    link: '/collections/collection1',
+    link: '/collections/tv-series',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098647/image2_bfoaha.webp',
   },
   {
     id: 'collection6',
     title: 'Music',
-    link: '/collections/collection2',
+    link: '/collections/music',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1749984208/image2_b6xais.webp',
   }, {
     id: 'collection7',
     title: 'Video Game',
-    link: '/collections/collection3',
+    link: '/collections/video-game',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098624/image1_oshqc7.webp',
   },
   {
     id: 'collection8',
     title: 'Motivate',
-    link: '/collections/collection1',
+    link: '/collections/motivational',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098690/image2_thw566.webp',
   },
   {
     id: 'collection9',
     title: 'Cricket',
-    link: '/collections/collection2',
+    link: '/collections/cricket',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098675/image4_pegth2.webp',
   }, {
     id: 'collection10',
     title: 'Football',
-    link: '/collections/collection3',
+    link: '/collections/football',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098682/image2_yf8k0x.webp',
   },
   {
     id: 'collection11',
     title: 'Nature',
-    link: '/collections/collection1',
+    link: '/collections/nature',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750973995/A33width_550_qxr5tr.webp',
   },
   {
     id: 'collection12',
     title: 'Quotes',
-    link: '/collections/collection2',
+    link: '/collections/quotes',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098710/image1_gqnujf.webp',
   },
 ];

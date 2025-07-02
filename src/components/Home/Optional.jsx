@@ -2,11 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
-import { useCartContext } from '../../context/CartContext';
+import { BiChevronRight, BiChevronLeft } from 'react-icons/bi';
 
 export default function YouMayAlsoLike() {
   const { firestore } = useFirebase();
-  const { addToCart } = useCartContext();
   const [posters, setPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -24,7 +23,7 @@ export default function YouMayAlsoLike() {
       try {
         const postersQuery = query(
           collection(firestore, 'posters'),
-          where('isActive', '==', true),  
+          where('isActive', '==', true),
           orderBy('createdAt', 'desc'),
           limit(6)
         );
@@ -59,35 +58,6 @@ export default function YouMayAlsoLike() {
 
     fetchPosters();
   }, [firestore]);
-
-  const handleAddToCart = (poster, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!poster.sizes || poster.sizes.length === 0) {
-      alert('No sizes available for this poster.');
-      return;
-    }
-
-    const defaultSize = poster.sizes[0].size;
-    const selectedSizeObj = poster.sizes[0] || {};
-    const displayPrice = selectedSizeObj.finalPrice || selectedSizeObj.price || 0;
-
-    const cartItem = {
-      posterId: poster.id,
-      title: poster.title,
-      size: defaultSize,
-      price: displayPrice,
-      image: poster.image,
-      seller: poster.seller,
-    };
-
-    try {
-      addToCart(cartItem);
-    } catch (err) {
-      console.error('Error adding to cart:', err);
-      alert('Failed to add to cart.');
-    }
-  };
 
   const scroll = (direction) => {
     const container = scrollRef.current;
@@ -131,15 +101,6 @@ export default function YouMayAlsoLike() {
             animation: 'pulse 1.5s infinite',
           }}
         />
-        <div
-          className="bg-light mt-auto"
-          style={{
-            height: '2.5rem',
-            width: '100%',
-            backgroundColor: '#e0e0e0',
-            animation: 'pulse 1.5s infinite',
-          }}
-        />
       </div>
     </div>
   );
@@ -178,7 +139,7 @@ export default function YouMayAlsoLike() {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="container">
-        <h2 className="text-center fw-bold fs-2 mb-4">You May Also Like</h2>
+        <h2 className="text-center fw-bold mb-4">You May Also Like</h2>
         {isHovered && posters.length > 0 && (
           <>
             <button
@@ -187,7 +148,7 @@ export default function YouMayAlsoLike() {
               style={{ width: '40px', height: '40px', zIndex: 10 }}
               aria-label="Scroll left"
             >
-              <i className="bi bi-chevron-left fs-5" />
+              <BiChevronLeft className="fs-5" />
             </button>
             <button
               onClick={() => scroll('right')}
@@ -195,13 +156,13 @@ export default function YouMayAlsoLike() {
               style={{ width: '40px', height: '40px', zIndex: 10 }}
               aria-label="Scroll right"
             >
-              <i className="bi bi-chevron-right fs-5" />
+              <BiChevronRight className="fs-5" />
             </button>
           </>
         )}
         <div
           ref={scrollRef}
-          className="d-flex overflow-auto gap-3 pb-2"
+          className="d-flex overflow-auto gap-3 py-2"
           style={{
             scrollSnapType: 'x mandatory',
             scrollbarWidth: 'none',
@@ -263,15 +224,6 @@ export default function YouMayAlsoLike() {
                     </p>
                   </div>
                 </Link>
-                <div className="px-3 pb-3 text-center">
-                  <button
-                    onClick={(e) => handleAddToCart(poster, e)}
-                    className="btn btn-dark btn-sm rounded-pill px-4"
-                    aria-label={`Add ${poster.title} to cart`}
-                  >
-                    Add to Cart
-                  </button>
-                </div>
               </div>
             </div>
           ))}

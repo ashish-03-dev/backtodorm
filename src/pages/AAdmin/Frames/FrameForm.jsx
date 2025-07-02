@@ -15,7 +15,7 @@ const POSTER_POSITIONS = {
     label: "Top Left",
     getPosition: (size) => ({
       x: FRAME_SIZES[size].widthPx * 0.05,
-      y: FRAME_SIZES[size].heightPx * 0.05,
+      y: FRAME_SIZES[size].heightPx * 0.10, // was 0.05
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -24,7 +24,7 @@ const POSTER_POSITIONS = {
     label: "Top Center",
     getPosition: (size) => ({
       x: FRAME_SIZES[size].widthPx * 0.2,
-      y: FRAME_SIZES[size].heightPx * 0.05,
+      y: FRAME_SIZES[size].heightPx * 0.10, // was 0.05
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -33,7 +33,7 @@ const POSTER_POSITIONS = {
     label: "Top Right",
     getPosition: (size) => ({
       x: FRAME_SIZES[size].widthPx * 0.35,
-      y: FRAME_SIZES[size].heightPx * 0.05,
+      y: FRAME_SIZES[size].heightPx * 0.10, // was 0.05
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),

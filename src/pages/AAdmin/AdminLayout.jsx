@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { BsHouse, BsCartCheck, BsFileText, BsImage, BsCheckCircle, BsCollection, BsPersonBadge, BsPeople, BsGear, BsPersonGear, BsQuestionCircle, BsHouseDoor, BsChevronRight } from "react-icons/bs";
+import {
+  BsHouse,
+  BsCartCheck,
+  BsFileText,
+  BsImage,
+  BsCheckCircle,
+  BsCollection,
+  BsBoxes,
+  BsPersonBadge,
+  BsPeople,
+  BsGear,
+  BsPersonGear,
+  BsQuestionCircle,
+  BsHouseDoor,
+  BsChevronRight
+} from "react-icons/bs";
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -29,20 +44,24 @@ export default function AdminLayout() {
     return location.pathname === path;
   };
 
-  const navItems = [
-    { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
-    { path: "/admin/orders", label: "Orders", icon: BsCartCheck },
-    { path: "/admin/home-content", label: "Home Content", icon: BsFileText },
-    { path: "/admin/posters", label: "Posters", icon: BsImage },
-    { path: "/admin/poster-approvals", label: "Poster Approvals", icon: BsCheckCircle },
-    { path: "/admin/frames", label: "Frames", icon: BsCollection },
-    { path: "/admin/sellers", label: "Sellers", icon: BsPersonBadge },
-    { path: "/admin/users", label: "Users", icon: BsPeople },
-    { path: "/admin/settings", label: "Site Settings", icon: BsGear },
-    { path: "/admin/admin-users", label: "Admin Users", icon: BsPersonGear },
-    { path: "/admin/support", label: "Support", icon: BsQuestionCircle },
-    { path: "/", label: "Home", icon: BsHouseDoor },
-  ];
+
+
+const navItems = [
+  { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
+  { path: "/admin/orders", label: "Orders", icon: BsCartCheck },
+  { path: "/admin/home-content", label: "Home Content", icon: BsFileText },
+  { path: "/admin/posters", label: "Posters", icon: BsImage },
+  { path: "/admin/poster-approvals", label: "Poster Approvals", icon: BsCheckCircle },
+  { path: "/admin/frames", label: "Frames", icon: BsCollection },
+  { path: "/admin/collections-packs", label: "Collections-Packs", icon: BsBoxes },
+  { path: "/admin/sellers", label: "Sellers", icon: BsPersonBadge },
+  { path: "/admin/users", label: "Users", icon: BsPeople },
+  { path: "/admin/settings", label: "Site Settings", icon: BsGear },
+  { path: "/admin/admin-users", label: "Admin Users", icon: BsPersonGear },
+  { path: "/admin/support", label: "Support", icon: BsQuestionCircle },
+  { path: "/", label: "Home", icon: BsHouseDoor },
+];
+
 
   return (
     <div className="bg-light p-3">

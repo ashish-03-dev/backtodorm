@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { useFirebase } from "../../context/FirebaseContext"; // Adjust path as needed
+import { collection, getDocs, query, limit } from "firebase/firestore";
+import { useFirebase } from "../../context/FirebaseContext";
 import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
- 
-export default function HorizontalCollectionScroll({ title }) {
+
+export default function HorizontalCollectionScroll() {
   const { firestore } = useFirebase();
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +12,6 @@ export default function HorizontalCollectionScroll({ title }) {
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Helper to ensure string or empty string
   const ensureString = (value) => (typeof value === "string" ? value : "");
 
   useEffect(() => {
@@ -24,58 +23,20 @@ export default function HorizontalCollectionScroll({ title }) {
       }
 
       try {
-        // Fetch standaloneCollections
         const collectionsRef = collection(firestore, "standaloneCollections");
-        const snapshot = await getDocs(collectionsRef);
+        const q = query(collectionsRef, limit(8));
+        const snapshot = await getDocs(q);
+
         const fetchedCollections = snapshot.docs.map((doc) => ({
           id: doc.id,
           title: ensureString(doc.data().title),
           description: ensureString(doc.data().description),
-          image: ensureString(doc.data().image), // posterId or legacy URL
-          discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 20,
+          imageUrl: ensureString(doc.data().imageUrl),
+          discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 0,
           posters: Array.isArray(doc.data().posters) ? doc.data().posters : [],
         }));
 
-        // Collect unique posterIds from image fields
-        const posterIds = [...new Set(fetchedCollections.map((col) => col.image).filter((id) => id && /^[a-zA-Z0-9_-]+$/.test(id)))];
-        const posterImages = {};
-
-        // Fetch poster image URLs
-        if (posterIds.length) {
-          await Promise.all(
-            posterIds.map(async (posterId) => {
-              try {
-                const posterRef = doc(firestore, "posters", posterId);
-                const posterSnap = await getDoc(posterRef);
-                if (posterSnap.exists() && posterSnap.data().imageUrl) {
-                  posterImages[posterId] = ensureString(posterSnap.data().imageUrl);
-                } else {
-                  posterImages[posterId] = "https://via.placeholder.com/150"; // Placeholder
-                }
-              } catch (err) {
-                console.warn(`Failed to fetch poster ${posterId}: ${err.message}`);
-                posterImages[posterId] = "https://via.placeholder.com/150"; // Placeholder
-              }
-            })
-          );
-        }
-
-        // Map collections with image URLs
-        const collectionsWithImages = fetchedCollections.map((col) => {
-          let imageUrl = "https://via.placeholder.com/150"; // Default placeholder
-          if (col.image) {
-            if (/^[a-zA-Z0-9_-]+$/.test(col.image)) {
-              // posterId
-              imageUrl = posterImages[col.image] || imageUrl;
-            } else if (col.image.startsWith("http")) {
-              // Legacy URL
-              imageUrl = col.image;
-            }
-          }
-          return { ...col, imageUrl };
-        });
-
-        setCollections(collectionsWithImages);
+        setCollections(fetchedCollections);
         setLoading(false);
       } catch (err) {
         setError("Failed to load collections: " + err.message);
@@ -88,20 +49,17 @@ export default function HorizontalCollectionScroll({ title }) {
 
   const scroll = (direction) => {
     const container = scrollRef.current;
-    const scrollAmount = 320;
-    container.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
+    if (container) {
+      const scrollAmount = 320;
+      container.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
   };
 
-  if (loading) {
-    return <div>Loading collections...</div>;
-  }
-
-  if (error) {
-    return <div className="text-danger">{error}</div>;
-  }
+  if (loading) return <div>Loading collections...</div>;
+  if (error) return <div className="text-danger">{error}</div>;
 
   return (
     <section
@@ -109,7 +67,7 @@ export default function HorizontalCollectionScroll({ title }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <h2 className="fs-2 fw-bold mb-4">{title}</h2>
+      <h2 className="fs-2 fw-bold mb-4 text-center">Collection Packs</h2>
 
       {isHovered && (
         <>
@@ -119,7 +77,7 @@ export default function HorizontalCollectionScroll({ title }) {
             style={{ width: "40px", height: "40px", zIndex: 10 }}
             aria-label="Scroll left"
           >
-          <BsChevronLeft className="fs-5" />
+            <BsChevronLeft className="fs-5" />
           </button>
           <button
             onClick={() => scroll("right")}
@@ -127,7 +85,7 @@ export default function HorizontalCollectionScroll({ title }) {
             style={{ width: "40px", height: "40px", zIndex: 10 }}
             aria-label="Scroll right"
           >
-         <BsChevronRight className="fs-5" />
+            <BsChevronRight className="fs-5" />
           </button>
         </>
       )}
@@ -160,9 +118,6 @@ export default function HorizontalCollectionScroll({ title }) {
                   borderTopLeftRadius: "0.5rem",
                   borderTopRightRadius: "0.5rem",
                 }}
-                onError={(e) => {
-                  e.target.src = "https://via.placeholder.com/150"; // Fallback on load error
-                }}
               />
               <div className="card-body d-flex flex-column justify-content-between">
                 <div>
@@ -176,6 +131,11 @@ export default function HorizontalCollectionScroll({ title }) {
             </div>
           </Link>
         ))}
+      </div>
+      <div className="text-center mt-4">
+        <Link to="/collections-packs" className="btn btn-outline-dark">
+          View All
+        </Link>
       </div>
     </section>
   );

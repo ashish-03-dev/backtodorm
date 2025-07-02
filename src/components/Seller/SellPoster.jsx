@@ -12,7 +12,7 @@ import { addPoster } from "./sellerUtils";
 const POSTER_SIZES = {
   A4: { widthPx: 2480, heightPx: 3508, aspectRatio: 2480 / 3508 },
   A3: { widthPx: 3508, heightPx: 4961, aspectRatio: 3508 / 4961 },
-  "A3*3": { widthPx: 3508 * 3, heightPx: 4961, aspectRatio: (3508 * 3) / 4961 },
+  // "A3 x 3": { widthPx: 3508 * 3, heightPx: 4961, aspectRatio: (3508 * 3) / 4961 },
 };
 
 export default function SellYourPoster() {
@@ -23,7 +23,7 @@ export default function SellYourPoster() {
     description: "",
     tags: "",
     collections: [],
-    sizes: [{ size: "" }],
+    size: "", // Changed from sizes array to single size string
     imageFile: null,
   });
   const [error, setError] = useState("");
@@ -54,7 +54,7 @@ export default function SellYourPoster() {
         description: "",
         tags: "",
         collections: [],
-        sizes: [{ size: "" }],
+        size: "",
         imageFile: null,
       });
       setError("");
@@ -123,7 +123,6 @@ export default function SellYourPoster() {
         setCropImageSize({ width: 0, height: 0 });
       }
     }
-    // Do not reset cropImageSize when croppedPreview exists or after cropping
   }, [crop, imageSrc, selectedSize]);
 
   const handleImageChange = (e) => {
@@ -184,7 +183,6 @@ export default function SellYourPoster() {
                 const scaledFile = new File([blob], `scaled_${Date.now()}.jpg`, { type: "image/jpeg" });
                 setFormData((prev) => ({ ...prev, imageFile: scaledFile }));
                 setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
-                // Retain original image resolution for display
                 setCropImageSize({ width: img.width, height: img.height });
               } else {
                 setError("Failed to process image.");
@@ -201,8 +199,9 @@ export default function SellYourPoster() {
   };
 
   const handleSwitchSize = () => {
-    if (recommendedSize && formData.sizes.length === 1) {
-      handleSizeChange(0, recommendedSize);
+    if (recommendedSize) {
+      setFormData((prev) => ({ ...prev, size: recommendedSize }));
+      setSelectedSize(recommendedSize);
       setRecommendedSize(null);
     }
   };
@@ -249,7 +248,6 @@ export default function SellYourPoster() {
         )
       );
       setRotation(newRotation);
-      // Update cropImageSize to rotated image dimensions
       setCropImageSize({
         width: Math.round(canvas.width),
         height: Math.round(canvas.height),
@@ -288,7 +286,6 @@ export default function SellYourPoster() {
             const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: "image/jpeg" });
             setFormData((prev) => ({ ...prev, imageFile: croppedFile }));
             setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
-            // Store cropped resolution
             setCropImageSize({ width: Math.round(cropWidth), height: Math.round(cropHeight) });
             resolve();
           },
@@ -308,10 +305,8 @@ export default function SellYourPoster() {
     }
   };
 
-  const handleSizeChange = (index, value) => {
-    const updatedSizes = [...formData.sizes];
-    updatedSizes[index] = { size: value in POSTER_SIZES ? value : "" };
-    setFormData((prev) => ({ ...prev, sizes: updatedSizes, imageFile: null }));
+  const handleSizeChange = (value) => {
+    setFormData((prev) => ({ ...prev, size: value in POSTER_SIZES ? value : "", imageFile: null }));
     setSelectedSize(value in POSTER_SIZES ? value : "");
     setImageSrc(null);
     setOriginalImageSrc(null);
@@ -322,25 +317,6 @@ export default function SellYourPoster() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const addSize = () => {
-    if (formData.sizes.every((s) => s.size in POSTER_SIZES)) {
-      setFormData((prev) => ({ ...prev, sizes: [...prev.sizes, { size: "" }] }));
-      setSelectedSize("");
-    } else {
-      setError("Please select a valid size for all fields.");
-    }
-  };
-
-  const removeSize = (index) => {
-    if (formData.sizes.length > 1) {
-      const newSizes = formData.sizes.filter((_, i) => i !== index);
-      setFormData((prev) => ({ ...prev, sizes: new formData.sizes }));
-      if (formData.sizes[index].size === selectedSize) {
-        setSelectedSize(newSizes[0]?.size in POSTER_SIZES ? newSizes[0].size : "");
-      }
-    }
-  };
-
   const simplifyTags = (tags) => {
     return tags
       .split(",")
@@ -348,12 +324,11 @@ export default function SellYourPoster() {
         t
           .trim()
           .toLowerCase()
-          .replace(/[^a-z0-9\s]/g, "") // remove non-alphanumerics but keep space
-          .replace(/\s+/g, "-")        // then convert space to single "-"
+          .replace(/[^a-z0-9\s]/g, "")
+          .replace(/\s+/g, "-")
       )
       .filter(Boolean);
   };
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -387,24 +362,22 @@ export default function SellYourPoster() {
       setSubmitting(false);
       return;
     }
-    if (formData.sizes.some((s) => !(s.size in POSTER_SIZES))) {
-      setError("Please select a valid size for all fields.");
+    if (!(formData.size in POSTER_SIZES)) {
+      setError("Please select a valid size.");
       setSubmitting(false);
       return;
     }
 
-    // Prepare data, using collection values directly
     const data = {
       title: formData.title.trim(),
       description: formData.description.trim(),
       tags: simplifyTags(formData.tags),
-      collections: formData.collections.map((col) => col.value), // Use collection values as-is
-      sizes: formData.sizes,
+      collections: formData.collections.map((col) => col.value),
+      sizes: [{ size: formData.size }], // Convert single size to array for compatibility
       sellerUsername,
     };
 
     try {
-      // Proceed with image upload and poster submission
       const imageRef = ref(storage, `posters/${sellerUsername}/${Date.now()}_${formData.imageFile.name}`);
       const uploadTask = uploadBytesResumable(imageRef, formData.imageFile);
       uploadTask.on(
@@ -504,30 +477,20 @@ export default function SellYourPoster() {
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Sizes</Form.Label>
-              {formData.sizes.map((sizeObj, index) => (
-                <div key={index} className="d-flex align-items-center gap-2 mb-2">
-                  <Form.Select
-                    value={sizeObj.size}
-                    onChange={(e) => handleSizeChange(index, e.target.value)}
-                    required
-                    disabled={submitting}
-                  >
-                    <option value="">Select size</option>
-                    {Object.keys(POSTER_SIZES).map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </Form.Select>
-                  {formData.sizes.length > 1 && (
-                    <Button variant="outline-danger" onClick={() => removeSize(index)} disabled={submitting}>
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button variant="outline-primary" size="sm" onClick={addSize} disabled={submitting}>
-                + Add Size
-              </Button>
+              <Form.Label>Size</Form.Label>
+              <Form.Select
+                value={formData.size}
+                onChange={(e) => handleSizeChange(e.target.value)}
+                required
+                disabled={submitting}
+              >
+                <option value="">Select size</option>
+                {Object.entries(POSTER_SIZES).map(([label, size]) => (
+                  <option key={label} value={label}>
+                    {label} - ({size.widthPx} × {size.heightPx})
+                  </option>
+                ))}
+              </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Image</Form.Label>

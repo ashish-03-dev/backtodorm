@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { useFirebase } from "../../context/FirebaseContext";
 import { useCartContext } from "../../context/CartContext";
@@ -7,10 +7,13 @@ import { useCartContext } from "../../context/CartContext";
 export default function SingleCollection() {
   const { firestore } = useFirebase();
   const { collectionId } = useParams();
-  const { addToCart } = useCartContext();
+  const { addToCart, buyNow } = useCartContext();
+  const navigate = useNavigate();
   const [collection, setCollection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedFinish, setSelectedFinish] = useState("Gloss"); // Default finish for the collection
+  const [addedToCart, setAddedToCart] = useState(false); // place this at the top in your component
 
   const ensureString = (value) => (typeof value === "string" ? value : "");
   const ensureNumber = (value) => (Number.isFinite(value) && value >= 0 ? value : null);
@@ -84,7 +87,7 @@ export default function SingleCollection() {
               let size = ensureString(poster.size);
               let price = ensureNumber(poster.price);
               let finalPrice = ensureNumber(poster.finalPrice);
-              let discount = ensureNumber(posterData.discount); // Use top-level discount
+              let discount = ensureNumber(posterData.discount);
               let seller = ensureString(posterData.seller);
               let error = null;
 
@@ -133,7 +136,7 @@ export default function SingleCollection() {
                 selectedSize: size,
                 price,
                 finalPrice,
-                discount, // Use top-level discount
+                discount,
                 seller,
                 error: null,
               };
@@ -182,6 +185,11 @@ export default function SingleCollection() {
       return;
     }
 
+    if (!selectedFinish) {
+      setError("Please select a finish for the collection.");
+      return;
+    }
+
     // Validate all posters before adding to cart
     const invalidPosters = collection.posters.filter(
       (poster) => !poster.posterId || !poster.selectedSize || !poster.title || poster.price === null || poster.finalPrice === null || poster.discount === null
@@ -199,6 +207,7 @@ export default function SingleCollection() {
       {
         type: "collection",
         collectionId: collection.id,
+        finish: selectedFinish,
         posters: collection.posters.map((poster) => ({
           posterId: poster.posterId,
           title: poster.title,
@@ -218,6 +227,7 @@ export default function SingleCollection() {
     );
     console.log("Buy Full Pack clicked for collection:", {
       collectionId: collection.id,
+      finish: selectedFinish,
       collectionDiscount: collection.collectionDiscount,
       posters: collection.posters.map(p => ({
         posterId: p.posterId,
@@ -225,6 +235,65 @@ export default function SingleCollection() {
         discount: p.discount,
       })),
     });
+  };
+
+  const handleBuyNow = () => {
+    if (!collection?.posters?.length) {
+      setError("No valid posters available to proceed to checkout.");
+      return;
+    }
+
+    if (!selectedFinish) {
+      setError("Please select a finish for the collection.");
+      return;
+    }
+
+    // Validate all posters before proceeding to checkout
+    const invalidPosters = collection.posters.filter(
+      (poster) => !poster.posterId || !poster.selectedSize || !poster.title || poster.price === null || poster.finalPrice === null || poster.discount === null
+    );
+    if (invalidPosters.length > 0) {
+      const errorMessage = `Cannot proceed to checkout: Invalid posters detected: ${invalidPosters
+        .map((p) => p.posterId || "unknown")
+        .join(", ")}`;
+      console.error(errorMessage);
+      setError(errorMessage);
+      return;
+    }
+
+    buyNow(
+      {
+        type: "collection",
+        collectionId: collection.id,
+        finish: selectedFinish,
+        posters: collection.posters.map((poster) => ({
+          posterId: poster.posterId,
+          title: poster.title,
+          image: poster.image,
+          size: poster.selectedSize,
+          price: poster.price,
+          finalPrice: poster.finalPrice,
+          discount: poster.discount,
+          seller: poster.seller,
+        })),
+        quantity: 1,
+        collectionDiscount: collection.collectionDiscount,
+      },
+      true,
+      collection.id,
+      collection.collectionDiscount
+    );
+    console.log("Buy Now clicked for collection:", {
+      collectionId: collection.id,
+      finish: selectedFinish,
+      collectionDiscount: collection.collectionDiscount,
+      posters: collection.posters.map(p => ({
+        posterId: p.posterId,
+        size: p.selectedSize,
+        discount: p.discount,
+      })),
+    });
+    navigate('/checkout');
   };
 
   const handleAddToCart = (poster) => {
@@ -251,6 +320,11 @@ export default function SingleCollection() {
       return;
     }
 
+    if (!selectedFinish) {
+      setError("Please select a finish for the poster.");
+      return;
+    }
+
     addToCart(
       {
         type: "poster",
@@ -263,19 +337,21 @@ export default function SingleCollection() {
         discount: poster.discount,
         seller: poster.seller,
         quantity: 1,
+        finish: selectedFinish,
       },
       false
     );
     console.log("Added poster to cart:", {
       posterId: poster.posterId,
       size: poster.selectedSize,
+      finish: selectedFinish,
       price: poster.price,
       finalPrice: poster.finalPrice,
       discount: poster.discount,
     });
   };
 
-  if (loading) return <div className="d-flex justify-content-center align-items-center" style={{height:"calc(100svh - 65px)"}}><p className="text-center">Loading...</p></div>;
+  if (loading) return <div className="d-flex justify-content-center align-items-center" style={{ height: "calc(100svh - 65px)" }}><p className="text-center">Loading...</p></div>;
   if (error) return <p className="text-danger">{error}</p>;
   if (!collection) return <p>Collection not found</p>;
 
@@ -287,50 +363,78 @@ export default function SingleCollection() {
     <div className="container py-5">
       <h2 className="mb-3">{collection.title}</h2>
       <p className="mb-4 text-muted">{collection.description}</p>
-      <button
-        className="btn btn-dark mb-4"
-        onClick={handleBuyAll}
-        disabled={!collection.posters.length || totalFinalPrice === 0}
-      >
-        Buy Full Pack ({collection.collectionDiscount}% off) – ₹{discountedCollectionPrice}
-      </button>
+
+      <div className="mb-4">
+        <h6 className="fw-semibold mb-2">Select Finish for Collection</h6>
+        <div className="d-flex gap-2">
+          {['Gloss', 'Matte'].map((finish) => (
+            <button
+              key={finish}
+              className={`btn border ${selectedFinish === finish ? 'border-primary text-primary' : ''}`}
+              onClick={() => setSelectedFinish(finish)}
+              aria-label={`Select finish ${finish}`}
+            >
+              {finish}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="d-flex gap-2 mb-4 align-items-center">
+        <button
+          className="btn btn-dark"
+          onClick={() => {
+            handleBuyAll();
+            setAddedToCart(true);
+            setTimeout(() => setAddedToCart(false), 3000); // hide after 3 seconds
+          }}
+          disabled={!collection.posters.length || totalFinalPrice === 0}
+        >
+          Buy Full Pack ({collection.collectionDiscount}% off) – ₹{discountedCollectionPrice}
+        </button>
+
+        {addedToCart && (
+          <span className="text-success small ms-1">✅ Added to cart</span>
+        )}
+      </div>
 
       <div className="row">
         {collection.posters.map((poster) => (
           <div key={`${poster.id}-${poster.selectedSize}`} className="col-6 col-md-4 col-lg-3 mb-4">
-            <div className="card h-100 shadow-sm border-0">
-              <img
-                src={poster.image}
-                alt={`${poster.title} (${poster.selectedSize})`}
-                className="card-img-top"
-                style={{ aspectRatio: "20/23", objectFit: "cover" }}
-              />
-              <div className="card-body text-center">
-                <h6 className="fw-semibold text-truncate mb-2">{poster.title} ({poster.selectedSize})</h6>
-                {poster.error ? (
-                  <p className="text-danger small">{poster.error}</p>
-                ) : (
-                  <p className="mb-0">
-                    {poster.discount > 0 ? (
-                      <>
-                        <span className="text-muted text-decoration-line-through me-1">₹{poster.price}</span>
-                        <span className="fw-semibold">₹{poster.finalPrice}</span>
-                        <span className="text-success ms-1 small">({poster.discount}% off)</span>
-                      </>
-                    ) : (
-                      <span className="fw-semibold">₹{poster.price}</span>
-                    )}
-                  </p>
-                )}
-                <button
-                  className="btn btn-sm btn-outline-dark mt-2"
-                  onClick={() => handleAddToCart(poster)}
-                  disabled={!!poster.error}
-                >
-                  Add to Cart
-                </button>
+            <Link
+              to={`/poster/${poster.posterId}`}
+              className="text-decoration-none text-dark"
+            >
+              <div className="card h-100 shadow-sm border-0">
+                <img
+                  src={poster.image}
+                  alt={`${poster.title} (${poster.selectedSize})`}
+                  className="card-img-top"
+                  style={{ aspectRatio: "20/23", objectFit: "cover" }}
+                />
+                <div className="card-body text-center">
+                  <h6 className="text-truncate mb-2">
+                    {poster.title} ({poster.selectedSize})
+                  </h6>
+                  {poster.error ? (
+                    <p className="text-danger small">{poster.error}</p>
+                  ) : (
+                    <p className="mb-0">
+                      {poster.discount > 0 ? (
+                        <>
+                          <span className="text-muted text-decoration-line-through me-1">₹{poster.price}</span>
+                          <span className="fw-semibold">₹{poster.finalPrice}</span>
+                          <span className="text-success ms-1 small">({poster.discount}% off)</span>
+                        </>
+                      ) : (
+                        <span className="fw-semibold">₹{poster.price}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            </Link>
+
           </div>
         ))}
         {!collection.posters.length && (

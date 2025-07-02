@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useFirebase } from '../../context/FirebaseContext';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -8,14 +8,17 @@ export default function CollectionDetail({ addToCart }) {
   const { collectionId } = useParams();
   const [posters, setPosters] = useState([]);
   const [filteredPosters, setFilteredPosters] = useState([]);
+  const [displayedPosters, setDisplayedPosters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [collectionName, setCollectionName] = useState(null);
   const [sizeFilter, setSizeFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const postersPerPage = 12;
+  const [hasMore, setHasMore] = useState(true);
+  const [pageSize] = useState(8);
+  const observer = useRef(null);
 
+  // Fetch collection and posters
   useEffect(() => {
     const fetchCollectionAndPosters = async () => {
       if (!firestore) {
@@ -55,6 +58,8 @@ export default function CollectionDetail({ addToCart }) {
 
         setPosters(fetchedPosters);
         setFilteredPosters(fetchedPosters);
+        setDisplayedPosters(fetchedPosters.slice(0, pageSize));
+        setHasMore(fetchedPosters.length > pageSize);
       } catch (err) {
         console.error('Failed to fetch posters:', err);
         setError('Failed to load posters. Please try again.');
@@ -85,16 +90,28 @@ export default function CollectionDetail({ addToCart }) {
     });
 
     setFilteredPosters(updatedPosters);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [sizeFilter, sortOrder, posters]);
+    setDisplayedPosters(updatedPosters.slice(0, pageSize));
+    setHasMore(updatedPosters.length > pageSize);
+  }, [sizeFilter, sortOrder, posters, pageSize]);
 
-  // Pagination logic
-  const indexOfLastPoster = currentPage * postersPerPage;
-  const indexOfFirstPoster = indexOfLastPoster - postersPerPage;
-  const currentPosters = filteredPosters.slice(indexOfFirstPoster, indexOfLastPoster);
-  const totalPages = Math.ceil(filteredPosters.length / postersPerPage);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  // Infinite scroll logic
+  const lastPosterElementRef = useCallback(
+    (node) => {
+      if (isLoading) return;
+      if (observer.current) observer.current.disconnect();
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setDisplayedPosters((prev) => {
+            const newCount = prev.length + pageSize;
+            return filteredPosters.slice(0, newCount);
+          });
+          setHasMore(filteredPosters.length > displayedPosters.length + pageSize);
+        }
+      });
+      if (node) observer.current.observe(node);
+    },
+    [isLoading, hasMore, filteredPosters, pageSize, displayedPosters.length]
+  );
 
   if (isLoading) {
     return (
@@ -152,53 +169,44 @@ export default function CollectionDetail({ addToCart }) {
 
       {/* Posters Grid */}
       <div className="row row-cols-2 row-cols-sm-3 row-cols-lg-4 g-4">
-        {currentPosters.length === 0 ? (
+        {displayedPosters.length === 0 ? (
           <p className="col-12">No posters found for selected filters.</p>
         ) : (
-          currentPosters.map((poster) => (
-            <div key={poster.id} className="col">
-              <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
-                <div className="card h-100 shadow-sm border-0">
-                  <img
-                    src={poster.img}
-                    alt={poster.title}
-                    className="card-img-top"
-                    style={{ aspectRatio: '20/23', objectFit: 'cover' }}
-                  />
-                  <div className="card-body text-center">
-                    <h6 className="card-title fw-semibold text-truncate mb-2">{poster.title}</h6>
-                    <p className="card-text text-muted fw-semibold mb-0">₹{poster.finalPrice || poster.price}</p>
+          displayedPosters.map((poster, index) => {
+            const isLastRow = index >= displayedPosters.length - 4; // Assuming 4 posters per row on lg screens
+            return (
+              <div
+                key={poster.id}
+                ref={isLastRow && hasMore ? lastPosterElementRef : null}
+                className="col"
+              >
+                <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
+                  <div className="card h-100 shadow-sm border-0">
+                    <img
+                      src={poster.img}
+                      alt={poster.title}
+                      className="card-img-top"
+                      style={{ aspectRatio: '20/23', objectFit: 'cover' }}
+                    />
+                    <div className="card-body text-center">
+                      <h6 className="card-title fw-semibold text-truncate mb-2">{poster.title}</h6>
+                      <p className="card-text text-muted fw-semibold mb-0">₹{poster.finalPrice || poster.price}</p>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            </div>
-          ))
+                </Link>
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <nav aria-label="Page navigation" className="mt-4">
-          <ul className="pagination justify-content-center">
-            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => paginate(currentPage - 1)}>
-                Previous
-              </button>
-            </li>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
-                <button className="page-link" onClick={() => paginate(page)}>
-                  {page}
-                </button>
-              </li>
-            ))}
-            <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => paginate(currentPage + 1)}>
-                Next
-              </button>
-            </li>
-          </ul>
-        </nav>
+      {/* Loading Indicator for Infinite Scroll */}
+      {hasMore && (
+        <div className="text-center mt-4">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading more...</span>
+          </div>
+        </div>
       )}
     </div>
   );

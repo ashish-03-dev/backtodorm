@@ -207,13 +207,13 @@ export default function SearchPage() {
 
   return (
     <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
-      <h2>Search Posters</h2>
+      <h2 className="mb-4">Search Posters</h2>
       <form onSubmit={handleSearch} className="mb-4">
         <div className="input-group mb-3">
           <input
             type="text"
             className="form-control"
-            placeholder="Search posters by title, tags, minimalist..."
+            placeholder="Search here"
             value={queryString}
             onChange={(e) => {
               updateSearchState({ queryString: e.target.value });

@@ -14,15 +14,18 @@ export default function CartSidebar({ show, onClose }) {
     navigate('/checkout');
   };
 
-  // Group items by collectionId for display purposes
+  // Group items by collectionId and finish for collections, or posterId, size, and finish for individual posters
   const groupedByCollection = (cartItems || []).reduce((acc, item) => {
-    const key = item.type === 'collection' ? item.collectionId : `individual-${item.posterId || item.id}-${item.size}`;
+    const key = item.type === 'collection'
+      ? `collection-${item.collectionId}-${item.finish || 'Gloss'}`
+      : `individual-${item.posterId || item.id}-${item.size}-${item.finish || 'Gloss'}`;
     if (!acc[key]) {
       acc[key] = {
         items: [],
         collectionDiscount: item.type === 'collection' ? item.collectionDiscount || 0 : 0,
         type: item.type,
         collectionId: item.type === 'collection' ? item.collectionId : null,
+        finish: item.type === 'collection' ? item.finish || 'Gloss' : null,
       };
     }
     acc[key].items.push(item);
@@ -47,17 +50,17 @@ export default function CartSidebar({ show, onClose }) {
   const finalDeliveryCharge = isFreeDelivery ? 0 : deliveryCharge;
   const totalWithDelivery = cartItems.length > 0 ? (totalPrice + finalDeliveryCharge).toFixed(2) : '0.00';
 
-  const handleUpdateQuantity = (id, size, newQuantity, isCollection = false) => {
+  const handleUpdateQuantity = (id, size, finish, newQuantity, isCollection = false) => {
     if (newQuantity < 1) return;
-    updateQuantity(id, size, newQuantity, isCollection);
+    updateQuantity(id, size, finish, newQuantity, isCollection);
   };
 
-  const handleRemoveFromCart = (id, size, isCollection = false) => {
+  const handleRemoveFromCart = (id, size, finish, isCollection = false) => {
     if (!id) {
       console.error('Invalid ID:', id);
       return;
     }
-    removeFromCart(id, size, isCollection);
+    removeFromCart(id, size, finish, isCollection);
   };
 
   if (loading) {
@@ -108,7 +111,7 @@ export default function CartSidebar({ show, onClose }) {
                   {group.type === 'collection' && (
                     <div className="mb-2">
                       <h6 className="fw-semibold">
-                        Collection Pack: {group.items[0]?.collectionId || 'Untitled'} (Discount: {group.collectionDiscount}%)
+                        Collection Pack: {group.collectionId || 'Untitled'} (Finish: {group.finish}, Discount: {group.collectionDiscount}%)
                       </h6>
                     </div>
                   )}
@@ -127,7 +130,7 @@ export default function CartSidebar({ show, onClose }) {
                             className="me-3 rounded flex-shrink-0"
                           />
                           <div className="flex-grow-1">
-                            <h6 className="mb-1">Collection: {item.collectionId}</h6>
+                            <h6 className="mb-1">Collection: {item.collectionId} (Finish: {item.finish || 'Gloss'})</h6>
                             <ul className="mb-2 ps-3">
                               {item.posters.map((poster, i) => (
                                 <li key={i} className="text-muted small">
@@ -179,13 +182,12 @@ export default function CartSidebar({ show, onClose }) {
                                 </span>
                               )}
                             </p>
-
                             <div className="d-flex align-items-center gap-2">
                               <Button
                                 variant="outline-secondary"
                                 size="sm"
                                 onClick={() =>
-                                  handleUpdateQuantity(item.collectionId, '', item.quantity - 1, true)
+                                  handleUpdateQuantity(item.collectionId, '', item.finish || 'Gloss', item.quantity - 1, true)
                                 }
                                 disabled={item.quantity <= 1}
                                 className="d-flex align-items-center justify-content-center"
@@ -199,7 +201,7 @@ export default function CartSidebar({ show, onClose }) {
                                 variant="outline-secondary"
                                 size="sm"
                                 onClick={() =>
-                                  handleUpdateQuantity(item.collectionId, '', item.quantity + 1, true)
+                                  handleUpdateQuantity(item.collectionId, '', item.finish || 'Gloss', item.quantity + 1, true)
                                 }
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ width: '30px', height: '30px', lineHeight: '1' }}
@@ -212,7 +214,7 @@ export default function CartSidebar({ show, onClose }) {
                           <Button
                             variant="outline-danger"
                             size="sm"
-                            onClick={() => handleRemoveFromCart(item.collectionId, '', true)}
+                            onClick={() => handleRemoveFromCart(item.collectionId, '', item.finish || 'Gloss', true)}
                             className="ms-3 d-flex align-items-center justify-content-center flex-shrink-0"
                             style={{ width: '30px', height: '30px', lineHeight: '1' }}
                             aria-label={`Remove collection ${item.collectionId} from cart`}
@@ -234,15 +236,14 @@ export default function CartSidebar({ show, onClose }) {
                             style={{ maxWidth: 'calc(100% - 100px)' }}
                           >
                             <h6
-                              className="mb-1 text-truncate"
+                              className="mb-1"
                               title={item.title || 'Untitled'}
                               style={{ maxWidth: '100%', overflow: 'hidden' }}
                             >
-                              {item.title || 'Untitled'} ({item.size || 'N/A'})
+                              {item.title || 'Untitled'} ({item.size || 'N/A'}, Finish: {item.finish || 'Gloss'})
                             </h6>
-                            {item.seller && <p className="mb-1 text-muted small">By: {item.seller}</p>}
                             <p className="mb-2 d-flex align-items-center">
-                              {item.discount > 0 && (
+                              {item.discount > 0 ? (
                                 <>
                                   <span className="text-muted text-decoration-line-through me-2">
                                     ₹{(item.price * item.quantity).toLocaleString('en-IN')}
@@ -252,21 +253,18 @@ export default function CartSidebar({ show, onClose }) {
                                   </span>
                                   <span className="text-danger fw-semibold">↓ {item.discount}% OFF</span>
                                 </>
-                              )}
-
-                              {item.discount <= 0 && (
+                              ) : (
                                 <span className="text-muted fw-semibold">
                                   ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                                 </span>
                               )}
                             </p>
-
                             <div className="d-flex align-items-center gap-2">
                               <Button
                                 variant="outline-secondary"
                                 size="sm"
                                 onClick={() =>
-                                  handleUpdateQuantity(item.posterId, item.size, item.quantity - 1)
+                                  handleUpdateQuantity(item.posterId, item.size, item.finish || 'Gloss', item.quantity - 1, false)
                                 }
                                 disabled={item.quantity <= 1}
                                 className="d-flex align-items-center justify-content-center"
@@ -280,7 +278,7 @@ export default function CartSidebar({ show, onClose }) {
                                 variant="outline-secondary"
                                 size="sm"
                                 onClick={() =>
-                                  handleUpdateQuantity(item.posterId, item.size, item.quantity + 1)
+                                  handleUpdateQuantity(item.posterId, item.size, item.finish || 'Gloss', item.quantity + 1, false)
                                 }
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ width: '30px', height: '30px', lineHeight: '1' }}
@@ -293,7 +291,9 @@ export default function CartSidebar({ show, onClose }) {
                           <Button
                             variant="outline-danger"
                             size="sm"
-                            onClick={() => handleRemoveFromCart(item.posterId, item.size)}
+                            onClick={() =>
+                              handleRemoveFromCart(item.posterId, item.size, item.finish || 'Gloss', false)
+                            }
                             className="ms-3 d-flex align-items-center justify-content-center flex-shrink-0"
                             style={{ width: '30px', height: '30px', lineHeight: '1' }}
                             aria-label={`Remove ${item.title || 'item'} from cart`}

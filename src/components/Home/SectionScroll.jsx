@@ -19,6 +19,15 @@ export default function SectionScroll({ sectionId, title }) {
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const batchSize = 10; // Firestore 'in' query limit
+  const [selectedVariantMap, setSelectedVariantMap] = useState({});
+
+  const handleVariantChange = (posterId, value) => {
+    setSelectedVariantMap(prev => ({
+      ...prev,
+      [posterId]: value, // Format: "A4_Gloss"
+    }));
+  };
+
 
   // Fetch a batch of posters
   const fetchPosterBatch = useCallback(
@@ -41,7 +50,6 @@ export default function SectionScroll({ sectionId, title }) {
           const fetchedPosters = postersSnap.docs.map((doc) => {
             const data = doc.data();
             const sizes = Array.isArray(data.sizes) ? data.sizes : [];
-            const badges = Array.isArray(data.badges) ? data.badges : [];
             const minPriceSize = sizes.length
               ? sizes.reduce(
                 (min, size) => (size.finalPrice < min.finalPrice ? size : min),
@@ -57,7 +65,6 @@ export default function SectionScroll({ sectionId, title }) {
               finalPrice: minPriceSize.finalPrice || minPriceSize.price || 0,
               discount: minPriceSize.discount || data.discount || 0,
               sizes,
-              badges,
               defaultSize: minPriceSize.size,
               seller: data.seller || null,
             };
@@ -184,18 +191,20 @@ export default function SectionScroll({ sectionId, title }) {
   const handleAddToCart = (poster, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!poster.defaultSize) {
-      alert('No size available for this poster.');
-      return;
-    }
+
+    const selectedVariant = selectedVariantMap[poster.id] || `${poster.defaultSize}_Gloss`;
+    const [selectedSize, selectedFinish] = selectedVariant.split('_');
+
+    const sizeDetail = poster.sizes.find((s) => s.size === selectedSize) || {};
 
     const cartItem = {
       posterId: poster.id,
       title: poster.title,
-      size: poster.defaultSize,
-      price: poster.price,
-      finalPrice: poster.finalPrice,
-      discount: poster.discount,
+      size: selectedSize,
+      finish: selectedFinish,
+      price: sizeDetail.price || poster.price,
+      finalPrice: sizeDetail.finalPrice || poster.finalPrice,
+      discount: sizeDetail.discount || poster.discount,
       seller: poster.seller,
       image: poster.image || 'https://via.placeholder.com/60',
     };
@@ -203,6 +212,7 @@ export default function SectionScroll({ sectionId, title }) {
     addToCart(cartItem, false);
     console.log('Added to cart:', cartItem);
   };
+
 
   const SkeletonCard = () => (
     <div
@@ -346,25 +356,6 @@ export default function SectionScroll({ sectionId, title }) {
                         minHeight: '200px',
                       }}
                     />
-                    {item.badges.length > 0 && (
-                      <div
-                        className="position-absolute top-0 start-0 p-2 d-none d-md-flex gap-1"
-                        style={{ zIndex: 5 }}
-                      >
-                        {item.badges.map((badge, index) => (
-                          <span
-                            key={index}
-                            className="badge bg-primary text-white"
-                            style={{
-                              fontSize: '0.75rem',
-                              opacity: 0.9,
-                            }}
-                          >
-                            {badge}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                   <div className="pt-3 px-2 d-flex flex-column text-center">
                     <h6
@@ -379,39 +370,59 @@ export default function SectionScroll({ sectionId, title }) {
                     >
                       {item.title}
                     </h6>
-                    <p
-                      className="mb-1 text-muted small"
-                      style={{ minHeight: '1rem' }}
-                    >
-                      Size: {item.defaultSize || 'N/A'}
-                    </p>
+
                     <div
                       className="price-text mb-2"
                       style={{
-                        fontSize: window.innerWidth <= 576 ? '15px' : '17px',
-                        minHeight: '1.5rem',
+                        minHeight: '1.5rem', // adjust as needed to handle both 1-line and 2-line price displays
                       }}
                     >
-                      {item.discount > 0 ? (
-                        <div className="d-flex align-items-center justify-content-center flex-wrap">
-                          <span className="text-danger fw-semibold me-2">
-                            ↓ {item.discount}%
-                          </span>
-                          <h6 className="text-muted text-decoration-line-through mb-0 me-2">
-                            ₹{item.price.toLocaleString('en-IN')}
+                      {(() => {
+                        const selectedVariant = selectedVariantMap[item.id] || `${item.defaultSize}_Gloss`;
+                        const [selectedSize] = selectedVariant.split('_');
+                        const sizeDetail = item.sizes.find((s) => s.size === selectedSize);
+
+                        const price = sizeDetail?.price || item.price;
+                        const finalPrice = sizeDetail?.finalPrice || item.finalPrice;
+                        const discount = sizeDetail?.discount || item.discount || 0;
+
+                        return discount > 0 ? (
+                          <div className="d-flex align-items-center justify-content-center flex-wrap">
+                            <span className="text-danger me-2">↓ {discount}%</span>
+                            <h6 className="text-muted text-decoration-line-through mb-0 me-2">
+                              ₹{price.toLocaleString('en-IN')}
+                            </h6>
+                            <h6 className="text-success mb-0" style={{ fontSize: '1rem' }}>
+                              ₹{finalPrice.toLocaleString('en-IN')}
+                            </h6>
+                          </div>
+                        ) : (
+                          <h6 className="text-muted mb-0">
+                            ₹{finalPrice.toLocaleString('en-IN')}
                           </h6>
-                          <h6 className="text-success mb-0" style={{ fontSize: '1rem' }}>
-                            ₹{item.finalPrice.toLocaleString('en-IN')}
-                          </h6>
-                        </div>
-                      ) : (
-                        <h6 className="text-muted mb-0">
-                          From <span className="fw-semibold">₹{item.finalPrice.toLocaleString('en-IN')}</span>
-                        </h6>
-                      )}
+                        );
+                      })()}
                     </div>
+
                   </div>
                 </Link>
+
+                <div className="mb-2">
+                  <select
+                    className="form-select form-select-sm text-center"
+                    value={selectedVariantMap[item.id] || `${item.defaultSize}_Gloss`}
+                    onChange={(e) => handleVariantChange(item.id, e.target.value)}
+                  >
+                    {item.sizes.map((s) =>
+                      ['Gloss', 'Matte'].map((finish) => (
+                        <option key={`${s.size}_${finish}`} value={`${s.size}_${finish}`}>
+                          {s.size} – {finish} Finish
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
                 <button
                   className="btn btn-dark mb-3"
                   onClick={(e) => {

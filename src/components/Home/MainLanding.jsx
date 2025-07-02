@@ -6,7 +6,6 @@ import PopularPicks from './PopularPicks';
 import CollectionScroll from './CollectionScroll';
 import NewArrivals from './NewArrivals';
 import Optional from './Optional';
-import CustomerReviews from './CustomerReviews';
 import AboutSection from './AboutSection';
 import '../../styles/MainLanding.css';
 import PromoPanel from './PromoPanel';
@@ -15,18 +14,16 @@ import Footer from './Footer';
 
 export default function MainLanding() {
   const { addToCart, buyNow } = useCartContext();
-  const [cartItems, setCartItems] = useState([]);
 
   return (
     <>
       <HeroBanner />
-      <CategoryScroll title="Shop by Category" />
+      <CategoryScroll />
       <TrendingPosters />
       <PopularPicks />
-      <CollectionScroll title="Collections" />
+      <CollectionScroll />
       <NewArrivals />
       <Optional addToCart={addToCart} buyNow={buyNow} />
-      <CustomerReviews />
       <AboutSection />
       <PromoPanel />
       <Footer/>
