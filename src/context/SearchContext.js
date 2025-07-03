@@ -9,6 +9,11 @@ export const SearchProvider = ({ children }) => {
     loading: false,
     imagesLoading: false,
     error: "",
+    hasSearched: false,
+    allPosterIds: [],
+    page: 0,
+    hasMore: true,
+    totalResults: 0,
   });
 
   const updateSearchState = (updates) => {

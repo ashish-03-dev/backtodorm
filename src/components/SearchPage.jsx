@@ -9,13 +9,19 @@ export default function SearchPage() {
   const { firestore } = useFirebase();
   const navigate = useNavigate();
   const { searchState, updateSearchState } = useSearch();
-  const { queryString, results, loading, error } = searchState;
-  const [hasSearched, setHasSearched] = useState(false);
+  const {
+    queryString,
+    results,
+    loading,
+    error,
+    hasSearched,
+    hasMore,
+    allPosterIds,
+    page,
+    totalResults,
+  } = searchState;
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalResults, setTotalResults] = useState(0);
-  const [page, setPage] = useState(0);
-  const [allPosterIds, setAllPosterIds] = useState([]);
+
 
   const ITEMS_PER_PAGE = 12;
 
@@ -65,15 +71,18 @@ export default function SearchPage() {
   const fetchPosters = async (isLoadMore = false) => {
     if (!queryString.trim()) {
       updateSearchState({ error: "Please enter a search term.", results: [], loading: false });
-      setHasSearched(false);
-      setTotalResults(0);
-      setAllPosterIds([]);
-      setPage(0);
-      setHasMore(true);
+      updateSearchState({
+        hasSearched: false,
+        totalResults: 0,
+        allPosterIds: [],
+        page: 0,
+        hasMore: true,
+      });
+
       return;
     }
 
-    setHasSearched(true);
+    updateSearchState({ hasSearched: true });
     updateSearchState({
       loading: !isLoadMore,
       error: "",
@@ -92,10 +101,13 @@ export default function SearchPage() {
         uniquePosterIds = posterIds;
         const hasMorePages = uniquePosterIds.length > ITEMS_PER_PAGE;
 
-        setAllPosterIds(uniquePosterIds);
-        setTotalResults(uniquePosterIds.length);
-        setPage(0);
-        setHasMore(hasMorePages);
+        updateSearchState({
+          page: 0,
+          allPosterIds: uniquePosterIds,
+          totalResults: uniquePosterIds.length,
+          hasMore: hasMorePages,
+        });
+
 
         if (uniquePosterIds.length === 0) {
           updateSearchState({ results: [], loading: false });
@@ -107,8 +119,8 @@ export default function SearchPage() {
         const startIndex = page * ITEMS_PER_PAGE;
         posterIdsToFetch = allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
         if (posterIdsToFetch.length === 0) {
-          setHasMore(false);
-          updateSearchState({ results, loading: false });
+          updateSearchState({ hasMore: false });
+
           return;
         }
       }
@@ -156,11 +168,13 @@ export default function SearchPage() {
         loading: false,
       });
       const newPage = page + 1;
-      setPage(newPage);
+      updateSearchState({ page: newPage });
+
 
       // Use already-known array instead of possibly stale state
       const posterCount = isLoadMore ? allPosterIds.length : uniquePosterIds.length;
-      setHasMore(posterCount > newPage * ITEMS_PER_PAGE);
+  updateSearchState({ hasMore: posterCount > newPage * ITEMS_PER_PAGE });
+
 
     } catch (err) {
       updateSearchState({
@@ -168,7 +182,8 @@ export default function SearchPage() {
         loading: false,
         results: isLoadMore ? results : [],
       });
-      setHasMore(false);
+     updateSearchState({ hasMore: false });
+
     } finally {
       setIsFetchingMore(false);
     }
@@ -177,12 +192,14 @@ export default function SearchPage() {
   const handleSearch = async (e) => {
     e.preventDefault();
     // Reset all states for a fresh search
-    setAllPosterIds([]);
-    setPage(0);
-    setHasMore(true);
-    setHasSearched(false);
-    setTotalResults(0);
-    updateSearchState({ results: [], error: "", loading: true });
+    updateSearchState({
+      allPosterIds: [],
+      page: 0,
+      hasMore: true,
+      hasSearched: false,
+      totalResults: 0,
+    });
+
     await fetchPosters(false);
   };
 
@@ -223,12 +240,14 @@ export default function SearchPage() {
             onChange={(e) => {
               updateSearchState({ queryString: e.target.value });
               if (!e.target.value.trim()) {
-                setHasSearched(false);
-                updateSearchState({ results: [], error: "", loading: false });
-                setAllPosterIds([]);
-                setPage(0);
-                setHasMore(true);
-                setTotalResults(0);
+                updateSearchState({
+                  hasSearched: false,
+                  allPosterIds: [],
+                  page: 0,
+                  hasMore: true,
+                  totalResults: 0,
+                });
+
               }
             }}
             aria-label="Search posters"
