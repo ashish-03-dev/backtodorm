@@ -4,6 +4,22 @@ import { useFirebase } from '../../context/FirebaseContext';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import '../../styles/MobileSidebar.css';
 import menuList from '../../menu';
+import {
+  BsPersonCircle,
+  BsHouseDoor,
+  BsGrid,
+  BsChevronUp,
+  BsChevronDown,
+  BsCollection,
+  BsPersonBadge,
+  BsBagCheck,
+  BsCart3,
+  BsQuestionCircle,
+  BsShieldLock,
+  BsShop,
+  BsBriefcase,
+  BsX
+} from 'react-icons/bs';
 
 const fetchImages = async (ids, firestore) => {
   const uniqueIds = [...new Set(ids.filter(id => id))];
@@ -104,16 +120,18 @@ export default function MobileSidebar({ show, onClose }) {
       <div className={`mobile-sidebar ${show ? 'open' : ''}`}>
         <div className="bg-secondary text-white d-flex align-items-center justify-content-between px-3" style={{ height: '65px' }}>
           <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-person-circle fs-4 me-2"></i>
+            <BsPersonCircle className="fs-4 me-2" />
             <span className="fw-semibold">{userData?.name || 'Guest'}</span>
           </div>
-          <button className="btn btn-close btn-sm btn-close-white" onClick={onClose}></button>
+          <button className="btn btn-close btn-sm btn-close-white" onClick={onClose}>
+            <BsX />
+          </button>
         </div>
 
         <ul className="list-unstyled m-0 p-0">
           <li className="px-3 py-3 border-bottom">
             <Link to="/" onClick={onClose} className="d-flex align-items-center text-decoration-none text-dark">
-              <i className="bi bi-house-door me-3"></i> <span>Home</span>
+              <BsHouseDoor className="me-3" /> <span>Home</span>
             </Link>
           </li>
 
@@ -122,8 +140,8 @@ export default function MobileSidebar({ show, onClose }) {
               className="btn w-100 px-3 py-3 d-flex align-items-center justify-content-between text-start bg-light fw-semibold"
               onClick={() => toggleCategory('shop')}
             >
-              <span><i className="bi bi-grid me-3"></i> Shop Categories</span>
-              <i className={`bi ${openCategory === 'shop' ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
+              <span><BsGrid className="me-3" /> Shop Categories</span>
+              {openCategory === 'shop' ? <BsChevronUp /> : <BsChevronDown />}
             </button>
             {openCategory === 'shop' && (
               <div className="px-5 mt-3">
@@ -162,8 +180,8 @@ export default function MobileSidebar({ show, onClose }) {
               className="btn w-100 px-3 py-3 d-flex align-items-center justify-content-between text-start bg-light fw-semibold"
               onClick={() => toggleCategory('collections')}
             >
-              <span><i className="bi bi-collection me-3"></i> Collections</span>
-              <i className={`bi ${openCategory === 'collections' ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
+              <span><BsCollection className="me-3" /> Collections</span>
+              {openCategory === 'collections' ? <BsChevronUp /> : <BsChevronDown />}
             </button>
             {openCategory === 'collections' && (
               <div className="px-5 mt-3">
@@ -197,23 +215,13 @@ export default function MobileSidebar({ show, onClose }) {
             )}
           </li>
 
-          <li className="px-3 py-3 border-bottom">
-            <Link
-              to="/custom"
-              onClick={onClose}
-              className="d-flex align-items-center text-decoration-none text-dark"
-            >
-              <i className="bi bi-pencil-square me-3"></i> <span>Custom Poster</span>
-            </Link>
-          </li>
-
           <li className="px-3 py-2 border-bottom">
             <Link
               to="/account"
               onClick={onClose}
               className="d-flex align-items-center text-decoration-none text-dark py-3"
             >
-              <i className="bi bi-person-badge me-3"></i>
+              <BsPersonBadge className="me-3" />
               <span>My Account</span>
             </Link>
             <Link
@@ -221,7 +229,7 @@ export default function MobileSidebar({ show, onClose }) {
               onClick={onClose}
               className="d-flex align-items-center text-decoration-none text-dark py-3"
             >
-              <i className="bi bi-bag-check me-3"></i>
+              <BsBagCheck className="me-3" />
               <span>My Orders</span>
             </Link>
             <Link
@@ -229,7 +237,7 @@ export default function MobileSidebar({ show, onClose }) {
               onClick={onClose}
               className="d-flex align-items-center text-decoration-none text-dark py-3"
             >
-              <i className="bi bi-cart3 me-3"></i>
+              <BsCart3 className="me-3" />
               <span>My Cart</span>
             </Link>
             <Link
@@ -237,7 +245,7 @@ export default function MobileSidebar({ show, onClose }) {
               onClick={onClose}
               className="d-flex align-items-center text-decoration-none text-dark py-3"
             >
-              <i className="bi bi-question-circle me-3"></i>
+              <BsQuestionCircle className="me-3" />
               <span>Help Centre</span>
             </Link>
             {isAdmin && (
@@ -246,7 +254,7 @@ export default function MobileSidebar({ show, onClose }) {
                 onClick={onClose}
                 className="d-flex align-items-center text-decoration-none text-dark py-3"
               >
-                <i className="bi bi-shield-lock me-3"></i>
+                <BsShieldLock className="me-3" />
                 <span>Admin Dashboard</span>
               </Link>
             )}
@@ -256,7 +264,7 @@ export default function MobileSidebar({ show, onClose }) {
                 onClick={onClose}
                 className="d-flex align-items-center text-decoration-none text-dark py-3"
               >
-                <i className="bi bi-shop me-3"></i>
+                <BsShop className="me-3" />
                 <span>Seller Dashboard</span>
               </Link>
             ) : (
@@ -265,7 +273,7 @@ export default function MobileSidebar({ show, onClose }) {
                 onClick={onClose}
                 className="d-flex align-items-center text-decoration-none text-dark py-3"
               >
-                <i className="bi bi-briefcase me-3"></i>
+                <BsBriefcase className="me-3" />
                 <span>Sell Your Design</span>
               </Link>
             )}

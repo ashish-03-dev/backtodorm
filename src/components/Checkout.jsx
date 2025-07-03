@@ -9,7 +9,7 @@ import { BsTruck, BsTrash } from 'react-icons/bs';
 
 const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, setSelectedAddressId, setShowOverlay }) => {
   const [newAddress, setNewAddress] = useState({
-    title: '', name: '', phone: '', address: '', locality: '', city: '', state: '', pincode: '', landmark: '', type: 'Home',
+    title: '', name: '', phone: '', address: '', locality: '', city: '', state: '', pincode: '', landmark: '',
   });
   const [error, setError] = useState('');
 
@@ -181,7 +181,7 @@ const Checkout = () => {
 
   const [formData, setFormData] = useState({
     title: '', name: userData?.name || '', phone: userData?.phone || '', address: '',
-    locality: '', city: '', state: '', pincode: '', landmark: '', type: 'Home',
+    locality: '', city: '', state: '', pincode: '', landmark: '',
   });
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -234,7 +234,7 @@ const Checkout = () => {
     setSelectedAddressId(id);
     const selected = addresses.find(addr => addr.id === id);
     if (selected) setFormData(selected);
-    else setFormData({ title: '', name: userData?.name || '', phone: userData?.phone || '', address: '', locality: '', city: '', state: '', pincode: '', landmark: '', type: 'Home' });
+    else setFormData({ title: '', name: userData?.name || '', phone: userData?.phone || '', address: '', locality: '', city: '', state: '', pincode: '', landmark: ''});
     setShowPayment(false);
   };
 
@@ -509,7 +509,6 @@ const Checkout = () => {
                   <p className="mb-1"><strong>{formData.title || formData.name}</strong> {formData.phone}</p>
                   <p className="mb-1 text-muted">{formData.address}, {formData.locality}, {formData.city}{formData.landmark && `, ${formData.landmark}`}</p>
                   <p className="mb-0 text-muted">{formData.state} - {formData.pincode}</p>
-                  <p className="mb-0 text-muted">Type: {formData.type}</p>
                 </Card>
               )}
               {!showPayment && (
