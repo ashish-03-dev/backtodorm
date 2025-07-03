@@ -211,7 +211,7 @@ export default function ProductDetail() {
           />
         </div>
 
-        <div className="col-md-6 px-4 pt-4 pt-md-5 pb-4 d-flex flex-column justify-content-between">
+        <div className="col-md-6 p-4 pt-0 pt-md-5 d-flex flex-column justify-content-between">
           <div>
             {error && (
               <div className="alert alert-danger alert-dismissible fade show" role="alert">
@@ -279,24 +279,24 @@ export default function ProductDetail() {
           </div>
 
           <div>
-            <div className="border-top pt-4 mt-2">
+            <div className="border-top pt-4 mt-4">
               <h6 className="fw-semibold mb-3">Shipping & Returns</h6>
               <div className="d-flex flex-column gap-2">
                 <div className="d-flex align-items-center">
                   <BsTruck className="me-2 text-primary" style={{ fontSize: '1.2rem' }} />
-                  <p className="mb-0 text-dark">
+                  <p className="my-1 text-dark">
                     <strong>Delivery Charge:</strong> {deliveryCharge === 0 ? 'Free' : `₹${deliveryCharge.toLocaleString('en-IN')}`}
                   </p>
                 </div>
                 <div className="d-flex align-items-center">
                   <BsWallet2 className="me-2 text-success" style={{ fontSize: '1.2rem' }} />
-                  <p className="mb-0 text-dark">
+                  <p className="my-1 text-dark">
                     <strong>Free Delivery:</strong> On orders above ₹{freeDeliveryThreshold.toLocaleString('en-IN')}
                   </p>
                 </div>
                 <div className="d-flex align-items-center">
                   <BsBoxArrowLeft className="me-2 text-muted" style={{ fontSize: '1.2rem' }} />
-                  <p className="mb-0 text-muted small">
+                  <p className="my-1 text-muted small">
                     Ships in 2–4 days. 7-day return for damaged posters.{' '}
                     <Link to="/return-policy" className="text-primary text-decoration-underline">
                       Return Policy
