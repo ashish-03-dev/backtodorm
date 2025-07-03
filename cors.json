@@ -1,7 +1,10 @@
 [
   {
-    "origin": ["http://localhost:3000"],
-    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"],
+    "origin": ["http://localhost:3000", "https://www.backtodorm.shop/"],
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin"
+    ],
     "method": ["GET"],
     "maxAgeSeconds": 3600
   }

@@ -51,23 +51,7 @@ const Posters = () => {
           source: "posters",
         }));
 
-        const postersWithUrls = await Promise.all(
-          postersData.map(async (poster) => {
-            if (poster.imageUrl) {
-              try {
-                const imageRef = ref(storage, poster.imageUrl);
-                const url = await getDownloadURL(imageRef);
-                return { ...poster, imageUrl: url };
-              } catch (err) {
-                console.warn(`Failed to load image URL for poster ${poster.id}:`, err.message);
-                return poster;
-              }
-            }
-            return poster;
-          })
-        );
-
-        setPosters(postersWithUrls);
+        setPosters(postersData);
         setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
         setHasMore(snapshot.docs.length === 10);
         setLoading(false);
