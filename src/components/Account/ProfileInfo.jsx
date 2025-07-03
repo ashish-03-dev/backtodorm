@@ -70,6 +70,7 @@ export default function ProfileInfo() {
       setOtpSent(false);
       setOtp("");
       alert('Phone number linked successfully!');
+      await updateUser();
     } catch (err) {
       const errorMessages = {
         'auth/invalid-verification-code': 'Invalid OTP. Please try again.',
