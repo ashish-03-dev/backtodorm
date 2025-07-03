@@ -19,22 +19,22 @@ export default function NavbarComponent() {
   const [showCart, setShowCart] = useState(false);
   const navigate = useNavigate();
 
-const handleSearchClick = () => {
-  // Reset the entire search state before navigating
-  updateSearchState({
-    queryString: "",
-    results: [],
-    loading: false,
-    imagesLoading: false,
-    error: "",
-    page: 0,
-    hasSearched: false,
-    allPosterIds: [],
-    hasMore: true,
-    totalResults: 0,
-  });
-  navigate("/search");
-};
+  const handleSearchClick = () => {
+    updateSearchState({
+      queryString: "",
+      results: [],
+      loading: false,
+      error: "",
+      page: 0,
+      hasSearched: false,
+      allPosterIds: [],
+      hasMore: true,
+      totalResults: 0,
+    });
+
+    navigate("/search");
+  };
+
 
   return (
     <>
