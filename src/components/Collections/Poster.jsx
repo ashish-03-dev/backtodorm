@@ -279,7 +279,7 @@ export default function ProductDetail() {
           </div>
 
           <div>
-            <div className="border-top pt-3 mt-4 mt-lg-3">
+            <div className="border-top pt-3 mt-4">
               <h6 className="fw-semibold mb-3">Shipping & Returns</h6>
               <div className="d-flex flex-column gap-2">
                 <div className="d-flex align-items-center">
