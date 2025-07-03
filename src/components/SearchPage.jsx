@@ -8,6 +8,7 @@ import { BsSearch } from 'react-icons/bs';
 export default function SearchPage() {
   const { firestore } = useFirebase();
   const navigate = useNavigate();
+
   const { searchState, updateSearchState } = useSearch();
   const {
     queryString,
@@ -21,6 +22,7 @@ export default function SearchPage() {
     totalResults,
   } = searchState;
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [scrollKey, setScrollKey] = useState(0);
 
 
   const ITEMS_PER_PAGE = 12;
@@ -78,7 +80,6 @@ export default function SearchPage() {
         page: 0,
         hasMore: true,
       });
-
       return;
     }
 
@@ -93,9 +94,8 @@ export default function SearchPage() {
     try {
       const searchKey = normalizeSearchTerm(queryString);
       let uniquePosterIds = [];
-
-      // Fetch all poster IDs on initial search
       let posterIdsToFetch = [];
+
       if (!isLoadMore) {
         const posterIds = await fetchPosterIds(searchKey);
         uniquePosterIds = posterIds;
@@ -108,7 +108,6 @@ export default function SearchPage() {
           hasMore: hasMorePages,
         });
 
-
         if (uniquePosterIds.length === 0) {
           updateSearchState({ results: [], loading: false });
           return;
@@ -120,12 +119,10 @@ export default function SearchPage() {
         posterIdsToFetch = allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
         if (posterIdsToFetch.length === 0) {
           updateSearchState({ hasMore: false });
-
           return;
         }
       }
 
-      // Fetch poster data for the current page
       const searchResults = [];
       for (const posterId of posterIdsToFetch) {
         try {
@@ -133,33 +130,26 @@ export default function SearchPage() {
           const docSnap = await getDoc(posterRef);
           if (docSnap.exists()) {
             const posterData = docSnap.data();
-            if (!posterData.isActive) {
-              continue;
-            }
-            if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0) {
-              continue;
-            }
-
-            const poster = { id: docSnap.id, ...posterData };
+            if (!posterData.isActive || !Array.isArray(posterData.sizes) || posterData.sizes.length === 0) continue;
 
             const cheapestSize = posterData.sizes.reduce((best, size) => {
               const final = size.finalPrice ?? size.price ?? Infinity;
               return final < (best.finalPrice ?? Infinity) ? size : best;
             }, {});
-
             const cheapestPrice = cheapestSize.finalPrice ?? cheapestSize.price ?? 0;
             const originalPrice = cheapestSize.price ?? 0;
             const discount = cheapestSize.discount ?? posterData.discount ?? 0;
 
             searchResults.push({
-              ...poster,
+              id: docSnap.id,
+              ...posterData,
               cheapestPrice,
               originalPrice,
-              discount,
+              discount
             });
           }
         } catch (err) {
-          // Handle error silently or log only critical errors if needed
+          // Handle or log error if needed
         }
       }
 
@@ -167,23 +157,21 @@ export default function SearchPage() {
         results: isLoadMore ? [...results, ...searchResults] : searchResults,
         loading: false,
       });
-      const newPage = page + 1;
-      updateSearchState({ page: newPage });
 
-
-      // Use already-known array instead of possibly stale state
-      const posterCount = isLoadMore ? allPosterIds.length : uniquePosterIds.length;
-  updateSearchState({ hasMore: posterCount > newPage * ITEMS_PER_PAGE });
-
+      const totalPosters = isLoadMore ? allPosterIds.length : uniquePosterIds.length;
+      const nextPage = isLoadMore ? page + 1 : 1;
+      updateSearchState({
+        page: nextPage,
+        hasMore: totalPosters > nextPage * ITEMS_PER_PAGE,
+      });
 
     } catch (err) {
       updateSearchState({
         error: `Failed to fetch search results: ${err.message}`,
         loading: false,
         results: isLoadMore ? results : [],
+        hasMore: false,
       });
-     updateSearchState({ hasMore: false });
-
     } finally {
       setIsFetchingMore(false);
     }
@@ -191,17 +179,31 @@ export default function SearchPage() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    // Reset all states for a fresh search
+
+    window.scrollTo({ top: 0 });
+
+    // Force scroll effect to rebind first
+    setScrollKey((prev) => prev + 1);
+
+    // Reset full search state
     updateSearchState({
+      queryString: queryString.trim(),
+      results: [],
+      error: "",
+      loading: false,
       allPosterIds: [],
-      page: 0,
+      page: 0, // reset page before fetch
       hasMore: true,
       hasSearched: false,
       totalResults: 0,
     });
 
-    await fetchPosters(false);
+    // Wait a tick to allow scrollKey update to propagate
+    setTimeout(() => {
+      fetchPosters(false);
+    }, 0);
   };
+
 
   const handleViewPoster = (posterId) => {
     navigate(`/poster/${posterId}`);
@@ -225,7 +227,7 @@ export default function SearchPage() {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isFetchingMore, hasMore, hasSearched, results.length]);
+  }, [isFetchingMore, hasMore, hasSearched, results.length, scrollKey]);
 
   return (
     <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
@@ -242,14 +244,16 @@ export default function SearchPage() {
               if (!e.target.value.trim()) {
                 updateSearchState({
                   hasSearched: false,
+                  results: [],
                   allPosterIds: [],
                   page: 0,
                   hasMore: true,
                   totalResults: 0,
                 });
-
+                setIsFetchingMore(false); // Reset fetching state here too
               }
             }}
+
             aria-label="Search posters"
           />
           <button type="submit" className="btn btn-primary" disabled={loading || isFetchingMore}>
