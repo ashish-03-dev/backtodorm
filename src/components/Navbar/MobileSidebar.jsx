@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useFirebase } from '../../context/FirebaseContext';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import '../../styles/MobileSidebar.css';
+import menuList from '../../menu';
 
 const fetchImages = async (ids, firestore) => {
   const uniqueIds = [...new Set(ids.filter(id => id))];
@@ -39,10 +40,6 @@ export default function MobileSidebar({ show, onClose }) {
         return;
       }
       try {
-        const menusDoc = await getDocs(collection(firestore, 'homeSections'));
-        const menusData = menusDoc.docs.find((d) => d.id === 'menus')?.data();
-        const menuList = menusData?.menuList || [];
-
         if (!Array.isArray(menuList)) {
           console.error('menuList is not an array:', menuList);
           setMenus({});
@@ -61,7 +58,6 @@ export default function MobileSidebar({ show, onClose }) {
         }, {});
 
         setMenus(sanitizedMenus);
-
         const imageIds = menuList.flatMap((menu) =>
           (menu.images || []).map((img) => img.src).filter((id) => id && typeof id === 'string')
         );

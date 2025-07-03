@@ -21,7 +21,6 @@ import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
-import FramesAdmin from "./pages/AAdmin/Frames/FramesAdmin";
 import CollectionsPacks from "./pages/AAdmin/CollectionsPacks/CollectionsPacks";
 import CollectionsPacksPage from "./components/Collections/CollectionsPacksPage";
 
@@ -33,6 +32,7 @@ const SectionManager = lazy(() => import('./pages/AAdmin/HomeContentManager/Sect
 const Sellers = lazy(() => import('./pages/AAdmin/Sellers'));
 const Posters = lazy(() => import('./pages/AAdmin/Posters/Posters'));
 const PosterApprovals = lazy(() => import('./pages/AAdmin/PosterApprovals/PosterApprovals'));
+const FramesAdmin = lazy(() => import("./pages/AAdmin/Frames/FramesAdmin"));
 const Users = lazy(() => import('./pages/AAdmin/Users'));
 const Settings = lazy(() => import('./pages/AAdmin/SiteSettings'));
 const AdminUsers = lazy(() => import('./pages/AAdmin/AdminUsers'));

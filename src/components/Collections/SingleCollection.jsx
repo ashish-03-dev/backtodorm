@@ -37,13 +37,6 @@ export default function SingleCollection() {
         }
 
         const collectionData = collectionSnap.data();
-        console.log("Fetched collection data:", {
-          id: collectionSnap.id,
-          title: collectionData.title,
-          description: collectionData.description,
-          discount: collectionData.discount,
-          posters: collectionData.posters,
-        });
 
         if (!Array.isArray(collectionData.posters) || collectionData.posters.length === 0) {
           console.warn(`No posters found in collection ${collectionId}`);
@@ -76,13 +69,6 @@ export default function SingleCollection() {
               }
 
               const posterData = posterSnap.data();
-              console.log(`Fetched poster ${posterId}:`, {
-                title: posterData.title,
-                imageUrl: posterData.imageUrl,
-                seller: posterData.seller,
-                discount: posterData.discount,
-                sizes: posterData.sizes,
-              });
 
               let size = ensureString(poster.size);
               let price = ensureNumber(poster.price);
@@ -149,14 +135,7 @@ export default function SingleCollection() {
 
         const validPosters = posters.filter((p) => !p.error);
         const invalidPosters = posters.filter((p) => p.error);
-        console.log("Valid posters:", validPosters.map(p => ({
-          posterId: p.posterId,
-          title: p.title,
-          size: p.selectedSize,
-          discount: p.discount,
-        })));
-        console.log("Invalid posters:", invalidPosters);
-
+ 
         if (validPosters.length === 0 && invalidPosters.length > 0) {
           setError("No valid posters available in this collection. Check console for details.");
         }

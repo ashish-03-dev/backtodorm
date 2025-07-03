@@ -3,6 +3,7 @@ import { useFirebase } from "../context/FirebaseContext";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
 import { Link, useNavigate } from "react-router-dom";
 import { useSearch } from "../context/SearchContext";
+import { BsSearch } from 'react-icons/bs';
 
 export default function SearchPage() {
   const { firestore } = useFirebase();
@@ -41,10 +42,9 @@ export default function SearchPage() {
         where("isActive", "==", true)
       );
       const keywordSnapshot = await getDocs(keywordQuery);
-      console.log(`Keyword query results for ${searchKey}:`, keywordSnapshot.docs.length);
       keywordSnapshot.forEach((doc) => posterIds.add(doc.id));
     } catch (err) {
-      console.warn(`Keyword query failed for ${searchKey}:`, err.message);
+      // Handle error silently or log only critical errors if needed
     }
 
     // Fetch posterIds from collections
@@ -53,13 +53,10 @@ export default function SearchPage() {
       if (collectionDocSnap.exists()) {
         const collectionData = collectionDocSnap.data();
         const posterIdsArray = collectionData.posterIds || [];
-        console.log(`Found ${posterIdsArray.length} posterIds in collection: ${searchKey}`);
         posterIdsArray.forEach((id) => typeof id === "string" && posterIds.add(id));
-      } else {
-        console.log(`No collection doc found for: ${searchKey}`);
       }
     } catch (err) {
-      console.warn(`Error fetching collection doc for ${searchKey}:`, err.message);
+      // Handle error silently or log only critical errors if needed
     }
 
     return Array.from(posterIds);
@@ -86,22 +83,26 @@ export default function SearchPage() {
 
     try {
       const searchKey = normalizeSearchTerm(queryString);
+      let uniquePosterIds = [];
 
       // Fetch all poster IDs on initial search
       let posterIdsToFetch = [];
       if (!isLoadMore) {
         const posterIds = await fetchPosterIds(searchKey);
-        setAllPosterIds(posterIds);
-        setTotalResults(posterIds.length);
+        uniquePosterIds = posterIds;
+        const hasMorePages = uniquePosterIds.length > ITEMS_PER_PAGE;
+
+        setAllPosterIds(uniquePosterIds);
+        setTotalResults(uniquePosterIds.length);
         setPage(0);
-        setHasMore(posterIds.length > 0);
-        if (posterIds.length === 0) {
-          console.warn("No poster IDs found from any query.");
+        setHasMore(hasMorePages);
+
+        if (uniquePosterIds.length === 0) {
           updateSearchState({ results: [], loading: false });
-          setHasMore(false);
           return;
         }
-        posterIdsToFetch = posterIds.slice(0, ITEMS_PER_PAGE);
+
+        posterIdsToFetch = uniquePosterIds.slice(0, ITEMS_PER_PAGE);
       } else {
         const startIndex = page * ITEMS_PER_PAGE;
         posterIdsToFetch = allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -120,9 +121,10 @@ export default function SearchPage() {
           const docSnap = await getDoc(posterRef);
           if (docSnap.exists()) {
             const posterData = docSnap.data();
-            if (!posterData.isActive) continue;
+            if (!posterData.isActive) {
+              continue;
+            }
             if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0) {
-              console.warn(`Poster ${posterId} has invalid sizes:`, posterData.sizes);
               continue;
             }
 
@@ -145,19 +147,22 @@ export default function SearchPage() {
             });
           }
         } catch (err) {
-          console.warn(`Error processing poster ${posterId}:`, err.message);
+          // Handle error silently or log only critical errors if needed
         }
       }
 
-      console.log(`Fetched ${searchResults.length} posters for page ${page + 1}`);
       updateSearchState({
         results: isLoadMore ? [...results, ...searchResults] : searchResults,
         loading: false,
       });
-      setPage((prev) => prev + 1);
-      setHasMore(allPosterIds.length > (page + 1) * ITEMS_PER_PAGE);
+      const newPage = page + 1;
+      setPage(newPage);
+
+      // Use already-known array instead of possibly stale state
+      const posterCount = isLoadMore ? allPosterIds.length : uniquePosterIds.length;
+      setHasMore(posterCount > newPage * ITEMS_PER_PAGE);
+
     } catch (err) {
-      console.error("Search failed:", err);
       updateSearchState({
         error: `Failed to fetch search results: ${err.message}`,
         loading: false,
@@ -189,21 +194,21 @@ export default function SearchPage() {
     const handleScroll = () => {
       if (isFetchingMore || !hasMore || !hasSearched) return;
 
-      const container = document.querySelector(".container");
-      const lastRow = container.querySelector(".row > div:nth-last-child(3)");
-      if (!lastRow) return;
+      const posterItems = document.querySelectorAll(".row > div");
+      const lastItem = posterItems[posterItems.length - 1];
+      if (!lastItem) return;
 
-      const rect = lastRow.getBoundingClientRect();
-      const isLastRowVisible = rect.top <= window.innerHeight;
+      const rect = lastItem.getBoundingClientRect();
+      const isVisible = rect.top <= window.innerHeight;
 
-      if (isLastRowVisible && hasMore) {
+      if (isVisible) {
         fetchPosters(true);
       }
     };
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isFetchingMore, hasMore, hasSearched]);
+  }, [isFetchingMore, hasMore, hasSearched, results.length]);
 
   return (
     <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
@@ -236,7 +241,7 @@ export default function SearchPage() {
               </>
             ) : (
               <>
-                <i className="bi bi-search me-1"></i> Search
+                <BsSearch className="me-1" /> Search
               </>
             )}
           </button>
@@ -248,13 +253,8 @@ export default function SearchPage() {
           </p>
         )}
       </form>
-
       {(loading && !isFetchingMore) ? (
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
+        <div className="text-muted ">Searching...</div>
       ) : (
         <div className="row">
           {results.map((poster) => (
@@ -267,7 +267,7 @@ export default function SearchPage() {
                     alt={poster.title}
                     style={{ aspectRatio: "3/4", objectFit: "cover" }}
                   />
-                  <div className="p-3 d-flex flex-column" style={{minHeight:"0"}}>
+                  <div className="p-3 d-flex flex-column" style={{ minHeight: "0" }}>
                     <h6
                       className="text-truncate mb-2"
                       style={{ overflow: "hidden", whiteSpace: "nowrap" }}
