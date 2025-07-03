@@ -17,15 +17,19 @@ export default function ProfileOrders() {
       return;
     }
 
-    const fetchOrders = async (snapshot, isPending = false) => {
+    const fetchOrders = async (snapshot, fromTemporary = false) => {
       const fetchedOrders = await Promise.all(
         snapshot.docs.map(async (orderDoc) => {
           const orderData = orderDoc.data();
-          const orderRef = doc(firestore, isPending ? 'temporaryOrders' : 'orders', orderData.orderId);
+          const orderId = orderData.orderId;
+          const orderRef = fromTemporary
+            ? doc(firestore, 'temporaryOrders', orderId)
+            : doc(firestore, 'orders', orderId);
           const orderSnap = await getDoc(orderRef);
           if (!orderSnap.exists()) return null;
 
-          const fullOrderData = isPending ? orderData : orderSnap.data();
+          const fullOrderData = orderSnap.data();
+
           const items = await Promise.all(
             (fullOrderData.items || []).map(async (item) => {
               const ref = item.type === 'poster'
@@ -56,50 +60,57 @@ export default function ProfileOrders() {
           );
 
           return {
-            id: orderData.orderId,
-            date: (isPending ? orderData.createdAt?.toDate() : orderData.orderDate)
-              ? new Date(isPending ? orderData.createdAt.toDate() : orderData.orderDate).toLocaleDateString('en-US', {
-                year: 'numeric', month: 'short', day: 'numeric',
-              })
-              : 'N/A',
+            id: orderId,
+            date: new Date(fullOrderData.orderDate || orderData.createdAt?.toDate() || Date.now()).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            }),
             items: items.filter(Boolean),
             total: `₹${(fullOrderData.total || fullOrderData.totalPrice || 0).toLocaleString('en-IN')}`,
-            status: isPending ? 'Pending Payment' : orderData.status || 'Pending',
+            status: fromTemporary ? 'Pending Payment' : fullOrderData.status || 'Pending',
             shippingAddress: fullOrderData.shippingAddress || null,
-            paymentStatus: fullOrderData.paymentStatus || (isPending ? 'Pending' : 'Completed'),
-            paymentMethod: fullOrderData.paymentMethod || (isPending ? 'Razorpay' : 'N/A'),
-            isPending,
+            paymentStatus: fromTemporary
+              ? 'Pending'
+              : fullOrderData.paymentStatus || orderData.paymentStatus || 'Pending',
+            paymentMethod: fullOrderData.paymentMethod || (fromTemporary ? 'Razorpay' : 'N/A'),
           };
         })
       );
+
+      console.log(`${fromTemporary ? '[TEMP]' : '[CONFIRMED]'} Fetched Orders:`, fetchedOrders.filter(Boolean));
       return fetchedOrders.filter(Boolean);
     };
 
-    const ordersQuery = query(collection(firestore, `userOrders/${user.uid}/orders`));
-    const pendingOrdersQuery = query(collection(firestore, 'temporaryOrders'), where('userId', '==', user.uid));
 
-    const unsubscribeOrders = onSnapshot(ordersQuery, async (snapshot) => {
+    const ordersQuery = query(collection(firestore, `userOrders/${user.uid}/orders`));
+    const tempOrdersQuery = query(collection(firestore, 'temporaryOrders'), where('userId', '==', user.uid));
+
+    const unsubscribeConfirmed = onSnapshot(ordersQuery, async (confirmedSnap) => {
       try {
-        const confirmedOrders = await fetchOrders(snapshot);
-        const unsubscribePending = onSnapshot(pendingOrdersQuery, async (pendingSnapshot) => {
+        const confirmedOrders = await fetchOrders(confirmedSnap, false);
+
+        const unsubscribeTemp = onSnapshot(tempOrdersQuery, async (tempSnap) => {
           try {
-            const pendingOrders = await fetchOrders(pendingSnapshot, true);
+            const pendingOrders = await fetchOrders(tempSnap, true);
             setOrders([...confirmedOrders, ...pendingOrders].sort((a, b) => new Date(b.date) - new Date(a.date)));
             setLoading(false);
           } catch (err) {
-            setError(`Failed to load pending orders: ${err.message}`);
+            setError(`Failed to load temporary orders: ${err.message}`);
             setLoading(false);
           }
         });
-        return () => unsubscribePending();
+
+        return () => unsubscribeTemp();
       } catch (err) {
-        setError(`Failed to load orders: ${err.message}`);
+        setError(`Failed to load confirmed orders: ${err.message}`);
         setLoading(false);
       }
     });
 
-    return () => unsubscribeOrders();
+    return () => unsubscribeConfirmed();
   }, []);
+
 
   const renderOrders = (orderList) => (
     <div className="d-flex flex-column gap-4">
@@ -219,9 +230,10 @@ export default function ProfileOrders() {
 
   const filteredOrders = {
     all: orders,
-    pending: orders.filter((order) => order.isPending),
-    confirmed: orders.filter((order) => !order.isPending),
+    pending: orders.filter((order) => order.paymentStatus === 'Pending'),
+    confirmed: orders.filter((order) => order.paymentStatus === 'Completed'),
   };
+
 
   return (
     <div className="container p-4 p-md-5">

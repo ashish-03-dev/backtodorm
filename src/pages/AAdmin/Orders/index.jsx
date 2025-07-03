@@ -70,7 +70,9 @@ const Orders = () => {
         sentToSupplier: true,
         supplierInfo: {
           supplierName: supplierData.supplierName,
-          items: supplierData.items,
+          items: supplierData.items.map((item) => ({
+            ...item, 
+          })),
           address: supplierData.address,
           supplierOrderId: supplierData.supplierOrderId,
         },
