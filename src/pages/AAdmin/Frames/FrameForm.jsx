@@ -311,7 +311,6 @@ const FrameForm = ({ showForm, onSubmit, submitting, onClose, user, loading, set
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    console.log("submitting")
     if (!user) {
       setError("User not authenticated.");
       return;
@@ -513,7 +512,7 @@ const FrameForm = ({ showForm, onSubmit, submitting, onClose, user, loading, set
                   variant="primary"
                   disabled={submitting || !formData.frameStyle || !formData.file}
                 >
-                  {loading ? "Saving..." : "Add Frame"}
+                  {submitting ? "Saving..." : "Add Frame"}
                 </Button>
                 <Button variant="secondary" onClick={handleFormReset} disabled={loading}>
                   Close

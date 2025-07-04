@@ -7,67 +7,62 @@ import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 // Static data defined within the component
 const collectionsData = [
   {
-    id: 'collection2',
-    title: 'Summer Collection',
-    link: '/collections/summer-collection',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098725/image1_a4ytcc.webp',
-  },
-  {
-    id: 'collection3',
-    title: 'Winter Collection',
-    link: '/collections/winter-collection',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750973995/A33width_550_qxr5tr.webp',
-  }, {
     id: 'collection4',
     title: 'Movies',
     link: '/collections/movies',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098632/image1_pcjx4w.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624069/American_Psycho_-_Flore_Maquin_xhxylf.jpg',
   },
   {
     id: 'collection5',
     title: 'TV Series',
     link: '/collections/tv-series',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098647/image2_bfoaha.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624029/Breaking_bad_ytmes0.jpg',
   },
   {
     id: 'collection6',
     title: 'Music',
     link: '/collections/music',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1749984208/image2_b6xais.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751623849/starboy_erlifz.jpg',
+  },
+  {
+    id: 'collection6',
+    title: 'Disney',
+    link: '/collections/disney',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624114/UP_Poster_AllChar_aea7ag.jpg',
   }, {
     id: 'collection7',
     title: 'Video Game',
     link: '/collections/video-game',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098624/image1_oshqc7.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624924/39312bc6-4794-4af6-87ae-99bafa67fed6_bmpuws.jpg',
   },
   {
     id: 'collection8',
     title: 'Motivate',
     link: '/collections/motivational',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098690/image2_thw566.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624222/download_1_re61fr.jpg',
   },
   {
     id: 'collection9',
     title: 'Cricket',
     link: '/collections/cricket',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098675/image4_pegth2.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624542/MS_Dhoni_Poster_j3gny0.jpg',
   }, {
     id: 'collection10',
     title: 'Football',
     link: '/collections/football',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098682/image2_yf8k0x.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624547/The_Iconic_Poster_Design_ujnxmw.jpg',
   },
   {
     id: 'collection11',
     title: 'Nature',
     link: '/collections/nature',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750973995/A33width_550_qxr5tr.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624610/Yosemite_National_Park_Poster_ggpoj3.jpg',
   },
   {
     id: 'collection12',
     title: 'Quotes',
     link: '/collections/quotes',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1750098710/image1_gqnujf.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624916/Motivational_wall_decor_wall_art_prints_quote_prints_minimalist_black_and_white_typography_p____wytxie.jpg',
   },
 ];
 
