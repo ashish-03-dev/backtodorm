@@ -46,7 +46,7 @@ export const addPoster = async (firestore, posterData) => {
             ...existingTempPosters,
             {
               id: posterId,
-              status: posterData.approved || "Pending",
+              status: "Pending",
               createdAt: new Date(),
             },
           ],

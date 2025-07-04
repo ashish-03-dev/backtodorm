@@ -41,7 +41,6 @@ export const submitPoster = async (
     const storagePath = `posters/${posterData.sellerUsername}/${Date.now()}_${posterData.imageFile.name}`;
     const imageRef = ref(storage, storagePath);
     await uploadBytes(imageRef, posterData.imageFile);
-    const imageUrl = await getDownloadURL(imageRef);
 
     // Prepare poster data, excluding imageFile
     const { imageFile, ...posterDataWithoutImage } = posterData;
@@ -52,7 +51,7 @@ export const submitPoster = async (
       updatedAt: serverTimestamp(),
       approved: "pending",
       isActive: posterData.isActive !== false,
-      originalImageUrl: imageUrl,
+      originalImageUrl: imageRef.fullPath,
     };
 
     await runTransaction(firestore, async (transaction) => {

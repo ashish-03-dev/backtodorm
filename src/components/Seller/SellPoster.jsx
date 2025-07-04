@@ -449,7 +449,6 @@ export default function SellYourPoster() {
                 as="textarea"
                 value={formData.description}
                 onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                required
                 placeholder="Describe your poster"
                 rows={2}
                 disabled={submitting}
