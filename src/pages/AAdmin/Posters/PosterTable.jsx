@@ -8,8 +8,11 @@ const PosterTable = ({
   onEdit,
   onView,
   onReject,
-  onUpload,
+ 
+
+onUpload,
   onSetFrame,
+  onDelete,
   lastPosterRef,
 }) => {
   const [uploadingPosterId, setUploadingPosterId] = useState(false);
@@ -62,10 +65,7 @@ const PosterTable = ({
             <td>{poster.approved || "Pending"}</td>
             <td>
               {poster.createdAt?.toDate
-                ? poster.createdAt.toDate().toLocaleString("en-IN", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })
+                ? moment(poster.createdAt.toDate()).format("D MMM YYYY, h:mm A")
                 : "N/A"}
             </td>
             <td>
@@ -127,6 +127,16 @@ const PosterTable = ({
                     disabled={uploadingPosterId === poster.id}
                   >
                     {uploadingPosterId === poster.id ? "Uploading..." : "Upload"}
+                  </Button>
+                )}
+                {poster.source === "posters" && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => onDelete(poster)}
+                    title="Delete poster"
+                  >
+                    Delete
                   </Button>
                 )}
               </div>

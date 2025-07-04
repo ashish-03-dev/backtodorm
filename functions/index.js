@@ -330,6 +330,100 @@ exports.approvePoster = onCall(
   }
 );
 
+exports.deletePoster = onCall(
+  {
+    secrets: CLOUDINARY_SECRETS,
+    region: "us-central1",
+    timeoutSeconds: 120,
+    concurrency: 80,
+  },
+  async ({ data: { posterId }, auth }) => {
+    if (!auth) throw new HttpsError("unauthenticated", "User must be authenticated");
+
+    const user = await db.collection("users").doc(auth.uid).get();
+    if (!user.exists || !user.data().isAdmin) {
+      throw new HttpsError("permission-denied", "Admin access required");
+    }
+
+    if (!posterId) throw new HttpsError("invalid-argument", "Poster ID is required");
+
+    const [cloudName, apiKey, apiSecret] = CLOUDINARY_SECRETS.map((s) => s.value());
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new HttpsError("failed-precondition", "Cloudinary secrets not configured");
+    }
+
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
+
+    const posterRef = db.collection("posters").doc(posterId);
+    const originalPosterRef = db.collection("originalPoster").doc(posterId);
+    const poster = await posterRef.get();
+
+    if (!poster.exists) throw new HttpsError("not-found", "Poster not found");
+
+    const posterData = poster.data();
+    const deletionPromises = [];
+
+    // Delete framed image from Cloudinary using imageUrl
+    if (posterData.imageUrl) {
+      const framedPublicId = posterData.imageUrl.split("/image/upload/")[1]?.split(".")[0];
+      if (framedPublicId) {
+        deletionPromises.push(cloudinary.uploader.destroy(framedPublicId));
+      }
+    }
+
+    // Delete original image from Cloudinary using imageUrl
+    const originalPoster = await originalPosterRef.get();
+    if (originalPoster.exists && originalPoster.data().imageUrl) {
+      const originalPublicId = originalPoster.data().imageUrl.split("/image/upload/")[1]?.split(".")[0];
+      if (originalPublicId) {
+        deletionPromises.push(cloudinary.uploader.destroy(originalPublicId));
+      }
+    }
+
+    // Firestore transaction to delete from collections
+    await db.runTransaction(async (t) => {
+      const sellerRef = db.collection("sellers").doc(posterData.sellerUsername);
+      const collectionRefs = (posterData.collections || []).map((col) =>
+        db.collection("standaloneCollections").doc(col)
+      );
+
+      const [seller, ...collections] = await Promise.all([
+        t.get(sellerRef),
+        ...collectionRefs.map((ref) => t.get(ref)),
+      ]);
+
+      // Delete from posters and originalPoster collections
+      t.delete(posterRef);
+      t.delete(originalPosterRef);
+
+      // Remove from seller's approvedPosters
+      if (seller.exists) {
+        t.update(sellerRef, {
+          approvedPosters: admin.firestore.FieldValue.arrayRemove(posterId),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Remove from collections
+      collections.forEach((col, i) => {
+        if (col.exists && col.data().posterIds?.includes(posterId)) {
+          t.update(collectionRefs[i], {
+            posterIds: admin.firestore.FieldValue.arrayRemove(posterId),
+          });
+        }
+      });
+    });
+
+    try {
+      await Promise.all(deletionPromises);
+    } catch (error) {
+      throw new HttpsError("internal", `Failed to delete images from Cloudinary: ${error.message}`);
+    }
+
+    return { success: true };
+  }
+);
+
 exports.createRazorpayOrder = onCall(
   {
     secrets: RAZORPAY_SECRETS,
