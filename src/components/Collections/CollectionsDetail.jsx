@@ -28,34 +28,38 @@ export default function CollectionDetail({ addToCart }) {
       }
 
       try {
-        // Fetch collection document
+        // Fetch the collection document
         const collectionRef = doc(firestore, 'collections', collectionId);
         const collectionDoc = await getDoc(collectionRef);
+
         let collectionLabel = collectionId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        let posterIds = [];
 
         if (collectionDoc.exists()) {
-          collectionLabel = collectionDoc.data().name || collectionLabel;
+          const data = collectionDoc.data();
+          collectionLabel = data.name || collectionLabel;
+          posterIds = data.posterIds || []; // Array of poster IDs
         }
+
         setCollectionName(collectionLabel);
-
-        // Fetch posters
-        const postersRef = collection(firestore, 'posters');
-        const q = query(postersRef, where('collections', 'array-contains', collectionLabel));
-        const querySnapshot = await getDocs(q);
-
-        const fetchedPosters = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title || 'Untitled Poster',
-            img: data.imageUrl || '/placeholder-image.jpg',
-            sizes: data.sizes || [],
-            price: data.sizes?.[0]?.price || 0,
-            discount: data.discount || 0,
-            finalPrice: data.sizes?.[0]?.finalPrice || data.sizes?.[0]?.price || 0,
-          };
-        });
-
+        // Fetch only the posters listed in the collection
+        const fetchedPosters = [];
+        for (const posterId of posterIds) {
+          const posterRef = doc(firestore, 'posters', posterId);
+          const posterDoc = await getDoc(posterRef);
+          if (posterDoc.exists()) {
+            const data = posterDoc.data();
+            fetchedPosters.push({
+              id: posterDoc.id,
+              title: data.title || 'Untitled Poster',
+              img: data.imageUrl,
+              sizes: data.sizes || [],
+              price: data.sizes?.[0]?.price || 0,
+              discount: data.discount || 0,
+              finalPrice: data.sizes?.[0]?.finalPrice || data.sizes?.[0]?.price || 0,
+            });
+          }
+        }
         setPosters(fetchedPosters);
         setFilteredPosters(fetchedPosters);
         setDisplayedPosters(fetchedPosters.slice(0, pageSize));
