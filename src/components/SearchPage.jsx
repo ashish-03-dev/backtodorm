@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useFirebase } from "../context/FirebaseContext";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useSearch } from "../context/SearchContext";
 import { BsSearch } from 'react-icons/bs';
 
 export default function SearchPage() {
   const { firestore } = useFirebase();
-  const navigate = useNavigate();
 
   const { searchState, updateSearchState } = useSearch();
   const {
@@ -40,7 +39,20 @@ export default function SearchPage() {
   const fetchPosterIds = async (searchKey) => {
     const posterIds = new Set();
 
-    // Fetch posters by keywords
+    // 1. Try to fetch from 'collections' first
+    try {
+      const collectionDocSnap = await getDoc(doc(firestore, "collections", searchKey));
+      if (collectionDocSnap.exists()) {
+        const collectionData = collectionDocSnap.data();
+        const posterIdsArray = collectionData.posterIds || [];
+        posterIdsArray.forEach((id) => typeof id === "string" && posterIds.add(id));
+        return Array.from(posterIds); // Return early if found in collections
+      }
+    } catch (err) {
+      console.error("Error fetching from collections:", err);
+    }
+
+    // 2. If not found in collections, search in 'posters' by keyword
     try {
       const postersRef = collection(firestore, "posters");
       const keywordQuery = query(
@@ -52,19 +64,7 @@ export default function SearchPage() {
       const keywordSnapshot = await getDocs(keywordQuery);
       keywordSnapshot.forEach((doc) => posterIds.add(doc.id));
     } catch (err) {
-      // Handle error silently or log only critical errors if needed
-    }
-
-    // Fetch posterIds from collections
-    try {
-      const collectionDocSnap = await getDoc(doc(firestore, "collections", searchKey));
-      if (collectionDocSnap.exists()) {
-        const collectionData = collectionDocSnap.data();
-        const posterIdsArray = collectionData.posterIds || [];
-        posterIdsArray.forEach((id) => typeof id === "string" && posterIds.add(id));
-      }
-    } catch (err) {
-      // Handle error silently or log only critical errors if needed
+      console.error("Error fetching from posters by keywords:", err);
     }
 
     return Array.from(posterIds);
@@ -202,11 +202,6 @@ export default function SearchPage() {
     setTimeout(() => {
       fetchPosters(false);
     }, 0);
-  };
-
-
-  const handleViewPoster = (posterId) => {
-    navigate(`/poster/${posterId}`);
   };
 
   useEffect(() => {

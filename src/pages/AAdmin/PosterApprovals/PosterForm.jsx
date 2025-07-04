@@ -4,6 +4,7 @@ import Select from "react-select";
 import ReactCrop from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { usePosterForm } from "../Posters/usePosterForm";
+import CreatableSelect from "react-select/creatable";
 
 const POSTER_SIZES = {
   A4: { name: "A4", widthPx: 2480, heightPx: 3508, widthCm: 21, heightCm: 29.7, aspectRatio: 2480 / 3508 },
@@ -178,13 +179,13 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
         <Form.Group className="mb-3">
           <Form.Label>Collections</Form.Label>
           <div className="d-flex align-items-center gap-2">
-            <Select
+            <CreatableSelect
               isMulti
               options={availableCollections}
               value={selectedCollections}
               onChange={setSelectedCollections}
               className="flex-grow-1"
-              placeholder="Select collections..."
+              placeholder="Select or type new collections..."
               isDisabled={uploading}
             />
           </div>
