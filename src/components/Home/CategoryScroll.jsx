@@ -144,7 +144,7 @@ function CollectionCard({ title, link, image }) {
           src={image}
           alt={title}
           style={{
-            height: '17rem',
+            aspectRatio:"1/1.414",
             objectFit: 'cover',
             width: '100%',
           }}
