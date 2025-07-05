@@ -8,14 +8,12 @@ const PosterTable = ({
   onEdit,
   onView,
   onReject,
- 
-
-onUpload,
+  onUpload,
   onSetFrame,
   onDelete,
   lastPosterRef,
 }) => {
-  const [uploadingPosterId, setUploadingPosterId] = useState(false);
+  const [uploadingPosterId, setUploadingPosterId] = useState(null);
 
   if (!posters || posters.length === 0) {
     return <p>No posters found.</p>;
@@ -49,15 +47,15 @@ onUpload,
             ref={index === posters.length - 3 ? lastPosterRef : null}
           >
             <td>
-              {poster.imageUrl || poster.originalImageUrl ? (
+              {poster.imageUrl && poster.source !== "tempPosters" ? (
                 <Image
-                  src={poster.imageUrl || poster.originalImageUrl}
+                  src={poster.imageUrl}
                   alt={poster.title}
                   thumbnail
                   style={{ width: "100px", height: "auto" }}
                 />
               ) : (
-                "No image"
+                "Firestore image"
               )}
             </td>
             <td>{poster.title || "Untitled"}</td>

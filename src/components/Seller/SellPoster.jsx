@@ -45,6 +45,7 @@ export default function SellYourPoster() {
   const imgRef = useRef(null);
   const fileInputRef = useRef(null);
   const IMAGE_QUALITY = 0.9;
+  const [showOptionalCropNotice, setShowOptionalCropNotice] = useState(false);
 
   // Reset form when closing
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function SellYourPoster() {
       setError("Please select a size before uploading an image.");
       return;
     }
+
     const file = e.target.files[0];
     if (!file) return;
 
@@ -138,16 +140,18 @@ export default function SellYourPoster() {
       const img = new Image();
       img.onload = () => {
         const { widthPx, heightPx, aspectRatio } = POSTER_SIZES[selectedSize];
+        const actualAspect = img.width / img.height;
+        const aspectDiff = Math.abs(actualAspect - aspectRatio);
 
-        // Set cropImageSize to original image resolution
+        // Set image resolution for preview
         setCropImageSize({ width: img.width, height: img.height });
 
-        // Check for recommended size
+        // Recommend better size if resolution is low
         const bestSize = Object.keys(POSTER_SIZES).reduce((best, size) => {
-          const { widthPx: w, heightPx: h } = POSTER_SIZES[size];
-          const aspectDiff = Math.abs((img.width / img.height) - POSTER_SIZES[size].aspectRatio);
-          const isLargeEnough = img.width >= w && img.height >= h;
-          if (isLargeEnough && (!best || aspectDiff < Math.abs((img.width / img.height) - POSTER_SIZES[best].aspectRatio))) {
+          const { widthPx: w, heightPx: h, aspectRatio: r } = POSTER_SIZES[size];
+          const diff = Math.abs((img.width / img.height) - r);
+          const largeEnough = img.width >= w && img.height >= h;
+          if (largeEnough && (!best || diff < Math.abs((img.width / img.height) - POSTER_SIZES[best].aspectRatio))) {
             return size;
           }
           return best;
@@ -157,7 +161,29 @@ export default function SellYourPoster() {
         setRecommendedSize(isUpscaling && bestSize && bestSize !== selectedSize ? bestSize : null);
 
         const imageDataUrl = event.target.result;
-        if (Math.abs(img.width / img.height - aspectRatio) > 0.05) {
+
+        const applyAutoScale = () => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = widthPx;
+          canvas.height = heightPx;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, widthPx, heightPx);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const scaledFile = new File([blob], `scaled_${Date.now()}.jpg`, { type: "image/jpeg" });
+              setFormData((prev) => ({ ...prev, imageFile: scaledFile }));
+              setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+              setCropImageSize({ width: img.width, height: img.height });
+            } else {
+              setError("Failed to process image.");
+            }
+          }, "image/jpeg", IMAGE_QUALITY);
+        };
+
+        if (aspectDiff >= 0.02) {
+          // Force crop
           setOriginalImageSrc(imageDataUrl);
           setImageSrc(imageDataUrl);
           setShowCropModal(true);
@@ -170,33 +196,27 @@ export default function SellYourPoster() {
             )
           );
         } else {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          canvas.width = widthPx;
-          canvas.height = heightPx;
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(img, 0, 0, widthPx, heightPx);
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const scaledFile = new File([blob], `scaled_${Date.now()}.jpg`, { type: "image/jpeg" });
-                setFormData((prev) => ({ ...prev, imageFile: scaledFile }));
-                setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
-                setCropImageSize({ width: img.width, height: img.height });
-              } else {
-                setError("Failed to process image.");
-              }
-            },
-            "image/jpeg",
-            IMAGE_QUALITY
+          // Allow auto-scaling + manual cropping (optional)
+          applyAutoScale();
+          setOriginalImageSrc(imageDataUrl);
+          setImageSrc(imageDataUrl);
+          setRotation(0);
+          setShowOptionalCropNotice(true);
+          setCrop(
+            centerCrop(
+              makeAspectCrop({ unit: "%", width: 80, aspect: aspectRatio }, aspectRatio, img.width, img.height),
+              img.width,
+              img.height
+            )
           );
+
         }
       };
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   };
+
 
   const handleSwitchSize = () => {
     if (recommendedSize) {
@@ -215,6 +235,7 @@ export default function SellYourPoster() {
     setCrop(null);
     setRotation(0);
     setRecommendedSize(null);
+    setShowOptionalCropNotice(false); // 👈 ADD THIS HERE
     setCropImageSize({ width: 0, height: 0 });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -313,6 +334,7 @@ export default function SellYourPoster() {
     setCroppedPreview(null);
     setShowCropModal(false);
     setRecommendedSize(null);
+    setShowOptionalCropNotice(false); // 👈 ADD THIS HERE
     setCropImageSize({ width: 0, height: 0 });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -532,6 +554,20 @@ export default function SellYourPoster() {
                   </Button>
                 </div>
               )}
+              {showOptionalCropNotice && (
+                <Button
+                  size="sm"
+                  className="mt-3"
+                  variant="outline-secondary"
+                  onClick={() => {
+                    setShowCropModal(true);
+                    setShowOptionalCropNotice(false); // hide this after showing crop modal
+                  }}
+                >
+                  Crop Anyway
+                </Button>
+              )}
+
               {croppedPreview && selectedSize && POSTER_SIZES[selectedSize] && (
                 <div className="mt-3">
                   <p>

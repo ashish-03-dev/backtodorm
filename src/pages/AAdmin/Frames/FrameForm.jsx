@@ -14,8 +14,8 @@ const POSTER_POSITIONS = {
   "top-left": {
     label: "Top Left",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.05,
-      y: FRAME_SIZES[size].heightPx * 0.10, // was 0.05
+      x: FRAME_SIZES[size].widthPx * 0.10, // doubled from 0.05
+      y: FRAME_SIZES[size].heightPx * 0.13, // slightly lowered from 0.10
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -24,7 +24,7 @@ const POSTER_POSITIONS = {
     label: "Top Center",
     getPosition: (size) => ({
       x: FRAME_SIZES[size].widthPx * 0.2,
-      y: FRAME_SIZES[size].heightPx * 0.10, // was 0.05
+      y: FRAME_SIZES[size].heightPx * 0.13,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -32,8 +32,8 @@ const POSTER_POSITIONS = {
   "top-right": {
     label: "Top Right",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.35,
-      y: FRAME_SIZES[size].heightPx * 0.10, // was 0.05
+      x: FRAME_SIZES[size].widthPx * 0.30, // reduced from 0.35
+      y: FRAME_SIZES[size].heightPx * 0.13,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -41,7 +41,7 @@ const POSTER_POSITIONS = {
   "center-left": {
     label: "Center Left",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.05,
+      x: FRAME_SIZES[size].widthPx * 0.10, // doubled from 0.05
       y: FRAME_SIZES[size].heightPx * 0.2,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
@@ -59,7 +59,7 @@ const POSTER_POSITIONS = {
   "center-right": {
     label: "Center Right",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.35,
+      x: FRAME_SIZES[size].widthPx * 0.30, // reduced from 0.35
       y: FRAME_SIZES[size].heightPx * 0.2,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
@@ -123,58 +123,57 @@ const FrameForm = ({ showForm, onSubmit, submitting, onClose, user, loading, set
         const isCorrectSize = img.width >= widthPx && img.height >= heightPx;
         const isCorrectAspect = Math.abs(img.width / img.height - aspectRatio) <= 0.05;
 
-        if (isWebP && isCorrectSize && isCorrectAspect) {
-          setFormData((prev) => ({ ...prev, file }));
-          setCroppedPreview(event.target.result);
-        } else {
-          const bestSize = Object.keys(FRAME_SIZES).reduce((best, size) => {
-            const { widthPx: w, heightPx: h } = FRAME_SIZES[size];
-            if (img.width >= w && img.height >= h && (!best || w * h > FRAME_SIZES[best].widthPx * FRAME_SIZES[best].heightPx)) {
-              return size;
-            }
-            return best;
-          }, null);
+       if (isWebP && isCorrectSize) {
+  const imageDataUrl = event.target.result;
+  setImageSrc(imageDataUrl);
+  setShowCropModal(true);
+  setRotation(0);
+  setCrop(
+    centerCrop(
+      makeAspectCrop(
+        { unit: "%", width: 80, aspect: aspectRatio },
+        aspectRatio,
+        img.width,
+        img.height
+      ),
+      img.width,
+      img.height
+    )
+  );
+} else {
+  const bestSize = Object.keys(FRAME_SIZES).reduce((best, size) => {
+    const { widthPx: w, heightPx: h } = FRAME_SIZES[size];
+    if (img.width >= w && img.height >= h && (!best || w * h > FRAME_SIZES[best].widthPx * FRAME_SIZES[best].heightPx)) {
+      return size;
+    }
+    return best;
+  }, null);
 
-          const isUpscaling = img.width < widthPx || img.height < heightPx;
-          if (isUpscaling && bestSize && bestSize !== formData.size) {
-            setRecommendedSize(bestSize);
-          } else {
-            setRecommendedSize(null);
-          }
+  const isUpscaling = img.width < widthPx || img.height < heightPx;
+  if (isUpscaling && bestSize && bestSize !== formData.size) {
+    setRecommendedSize(bestSize);
+  } else {
+    setRecommendedSize(null);
+  }
 
-          const imageDataUrl = event.target.result;
-          if (Math.abs(img.width / img.height - aspectRatio) > 0.05) {
-            setImageSrc(imageDataUrl);
-            setShowCropModal(true);
-            setRotation(0);
-            setCrop(
-              centerCrop(
-                makeAspectCrop({ unit: "%", width: 80, aspect: aspectRatio }, aspectRatio, img.width, img.height),
-                img.width,
-                img.height
-              )
-            );
-          } else {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-            canvas.width = widthPx;
-            canvas.height = heightPx;
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(img, 0, 0, widthPx, heightPx);
-            canvas.toBlob(
-              (blob) => {
-                if (blob) {
-                  const scaledFile = new File([blob], `scaled_${Date.now()}.webp`, { type: "image/webp" });
-                  setFormData((prev) => ({ ...prev, file: scaledFile }));
-                  setCroppedPreview(canvas.toDataURL("image/webp", IMAGE_QUALITY));
-                }
-              },
-              "image/webp",
-              IMAGE_QUALITY
-            );
-          }
-        }
+  const imageDataUrl = event.target.result;
+  setImageSrc(imageDataUrl);
+  setShowCropModal(true);
+  setRotation(0);
+  setCrop(
+    centerCrop(
+      makeAspectCrop(
+        { unit: "%", width: 80, aspect: aspectRatio },
+        aspectRatio,
+        img.width,
+        img.height
+      ),
+      img.width,
+      img.height
+    )
+  );
+}
+
       };
       img.src = event.target.result;
     };

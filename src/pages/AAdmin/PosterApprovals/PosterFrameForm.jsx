@@ -24,7 +24,7 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
   const [posterImage, setPosterImage] = useState(null);
   const [useCssShadow, setUseCssShadow] = useState(true); // Changed to true for default checked
   const [cssShadow, setCssShadow] = useState({
-    xOffset: -5,
+    xOffset: -8,
     yOffset: 5,
     blurRadius: 10,
     spreadRadius: 0,
