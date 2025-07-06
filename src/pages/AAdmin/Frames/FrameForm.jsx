@@ -14,8 +14,8 @@ const POSTER_POSITIONS = {
   "top-left": {
     label: "Top Left",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.10, // doubled from 0.05
-      y: FRAME_SIZES[size].heightPx * 0.13, // slightly lowered from 0.10
+      x: FRAME_SIZES[size].widthPx * 0.14, // was 0.10
+      y: FRAME_SIZES[size].heightPx * 0.16,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -24,7 +24,7 @@ const POSTER_POSITIONS = {
     label: "Top Center",
     getPosition: (size) => ({
       x: FRAME_SIZES[size].widthPx * 0.2,
-      y: FRAME_SIZES[size].heightPx * 0.13,
+      y: FRAME_SIZES[size].heightPx * 0.16,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -32,8 +32,8 @@ const POSTER_POSITIONS = {
   "top-right": {
     label: "Top Right",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.30, // reduced from 0.35
-      y: FRAME_SIZES[size].heightPx * 0.13,
+      x: FRAME_SIZES[size].widthPx * 0.26, // was 0.30
+      y: FRAME_SIZES[size].heightPx * 0.16,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
     }),
@@ -41,7 +41,7 @@ const POSTER_POSITIONS = {
   "center-left": {
     label: "Center Left",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.10, // doubled from 0.05
+      x: FRAME_SIZES[size].widthPx * 0.14, // was 0.10
       y: FRAME_SIZES[size].heightPx * 0.2,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
@@ -59,7 +59,7 @@ const POSTER_POSITIONS = {
   "center-right": {
     label: "Center Right",
     getPosition: (size) => ({
-      x: FRAME_SIZES[size].widthPx * 0.30, // reduced from 0.35
+      x: FRAME_SIZES[size].widthPx * 0.26, // was 0.30
       y: FRAME_SIZES[size].heightPx * 0.2,
       width: FRAME_SIZES[size].widthPx * 0.6,
       height: FRAME_SIZES[size].heightPx * 0.6,
@@ -75,6 +75,7 @@ const POSTER_POSITIONS = {
     }),
   },
 };
+
 
 const IMAGE_QUALITY = 1.0;
 

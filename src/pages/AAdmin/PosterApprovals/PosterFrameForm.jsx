@@ -26,7 +26,7 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
   const [cssShadow, setCssShadow] = useState({
     xOffset: -8,
     yOffset: 5,
-    blurRadius: 10,
+    blurRadius: 8,
     spreadRadius: 0,
     color: "rgba(0, 0, 0, 0.5)",
   });
