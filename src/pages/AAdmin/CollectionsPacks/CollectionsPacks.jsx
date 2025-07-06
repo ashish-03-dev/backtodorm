@@ -15,6 +15,7 @@ import {
   handleSizeChange,
   handlePasteClipboard,
   handleMainImagePosterIdChange,
+  fetchPosterImagesData,
 } from "./utils";
 
 const CollectionsPacks = ({ filter }) => {
@@ -47,9 +48,9 @@ const CollectionsPacks = ({ filter }) => {
   );
   const isFiltering = !!filter?.search?.trim();
 
-  const handleEdit = (item = null) => {
+  const handleEdit = async (item = null) => {
     setSelectedItem(item);
-    setFormData({
+    const newFormData = {
       title: ensureString(item?.title),
       description: ensureString(item?.description),
       image: ensureString(item?.image),
@@ -60,11 +61,43 @@ const CollectionsPacks = ({ filter }) => {
           }))
         : [{ posterId: "", size: "" }],
       discount: item?.discount || 20,
-    });
+    };
+    setFormData(newFormData);
     setFormErrors({});
     setSubmissionError(null);
     setPosterDetails({});
     setMainImagePosterTitle("");
+
+    // Fetch poster details for main image and all posters
+    if (item) {
+      if (newFormData.image) {
+        await fetchPosterImagesData(
+          newFormData.image,
+          null,
+          firestore,
+          setFormErrors,
+          setPosterDetails,
+          newFormData,
+          setFormData,
+          setMainImagePosterTitle
+        );
+      }
+      for (let i = 0; i < newFormData.posters.length; i++) {
+        const poster = newFormData.posters[i];
+        if (poster.posterId) {
+          await fetchPosterImagesData(
+            poster.posterId,
+            i,
+            firestore,
+            setFormErrors,
+            setPosterDetails,
+            newFormData,
+            setFormData
+          );
+        }
+      }
+    }
+
     setShowEditModal(true);
   };
 
@@ -88,7 +121,7 @@ const CollectionsPacks = ({ filter }) => {
     }));
     setFormErrors((prev) => ({
       ...prev,
-      posters: prev.posters?.filter((pErr) => pErr.index !== index) || [],
+      posters: prev.posters?.filter((prev) => prev.index !== index) || [],
     }));
     setPosterDetails((prev) => {
       const newDetails = { ...prev };
@@ -171,6 +204,15 @@ const CollectionsPacks = ({ filter }) => {
                   aria-label={`View collection ${collection.title}`}
                 >
                   View
+                </Button>
+                <Button
+                  variant="outline-success"
+                  size="sm"
+                  className="me-2"
+                  onClick={() => handleEdit(collection)}
+                  aria-label={`Edit collection ${collection.title}`}
+                >
+                  Edit
                 </Button>
                 <Button
                   variant="outline-danger"
@@ -322,7 +364,7 @@ const CollectionsPacks = ({ filter }) => {
                       )
                     }
                     title="Paste from clipboard"
-                    dainaria-label="Paste main image poster ID from clipboard"
+                    aria-label="Paste main image poster ID from clipboard"
                   >
                     <BiClipboard />
                   </Button>

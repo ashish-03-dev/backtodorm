@@ -123,8 +123,8 @@ export default function MobileSidebar({ show, onClose }) {
             <BsPersonCircle className="fs-4 me-2" />
             <span className="fw-semibold">{userData?.name || 'Guest'}</span>
           </div>
-          <button className="btn btn-close btn-sm btn-close-white" onClick={onClose}>
-            <BsX />
+          <button className="btn btn-sm text-white" onClick={onClose}>
+            <BsX size={24} />
           </button>
         </div>
 

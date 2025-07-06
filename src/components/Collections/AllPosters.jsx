@@ -36,16 +36,29 @@ export default function AllPosters() {
       const fetchedPosters = querySnapshot.docs.map((doc) => {
         const data = doc.data();
         const sizes = Array.isArray(data.sizes) ? data.sizes : [];
-        const lowestPrice = sizes.length > 0
-          ? Math.min(...sizes.map(s => s.finalPrice || s.price || 0))
-          : 0;
+
+        let price = 0;
+        let finalPrice = 0;
+
+        if (sizes.length > 0) {
+          const sorted = sizes
+            .map(s => ({
+              price: s.price || 0,
+              finalPrice: s.finalPrice !== undefined ? s.finalPrice : s.price || 0,
+            }))
+            .sort((a, b) => a.finalPrice - b.finalPrice);
+
+          price = sorted[0].price;
+          finalPrice = sorted[0].finalPrice;
+        }
 
         return {
           id: doc.id,
           title: data.title || 'Untitled',
-          image: data.imageUrl || 'https://via.placeholder.com/300',
-          sizes: sizes,
-          price: lowestPrice,
+          image: data.imageUrl,
+          sizes,
+          price,
+          finalPrice,
           discount: data.discount || 0,
           seller: data.seller || 'Unknown',
         };
@@ -174,10 +187,19 @@ export default function AllPosters() {
                       {poster.title}
                     </h3>
                     <p className="mb-1" style={{ fontSize: '16px' }}>
-                      From ₹{poster.price.toLocaleString('en-IN')}
-                      {poster.discount > 0 && (
-                        <span className="text-success ms-1">
-                          ({poster.discount}% off)
+                      {poster.discount > 0 && poster.finalPrice < poster.price ? (
+                        <>
+                          <span className="text-danger fw-semibold me-2">↓ {poster.discount}%</span>
+                          <span className="text-muted text-decoration-line-through me-2">
+                            ₹{poster.price.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-success fw-semibold">
+                            ₹{poster.finalPrice.toLocaleString('en-IN')}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted fw-semibold">
+                          From ₹{poster.price.toLocaleString('en-IN')}
                         </span>
                       )}
                     </p>

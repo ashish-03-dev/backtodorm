@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { collection, getDoc, getDocs, doc, where, query } from 'firebase/firestore';
 import { useCartContext } from '../../context/CartContext';
-import { useSectionContext } from '../../context/SectionScrollContext'; // Import PosterContext
+import { useSectionContext } from '../../context/SectionScrollContext';
 import { useFirebase } from '../../context/FirebaseContext';
 import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 import '../../styles/trendingPosters.css';
@@ -11,11 +11,10 @@ import '../../styles/trendingPosters.css';
 export default function SectionScroll({ sectionId, title }) {
   const { firestore } = useFirebase();
   const { addToCart } = useCartContext();
-  const { getCachedPosters, cachePosters } = useSectionContext(); // Use PosterContext
+  const { getCachedPosters, cachePosters } = useSectionContext();
   const [posters, setPosters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
   const [posterIds, setPosterIds] = useState([]);
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -26,7 +25,7 @@ export default function SectionScroll({ sectionId, title }) {
     setSelectedVariantMap((prev) => ({ ...prev, [posterId]: value }));
   };
 
-  // Fetch or load cached posters
+  // Fetch all posters at once
   useEffect(() => {
     if (!firestore) {
       setError('Firestore is not available.');
@@ -40,7 +39,6 @@ export default function SectionScroll({ sectionId, title }) {
       if (cachedData) {
         setPosters(cachedData.posters);
         setPosterIds(cachedData.posterIds);
-        setHasMore(cachedData.hasMore);
         setIsLoading(false);
         return;
       }
@@ -65,10 +63,10 @@ export default function SectionScroll({ sectionId, title }) {
 
         setPosterIds(section.posterIds);
 
-        // Fetch first batch of posters
+        // Fetch all posters at once
         const postersQuery = query(
           collection(firestore, 'posters'),
-          where('__name__', 'in', section.posterIds.slice(0, 10)),
+          where('__name__', 'in', section.posterIds),
           where('isActive', '==', true)
         );
         const postersSnap = await getDocs(postersQuery);
@@ -93,9 +91,8 @@ export default function SectionScroll({ sectionId, title }) {
         });
 
         setPosters(fetchedPosters);
-        setHasMore(section.posterIds.length > 10);
         // Cache the fetched data
-        cachePosters(sectionId, fetchedPosters, section.posterIds, section.posterIds.length > 10);
+        cachePosters(sectionId, fetchedPosters, section.posterIds, false);
         setIsLoading(false);
       } catch (err) {
         setError(`Failed to load ${title.toLowerCase()}: ${err.message}`);
@@ -105,68 +102,6 @@ export default function SectionScroll({ sectionId, title }) {
 
     fetchData();
   }, [firestore, sectionId, title, getCachedPosters, cachePosters]);
-
-  // Handle scroll for lazy loading
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || !hasMore) return;
-
-    const handleScroll = async () => {
-      const { scrollLeft, scrollWidth, clientWidth } = container;
-      if (scrollLeft + clientWidth >= scrollWidth - 50 && !isLoading) {
-        setIsLoading(true);
-        try {
-          const nextBatch = posterIds.slice(posters.length, posters.length + 10);
-          if (!nextBatch.length) {
-            setHasMore(false);
-            setIsLoading(false);
-            return;
-          }
-
-          const postersQuery = query(
-            collection(firestore, 'posters'),
-            where('__name__', 'in', nextBatch),
-            where('isActive', '==', true)
-          );
-
-          const postersSnap = await getDocs(postersQuery);
-          const newPosters = postersSnap.docs.map((doc) => {
-            const data = doc.data();
-            const sizes = Array.isArray(data.sizes) ? data.sizes : [];
-            const minPriceSize = sizes.length
-              ? sizes.reduce((min, size) => (size.finalPrice < min.finalPrice ? size : min), sizes[0])
-              : { price: 0, finalPrice: 0, size: '' };
-
-            return {
-              id: doc.id,
-              title: data.title || 'Untitled',
-              image: data.imageUrl || '',
-              price: minPriceSize.price || 0,
-              finalPrice: minPriceSize.finalPrice || minPriceSize.price || 0,
-              discount: minPriceSize.discount || data.discount || 0,
-              sizes,
-              defaultSize: minPriceSize.size,
-              seller: data.seller || null,
-            };
-          });
-
-          setPosters((prev) => {
-            const updatedPosters = [...prev, ...newPosters];
-            // Update cache with new posters
-            cachePosters(sectionId, updatedPosters, posterIds, posterIds.length > updatedPosters.length);
-            return updatedPosters;
-          });
-          setHasMore(posterIds.length > posters.length + newPosters.length);
-        } catch (err) {
-          setError(`Failed to load more posters: ${err.message}`);
-        }
-        setIsLoading(false);
-      }
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [hasMore, posters.length, posterIds, firestore, isLoading, sectionId, cachePosters]);
 
   // Scroll navigation
   const scroll = (direction) => {
@@ -239,8 +174,8 @@ export default function SectionScroll({ sectionId, title }) {
           <button
             onClick={() => scroll('right')}
             className="btn btn-light rounded-circle position-absolute top-50 end-0 translate-middle-y d-none d-md-flex align-items-center justify-content-center shadow-sm"
-            style={{ width: '40px', height: '40px', zIndex: 10 }}
-            arial='Scroll right'
+            style={{ width:'40px', height: '40px', zIndex: 10 }}
+            aria-label="Scroll right"
           >
             <BsChevronRight className="fs-5" />
           </button>
@@ -343,13 +278,6 @@ export default function SectionScroll({ sectionId, title }) {
               </div>
             </div>
           ))}
-          {isLoading && posters.length > 0 && (
-            <>
-              {Array(3).fill().map((_, index) => (
-                <SkeletonCard key={`loading-${index}`} />
-              ))}
-            </>
-          )}
         </div>
       )}
     </section>

@@ -123,7 +123,7 @@ export default function CartSidebar({ show, onClose }) {
                       {item.type === 'collection' ? (
                         <>
                           <Image
-                            src={item.posters[0]?.image || 'https://via.placeholder.com/60'}
+                            src={item.posters[0]?.image}
                             alt="Collection thumbnail"
                             title="Collection image"
                             style={{ width: '60px', aspectRatio: '4/5', objectFit: 'cover' }}
@@ -137,13 +137,13 @@ export default function CartSidebar({ show, onClose }) {
                                   {poster.title || 'Untitled'} ({poster.size || 'N/A'}) -{' '}
                                   {poster.discount > 0 ? (
                                     <>
+                                      <span className="text-danger">↓ {poster.discount}%</span>
                                       <span className="text-decoration-line-through me-1">
                                         ₹{(poster.price || 0).toLocaleString('en-IN')}
                                       </span>
                                       <span className="text-success me-1">
                                         ₹{(poster.finalPrice || 0).toLocaleString('en-IN')}
                                       </span>
-                                      <span className="text-danger">↓ {poster.discount}% OFF</span>
                                     </>
                                   ) : (
                                     <span>
@@ -156,21 +156,21 @@ export default function CartSidebar({ show, onClose }) {
                             <p className="mb-2 d-flex align-items-center flex-wrap">
                               {group.collectionDiscount > 0 ? (
                                 <>
+                                  <span className="text-danger fw-semibold me-2">
+                                    ↓ {group.collectionDiscount}%
+                                  </span>
                                   <span className="text-muted text-decoration-line-through me-2">
                                     ₹{(
                                       (item.posters || []).reduce((sum, p) => sum + (p.price || 0), 0) *
                                       (item.quantity || 1)
                                     ).toLocaleString('en-IN')}
                                   </span>
-                                  <span className="text-success fw-semibold me-2">
+                                  <span className="text-success fw-semibold">
                                     ₹{(
                                       (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) *
                                       (item.quantity || 1) *
                                       (1 - group.collectionDiscount / 100)
                                     ).toLocaleString('en-IN')}
-                                  </span>
-                                  <span className="text-danger fw-semibold">
-                                    ↓ {group.collectionDiscount}% OFF
                                   </span>
                                 </>
                               ) : (
@@ -245,13 +245,13 @@ export default function CartSidebar({ show, onClose }) {
                             <p className="mb-2 d-flex align-items-center">
                               {item.discount > 0 ? (
                                 <>
+                                  <span className="text-danger fw-semibold">↓ {item.discount}%</span>
                                   <span className="text-muted text-decoration-line-through me-2">
                                     ₹{(item.price * item.quantity).toLocaleString('en-IN')}
                                   </span>
                                   <span className="text-success fw-semibold me-2">
                                     ₹{(item.finalPrice * item.quantity).toLocaleString('en-IN')}
                                   </span>
-                                  <span className="text-danger fw-semibold">↓ {item.discount}% OFF</span>
                                 </>
                               ) : (
                                 <span className="text-muted fw-semibold">

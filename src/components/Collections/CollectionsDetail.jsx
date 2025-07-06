@@ -194,7 +194,21 @@ export default function CollectionDetail({ addToCart }) {
                     />
                     <div className="card-body text-center">
                       <h6 className="card-title fw-semibold text-truncate mb-2">{poster.title}</h6>
-                      <p className="card-text text-muted fw-semibold mb-0">₹{poster.finalPrice || poster.price}</p>
+                      <p className="card-text fw-semibold mb-0" style={{ fontSize: '16px' }}>
+                        {poster.discount > 0 ? (
+                          <>
+                            <span className="text-danger me-2">({poster.discount}% off)</span>
+                            <span className="text-decoration-line-through text-muted me-1">
+                              ₹{poster.price.toLocaleString('en-IN')}
+                            </span>
+                            <span className="text-success fw-semibold">
+                              ₹{poster.finalPrice.toLocaleString('en-IN')}
+                            </span>
+                          </>
+                        ) : (
+                          <>From ₹{poster.finalPrice.toLocaleString('en-IN')}</>
+                        )}
+                      </p>
                     </div>
                   </div>
                 </Link>
