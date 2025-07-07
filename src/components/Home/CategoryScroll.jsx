@@ -6,11 +6,23 @@ import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 
 // Static data defined within the component
 const collectionsData = [
+    {
+    id: 'collection13',
+    title: 'Quotes',
+    link: '/collections/quotes',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751895667/1_Better_Every_Day_jggefm.jpg',
+  },
   {
     id: 'collection2',
     title: 'Movies',
     link: '/collections/movies',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624069/American_Psycho_-_Flore_Maquin_xhxylf.jpg',
+  },
+  {
+    id: 'collection4',
+    title: 'Music',
+    link: '/collections/music',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751893071/StarBoy_The_Weeknd_pr8bgr.jpg',
   },
   {
     id: 'collection3',
@@ -19,29 +31,24 @@ const collectionsData = [
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624029/Breaking_bad_ytmes0.jpg',
   },
   {
-    id: 'collection4',
-    title: 'Music',
-    link: '/collections/music',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751623849/starboy_erlifz.jpg',
+    id: 'collection7',
+    title: 'Cars',
+    link: '/collections/cars',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751893575/download_15_w0w2at.jpg',
   },
   {
     id: 'collection5',
     title: 'Disney',
     link: '/collections/disney',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624114/UP_Poster_AllChar_aea7ag.jpg',
-  },  {
+  }, {
     id: 'collection6',
     title: 'Marvel',
     link: '/collections/marvel',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751798218/posters/iron-man-2008-film-poster-by-leoarts-1751795952584_framed_1751798217844.webp',
+    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751884060/download_13_no6zsk.jpg',
   }, {
-    id: 'collection7',
-    title: 'Cars',
-    link: '/collections/cars',
-    image: 'http://res.cloudinary.com/dqu3mzqfj/image/upload/v1751811662/posters/porsche-911-gt3-rs-the-motorsport-athlete-1751810428457_framed_1751811661899.webp',
-  },{
     id: 'collection8',
-    title: 'Video Game',
+    title: 'Video Games',
     link: '/collections/video-games',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624924/39312bc6-4794-4af6-87ae-99bafa67fed6_bmpuws.jpg',
   },
@@ -67,12 +74,6 @@ const collectionsData = [
     title: 'Nature',
     link: '/collections/nature',
     image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624610/Yosemite_National_Park_Poster_ggpoj3.jpg',
-  },
-  {
-    id: 'collection13',
-    title: 'Quotes',
-    link: '/collections/quotes',
-    image: 'https://res.cloudinary.com/dqu3mzqfj/image/upload/v1751624916/Motivational_wall_decor_wall_art_prints_quote_prints_minimalist_black_and_white_typography_p____wytxie.jpg',
   },
 ];
 
@@ -154,7 +155,7 @@ function CollectionCard({ title, link, image }) {
           src={image}
           alt={title}
           style={{
-            aspectRatio:"1/1.414",
+            aspectRatio: "1/1.414",
             objectFit: 'cover',
             width: '100%',
           }}
