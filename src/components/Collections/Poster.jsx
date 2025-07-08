@@ -224,9 +224,10 @@ export default function ProductDetail() {
                 ></button>
               </div>
             )}
-            <h3>{poster.title}</h3>
-            <p className="mb-4">{poster.description}</p>
-
+            <h3 className='mb-3'>{poster.title}</h3>
+            {poster.description && poster.description !== "No description available." && (
+              <p className="mb-4">{poster.description}</p>
+            )}
             <div className="mb-4">
               {isDiscounted ? (
                 <div className="d-flex align-items-center">
