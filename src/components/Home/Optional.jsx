@@ -1,63 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+// src/components/YouMayAlsoLike.js
+import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { useFirebase } from '../../context/FirebaseContext';
 import { BiChevronRight, BiChevronLeft } from 'react-icons/bi';
+import { usePosters } from '../../context/OptionalContext';
 
 export default function YouMayAlsoLike() {
-  const { firestore } = useFirebase();
-  const [posters, setPosters] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { posters, loading, error } = usePosters();
   const [isHovered, setIsHovered] = useState(false);
   const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (!firestore) {
-      setError('Firestore is not available.');
-      setLoading(false);
-      return;
-    }
-
-    const fetchPosters = async () => {
-      try {
-        const postersQuery = query(
-          collection(firestore, 'posters'),
-          where('isActive', '==', true),
-          orderBy('createdAt', 'desc'),
-          limit(6)
-        );
-
-        const querySnapshot = await getDocs(postersQuery);
-        const fetchedPosters = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          const sizes = Array.isArray(data.sizes) ? data.sizes : [];
-          const lowestPrice = sizes.length > 0
-            ? Math.min(...sizes.map(s => s.finalPrice || s.price || 0))
-            : 0;
-
-          return {
-            id: doc.id,
-            title: data.title || 'Untitled',
-            image: data.imageUrl || 'https://via.placeholder.com/300',
-            sizes: sizes,
-            price: lowestPrice,
-            discount: data.discount || 0,
-            seller: data.seller || 'Unknown',
-          };
-        });
-
-        setPosters(fetchedPosters);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching posters:', err);
-        setError('Failed to load posters: ' + err.message);
-        setLoading(false);
-      }
-    };
-
-    fetchPosters();
-  }, [firestore]);
 
   const scroll = (direction) => {
     const container = scrollRef.current;

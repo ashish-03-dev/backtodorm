@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useFirebase } from '../../context/FirebaseContext';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -16,7 +16,6 @@ export default function CollectionDetail({ addToCart }) {
   const [sortOrder, setSortOrder] = useState('asc');
   const [hasMore, setHasMore] = useState(true);
   const [pageSize] = useState(8);
-  const observer = useRef(null);
 
   // Fetch collection and posters
   useEffect(() => {
@@ -98,24 +97,15 @@ export default function CollectionDetail({ addToCart }) {
     setHasMore(updatedPosters.length > pageSize);
   }, [sizeFilter, sortOrder, posters, pageSize]);
 
-  // Infinite scroll logic
-  const lastPosterElementRef = useCallback(
-    (node) => {
-      if (isLoading) return;
-      if (observer.current) observer.current.disconnect();
-      observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          setDisplayedPosters((prev) => {
-            const newCount = prev.length + pageSize;
-            return filteredPosters.slice(0, newCount);
-          });
-          setHasMore(filteredPosters.length > displayedPosters.length + pageSize);
-        }
-      });
-      if (node) observer.current.observe(node);
-    },
-    [isLoading, hasMore, filteredPosters, pageSize, displayedPosters.length]
-  );
+  // Load more posters
+  const handleLoadMore = () => {
+    if (!hasMore || isLoading) return;
+    setDisplayedPosters((prev) => {
+      const newCount = prev.length + pageSize;
+      return filteredPosters.slice(0, newCount);
+    });
+    setHasMore(filteredPosters.length > displayedPosters.length + pageSize);
+  };
 
   if (isLoading) {
     return (
@@ -176,54 +166,51 @@ export default function CollectionDetail({ addToCart }) {
         {displayedPosters.length === 0 ? (
           <p className="col-12">No posters found for selected filters.</p>
         ) : (
-          displayedPosters.map((poster, index) => {
-            const isLastRow = index >= displayedPosters.length - 4; // Assuming 4 posters per row on lg screens
-            return (
-              <div
-                key={poster.id}
-                ref={isLastRow && hasMore ? lastPosterElementRef : null}
-                className="col"
-              >
-                <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
-                  <div className="card h-100 shadow-sm border-0">
-                    <img
-                      src={poster.img}
-                      alt={poster.title}
-                      className="card-img-top"
-                      style={{ aspectRatio: '20/23', objectFit: 'cover' }}
-                    />
-                    <div className="card-body text-center">
-                      <h6 className="card-title fw-semibold text-truncate mb-2">{poster.title}</h6>
-                      <p className="card-text fw-semibold mb-0" style={{ fontSize: '16px' }}>
-                        {poster.discount > 0 ? (
-                          <>
-                            <span className="text-danger me-2">({poster.discount}% off)</span>
-                            <span className="text-decoration-line-through text-muted me-1">
-                              ₹{poster.price.toLocaleString('en-IN')}
-                            </span>
-                            <span className="text-success fw-semibold">
-                              ₹{poster.finalPrice.toLocaleString('en-IN')}
-                            </span>
-                          </>
-                        ) : (
-                          <>From ₹{poster.finalPrice.toLocaleString('en-IN')}</>
-                        )}
-                      </p>
-                    </div>
+          displayedPosters.map((poster) => (
+            <div key={poster.id} className="col">
+              <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
+                <div className="card h-100 shadow-sm border-0">
+                  <img
+                    src={poster.img}
+                    alt={poster.title}
+                    className="card-img-top"
+                    style={{ aspectRatio: '20/23', objectFit: 'cover' }}
+                  />
+                  <div className="card-body text-center">
+                    <h6 className="card-title fw-semibold text-truncate mb-2">{poster.title}</h6>
+                    <p className="card-text fw-semibold mb-0" style={{ fontSize: '16px' }}>
+                      {poster.discount > 0 ? (
+                        <>
+                          <span className="text-danger me-2">({poster.discount}% off)</span>
+                          <span className="text-decoration-line-through text-muted me-1">
+                            ₹{poster.price.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-success fw-semibold">
+                            ₹{poster.finalPrice.toLocaleString('en-IN')}
+                          </span>
+                        </>
+                      ) : (
+                        <>From ₹{poster.finalPrice.toLocaleString('en-IN')}</>
+                      )}
+                    </p>
                   </div>
-                </Link>
-              </div>
-            );
-          })
+                </div>
+              </Link>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Loading Indicator for Infinite Scroll */}
+      {/* Load More Button */}
       {hasMore && (
         <div className="text-center mt-4">
-          <div className="spinner-border" role="status">
-            <span className="visually-hidden">Loading more...</span>
-          </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleLoadMore}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Loading...' : 'Load More'}
+          </button>
         </div>
       )}
     </div>

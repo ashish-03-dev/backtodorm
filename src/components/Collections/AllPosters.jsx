@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext';
@@ -11,8 +11,6 @@ export default function AllPosters() {
   const [error, setError] = useState(null);
   const [lastDoc, setLastDoc] = useState(null);
   const [hasMore, setHasMore] = useState(true);
-  const observerRef = useRef(null);
-  const loadMoreRef = useRef(null);
 
   const POSTERS_PER_PAGE = 12;
 
@@ -81,29 +79,11 @@ export default function AllPosters() {
     fetchPosters();
   }, [firestore]);
 
-  useEffect(() => {
+  const handleLoadMore = () => {
     if (!hasMore || loading || loadingMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setLoadingMore(true);
-          fetchPosters(lastDoc);
-        }
-      },
-      { threshold: 0.1, rootMargin: '800px' }
-    );
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
-
-    return () => {
-      if (loadMoreRef.current) {
-        observer.unobserve(loadMoreRef.current);
-      }
-    };
-  }, [hasMore, loading, loadingMore, lastDoc]);
+    setLoadingMore(true);
+    fetchPosters(lastDoc);
+  };
 
   const SkeletonCard = () => (
     <div className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch">
@@ -217,7 +197,15 @@ export default function AllPosters() {
           </div>
         )}
         {hasMore && (
-          <div ref={loadMoreRef} className="h-1 mt-4" />
+          <div className="text-center mt-5">
+            <button
+              className="btn btn-primary"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading...' : 'Load More'}
+            </button>
+          </div>
         )}
         {!hasMore && posters.length > 0 && (
           <div className="text-center mt-5">

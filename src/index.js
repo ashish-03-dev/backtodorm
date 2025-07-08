@@ -9,6 +9,9 @@ import '@fontsource/questrial';
 import { FirebaseProvider } from './context/FirebaseContext';
 import { AddressProvider } from './context/AddressContext';
 import { SearchProvider } from './context/SearchContext';
+import { OptionalProvider } from './context/OptionalContext';
+import { NewArrivalsProvider } from './context/NewArrivalsContext';
+import { CollectionsProvider } from './context/CollectionsContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -16,7 +19,13 @@ root.render(
     <FirebaseProvider>
       <AddressProvider>
         <SearchProvider>
-          <App />
+          <OptionalProvider>
+            <NewArrivalsProvider>
+              <CollectionsProvider>
+                <App />
+              </CollectionsProvider>
+            </NewArrivalsProvider>
+          </OptionalProvider>
         </SearchProvider>
       </AddressProvider>
     </FirebaseProvider>

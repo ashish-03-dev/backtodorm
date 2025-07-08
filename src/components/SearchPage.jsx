@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useFirebase } from "../context/FirebaseContext";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
 import { Link } from "react-router-dom";
@@ -7,7 +7,6 @@ import { BsSearch } from 'react-icons/bs';
 
 export default function SearchPage() {
   const { firestore } = useFirebase();
-
   const { searchState, updateSearchState } = useSearch();
   const {
     queryString,
@@ -21,8 +20,6 @@ export default function SearchPage() {
     totalResults,
   } = searchState;
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [scrollKey, setScrollKey] = useState(0);
-
 
   const ITEMS_PER_PAGE = 12;
 
@@ -39,20 +36,18 @@ export default function SearchPage() {
   const fetchPosterIds = async (searchKey) => {
     const posterIds = new Set();
 
-    // 1. Try to fetch from 'collections' first
     try {
       const collectionDocSnap = await getDoc(doc(firestore, "collections", searchKey));
       if (collectionDocSnap.exists()) {
         const collectionData = collectionDocSnap.data();
         const posterIdsArray = collectionData.posterIds || [];
         posterIdsArray.forEach((id) => typeof id === "string" && posterIds.add(id));
-        return Array.from(posterIds); // Return early if found in collections
+        return Array.from(posterIds);
       }
     } catch (err) {
       console.error("Error fetching from collections:", err);
     }
 
-    // 2. If not found in collections, search in 'posters' by keyword
     try {
       const postersRef = collection(firestore, "posters");
       const keywordQuery = query(
@@ -179,50 +174,30 @@ export default function SearchPage() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-
     window.scrollTo({ top: 0 });
 
-    // Force scroll effect to rebind first
-    setScrollKey((prev) => prev + 1);
-
-    // Reset full search state
     updateSearchState({
       queryString: queryString.trim(),
       results: [],
       error: "",
       loading: false,
       allPosterIds: [],
-      page: 0, // reset page before fetch
+      page: 0,
       hasMore: true,
       hasSearched: false,
       totalResults: 0,
     });
 
-    // Wait a tick to allow scrollKey update to propagate
     setTimeout(() => {
       fetchPosters(false);
     }, 0);
   };
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (isFetchingMore || !hasMore || !hasSearched) return;
-
-      const posterItems = document.querySelectorAll(".row > div");
-      const lastItem = posterItems[posterItems.length - 1];
-      if (!lastItem) return;
-
-      const rect = lastItem.getBoundingClientRect();
-      const isVisible = rect.top <= window.innerHeight;
-
-      if (isVisible) {
-        fetchPosters(true);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [isFetchingMore, hasMore, hasSearched, results.length, scrollKey]);
+  const handleLoadMore = () => {
+    if (!isFetchingMore && hasMore && hasSearched) {
+      fetchPosters(true);
+    }
+  };
 
   return (
     <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
@@ -245,10 +220,9 @@ export default function SearchPage() {
                   hasMore: true,
                   totalResults: 0,
                 });
-                setIsFetchingMore(false); // Reset fetching state here too
+                setIsFetchingMore(false);
               }
             }}
-
             aria-label="Search posters"
           />
           <button type="submit" className="btn btn-primary" disabled={loading || isFetchingMore}>
@@ -315,6 +289,17 @@ export default function SearchPage() {
               </Link>
             </div>
           ))}
+        </div>
+      )}
+      {hasSearched && hasMore && !isFetchingMore && !loading && (
+        <div className="text-center my-4">
+          <button
+            className="btn btn-primary"
+            onClick={handleLoadMore}
+            disabled={isFetchingMore}
+          >
+            Load More
+          </button>
         </div>
       )}
       {isFetchingMore && (

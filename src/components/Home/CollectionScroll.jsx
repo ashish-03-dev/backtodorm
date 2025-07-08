@@ -1,59 +1,20 @@
-import React, { useRef, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { collection, getDocs, query, limit } from "firebase/firestore";
-import { useFirebase } from "../../context/FirebaseContext";
-import { BsChevronLeft, BsChevronRight } from "react-icons/bs";
+import { useRef, useState} from 'react';
+import { Link } from 'react-router-dom';
+import { useCollectionsContext } from '../../context/CollectionsContext';
+import { BsChevronLeft, BsChevronRight } from 'react-icons/bs';
 
 export default function HorizontalCollectionScroll() {
-  const { firestore } = useFirebase();
-  const [collections, setCollections] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { collections, loading, error } = useCollectionsContext();
   const scrollRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
-
-  const ensureString = (value) => (typeof value === "string" ? value : "");
-
-  useEffect(() => {
-    const fetchCollections = async () => {
-      if (!firestore) {
-        setError("Invalid Firestore instance");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const collectionsRef = collection(firestore, "standaloneCollections");
-        const q = query(collectionsRef, limit(8));
-        const snapshot = await getDocs(q);
-
-        const fetchedCollections = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          title: ensureString(doc.data().title),
-          description: ensureString(doc.data().description),
-          imageUrl: ensureString(doc.data().imageUrl),
-          discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 0,
-          posters: Array.isArray(doc.data().posters) ? doc.data().posters : [],
-        }));
-
-        setCollections(fetchedCollections);
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load collections: " + err.message);
-        setLoading(false);
-      }
-    };
-
-    fetchCollections();
-  }, [firestore]);
 
   const scroll = (direction) => {
     const container = scrollRef.current;
     if (container) {
       const scrollAmount = 320;
       container.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
       });
     }
   };
@@ -70,10 +31,10 @@ export default function HorizontalCollectionScroll() {
         ref={scrollRef}
         className="d-flex overflow-auto gap-4 pb-2"
         style={{
-          scrollSnapType: "x mandatory",
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
       >
         {loading ? (
@@ -85,17 +46,17 @@ export default function HorizontalCollectionScroll() {
             {isHovered && (
               <>
                 <button
-                  onClick={() => scroll("left")}
+                  onClick={() => scroll('left')}
                   className="btn btn-light rounded-circle position-absolute top-50 start-0 translate-middle-y d-none d-md-flex align-items-center justify-content-center shadow"
-                  style={{ width: "40px", height: "40px", zIndex: 10 }}
+                  style={{ width: '40px', height: '40px', zIndex: 10 }}
                   aria-label="Scroll left"
                 >
                   <BsChevronLeft className="fs-5" />
                 </button>
                 <button
-                  onClick={() => scroll("right")}
+                  onClick={() => scroll('right')}
                   className="btn btn-light rounded-circle position-absolute top-50 end-0 translate-middle-y d-none d-md-flex align-items-center justify-content-center shadow"
-                  style={{ width: "40px", height: "40px", zIndex: 10 }}
+                  style={{ width: '40px', height: '40px', zIndex: 10 }}
                   aria-label="Scroll right"
                 >
                   <BsChevronRight className="fs-5" />
@@ -107,7 +68,7 @@ export default function HorizontalCollectionScroll() {
                 to={`/collection/${col.id}`}
                 key={col.id}
                 className="text-decoration-none text-dark flex-shrink-0 collection-cards"
-                style={{ scrollSnapAlign: "start" }}
+                style={{ scrollSnapAlign: 'start' }}
               >
                 <div className="card border h-100">
                   <img
@@ -115,10 +76,10 @@ export default function HorizontalCollectionScroll() {
                     alt={col.title}
                     className="w-100"
                     style={{
-                      aspectRatio: "20/23",
-                      objectFit: "cover",
-                      borderTopLeftRadius: "0.5rem",
-                      borderTopRightRadius: "0.5rem",
+                      aspectRatio: '20/23',
+                      objectFit: 'cover',
+                      borderTopLeftRadius: '0.5rem',
+                      borderTopRightRadius: '0.5rem',
                     }}
                   />
                   <div className="card-body d-flex flex-column justify-content-between">

@@ -182,7 +182,7 @@ export default function SellYourPoster() {
           }, "image/jpeg", IMAGE_QUALITY);
         };
 
-        if (aspectDiff >= 0.02) {
+        if (aspectDiff >= 0.05) {
           // Force crop
           setOriginalImageSrc(imageDataUrl);
           setImageSrc(imageDataUrl);
