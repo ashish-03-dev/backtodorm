@@ -34,8 +34,6 @@ const PosterTable = ({
         <tr>
           <th>Image</th>
           <th>Title</th>
-          <th>Seller</th>
-          <th>Status</th>
           <th>Created At</th>
           <th>Actions</th>
         </tr>
@@ -59,8 +57,6 @@ const PosterTable = ({
               )}
             </td>
             <td>{poster.title || "Untitled"}</td>
-            <td>{poster.sellerUsername || "Unknown"}</td>
-            <td>{poster.approved || "Pending"}</td>
             <td>
               {poster.createdAt?.toDate
                 ? moment(poster.createdAt.toDate()).format("D MMM YYYY, h:mm A")
@@ -76,17 +72,7 @@ const PosterTable = ({
                 >
                   View
                 </Button>
-                {poster.approved !== "approved" && (
-                  <Button
-                    variant="success"
-                    size="sm"
-                    onClick={() => onEdit(poster)}
-                    title="Edit and Approve poster"
-                  >
-                    Approve
-                  </Button>
-                )}
-                {poster.approved === "approved" && poster.source === "posters" && (
+                {poster.source === "posters" && (
                   <Button
                     variant="outline-secondary"
                     size="sm"
@@ -96,7 +82,7 @@ const PosterTable = ({
                     Edit
                   </Button>
                 )}
-                {onReject && poster.approved !== "approved" && (
+                {onReject && poster.source == "tempPosters" && !poster.framedImageUrl && (
                   <Button
                     variant="danger"
                     size="sm"
@@ -106,7 +92,7 @@ const PosterTable = ({
                     Reject
                   </Button>
                 )}
-                {onSetFrame && poster.approved === "approved" && !poster.framedImageUrl && (
+                {onSetFrame && !poster.framedImageUrl && (
                   <Button
                     variant="outline-info"
                     size="sm"
@@ -116,7 +102,7 @@ const PosterTable = ({
                     Set Frame
                   </Button>
                 )}
-                {onUpload && poster.approved === "approved" && poster.framedImageUrl && (
+                {onUpload && poster.framedImageUrl && (
                   <Button
                     variant="outline-info"
                     size="sm"

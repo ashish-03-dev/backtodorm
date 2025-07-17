@@ -51,9 +51,6 @@ export default function AccountLayout() {
     { label: "Orders", path: "/account/orders" },
     { label: "Security", path: "/account/security" },
     { label: "Help Centre", path: "/account/help-centre" },
-    userData?.isSeller
-      ? { label: "Seller Dashboard", path: "/seller" }
-      : { label: "Become a Seller", path: "/account/become-seller" },
   ];
 
   return (

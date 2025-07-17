@@ -72,23 +72,6 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
                 <BsShieldLock className="me-2" /> Admin Dashboard
               </div>
             )}
-            {userData?.isSeller ? (
-              <div
-                className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
-                onClick={() => handleNavigation('/seller')}
-                style={{ cursor: 'pointer' }}
-              >
-                <BsShop className="me-2" /> Seller Dashboard
-              </div>
-            ) : (
-              <div
-                className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
-                onClick={() => handleNavigation('/account/become-seller')}
-                style={{ cursor: 'pointer' }}
-              >
-                <BsBriefcase className="me-2" /> Sell Your Design
-              </div>
-            )}
             <div
               className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
               onClick={() => handleNavigation('/account/help-centre')}

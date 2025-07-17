@@ -20,7 +20,6 @@ import ProfileInfo from './components/Account/ProfileInfo';
 import ProfileOrders from './components/Account/ProfileOrders';
 import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
-import BecomeSeller from './components/Account/BecomeSeller';
 import CollectionsPacks from "./pages/AAdmin/CollectionsPacks/CollectionsPacks";
 import CollectionsPacksPage from "./components/Collections/CollectionsPacksPage";
 import { CollectionDetailProvider } from "./context/CollectionDetailContext";
@@ -29,7 +28,6 @@ const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
 const Dashboard = lazy(() => import('./pages/AAdmin/Dashboard'));
 const Orders = lazy(() => import('./pages/AAdmin/Orders/index'));
 const SectionManager = lazy(() => import('./pages/AAdmin/HomeContentManager/SectionManager'));
-const Sellers = lazy(() => import('./pages/AAdmin/Sellers'));
 const Posters = lazy(() => import('./pages/AAdmin/Posters/Posters'));
 const PosterApprovals = lazy(() => import('./pages/AAdmin/PosterApprovals/PosterApprovals'));
 const FramesAdmin = lazy(() => import("./pages/AAdmin/Frames/FramesAdmin"));
@@ -37,12 +35,6 @@ const Users = lazy(() => import('./pages/AAdmin/Users'));
 const Settings = lazy(() => import('./pages/AAdmin/SiteSettings'));
 const AdminUsers = lazy(() => import('./pages/AAdmin/AdminUsers'));
 const Support = lazy(() => import('./pages/AAdmin/Support'));
-
-const SellerLayout = lazy(() => import('./components/Seller/SellerLayout'));
-const SellerDashboard = lazy(() => import('./components/Seller/SellerDashboard'));
-const MyProducts = lazy(() => import('./components/Seller/MyProducts'));
-const SellPoster = lazy(() => import('./components/Seller/SellPoster'));
-const Payouts = lazy(() => import('./components/Seller/Payouts'));
 
 function App() {
 
@@ -75,15 +67,7 @@ function App() {
             <Route path="orders" element={<ProfileOrders />} />
             <Route path="addresses" element={<ProfileAddresses />} />
             <Route path="security" element={<SecuritySettings />} />
-            <Route path="become-seller" element={<BecomeSeller />} />
             <Route path="help-centre" element={<HelpCentre />} />
-          </Route>
-          <Route path="seller" element={<ProtectedRoute><SellerLayout /></ProtectedRoute>}>
-            <Route index element={<SellerDashboard />} />
-            <Route path="dashboard" element={<SellerDashboard />} />
-            <Route path="products" element={<MyProducts />} />
-            <Route path="sell-poster" element={<SellPoster />} />
-            <Route path="payouts" element={<Payouts />} />
           </Route>
           <Route path="/search" element={<SearchPage />} />
         </Route>
@@ -93,7 +77,6 @@ function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="home-content" element={<SectionManager />} />
           <Route path="collections-packs" element={<CollectionsPacks />} />
-          <Route path="sellers" element={<Sellers />} />
           <Route path="posters" element={<Posters />} />
           <Route path="poster-approvals" element={<PosterApprovals />} />
           <Route path="frames" element={<FramesAdmin />} />

@@ -8,20 +8,16 @@ const Dashboard = () => {
     { label: "Total Orders", value: 0, icon: "bi-bag-fill", color: "primary" },
     { label: "Order Status", value: { pending: 0, sent: 0, delivered: 0 }, icon: "bi-hourglass-split", color: "warning" },
     { label: "Total Revenue", value: "₹0", icon: "bi-currency-rupee", color: "success" },
-    { label: "Active Sellers", value: 0, icon: "bi-person-badge", color: "info" },
     { label: "Total Posters", value: 0, icon: "bi-image", color: "secondary" },
     { label: "Support Tickets", value: { open: 0, resolved: 0 }, icon: "bi-life-preserver", color: "danger" },
   ]);
 
   const activityLogs = [
     "🛒 Order #2345 placed by @user123",
-    "🎨 New poster uploaded by @seller45",
     "📬 Support ticket #678 resolved",
-    "🙋‍♂️ New seller signup: @creative_store",
   ];
 
   const notifications = [
-    "🔔 New seller @dreamdesigns signed up",
     "🚨 Complaint received for Order #2299",
     "📢 Promo banner expiring tomorrow",
   ];
@@ -49,10 +45,6 @@ const Dashboard = () => {
             totalRevenue += order.totalPrice || 0;
           }
         });
-
-        // Fetch Sellers
-        const sellersSnapshot = await getDocs(collection(firestore, 'sellers'));
-        const totalSellers = sellersSnapshot.size;
 
         // Fetch Posters
         const postersSnapshot = await getDocs(collection(firestore, 'posters'));
@@ -85,7 +77,6 @@ const Dashboard = () => {
             icon: "bi-currency-rupee",
             color: "success"
           },
-          { label: "Active Sellers", value: totalSellers, icon: "bi-person-badge", color: "info" },
           { label: "Total Posters", value: totalPosters, icon: "bi-image", color: "secondary" },
           {
             label: "Support Tickets",

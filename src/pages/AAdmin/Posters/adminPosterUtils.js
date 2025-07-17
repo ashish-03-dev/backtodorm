@@ -2,7 +2,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
   deleteDoc,
   runTransaction,
   serverTimestamp,
@@ -34,11 +33,10 @@ export const submitPoster = async (
     if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0)
       throw new Error("At least one valid size is required");
     if (!posterId) throw new Error("Poster ID is required");
-    if (!posterData.sellerUsername) throw new Error("Seller username is required");
     if (!posterData.imageFile) throw new Error("An image is required for new posters");
 
     // Upload image
-    const storagePath = `posters/${posterData.sellerUsername}/${Date.now()}_${posterData.imageFile.name}`;
+    const storagePath = `posters/${Date.now()}_${posterData.imageFile.name}`;
     const imageRef = ref(storage, storagePath);
     await uploadBytes(imageRef, posterData.imageFile);
 
@@ -49,7 +47,6 @@ export const submitPoster = async (
       posterId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      approved: "pending",
       isActive: posterData.isActive !== false,
       originalImageUrl: imageRef.fullPath,
     };
@@ -59,10 +56,6 @@ export const submitPoster = async (
       const posterRef = doc(firestore, "tempPosters", posterId);
       const posterDoc = await transaction.get(posterRef);
       if (posterDoc.exists()) throw new Error("Poster ID already exists");
-
-      const sellerRef = doc(firestore, "sellers", posterData.sellerUsername);
-      const sellerDoc = await transaction.get(sellerRef);
-      if (!sellerDoc.exists()) throw new Error("Seller not found");
 
       const collections = posterData.collections || [];
       const collectionDocs = await Promise.all(
@@ -74,14 +67,6 @@ export const submitPoster = async (
       // Step 2: Perform all writes
       // Write poster to tempPosters
       transaction.set(posterRef, poster);
-
-      // Update seller document
-      const sellerData = sellerDoc.data();
-      const tempPosters = sellerData.tempPosters || [];
-      transaction.update(sellerRef, {
-        tempPosters: [...tempPosters, { id: posterId, status: "pending" }],
-        updatedAt: serverTimestamp(),
-      });
 
       // Update collections
       collections.forEach((col, index) => {
@@ -111,7 +96,6 @@ export const submitPoster = async (
   }
 };
 
-// Update an existing approved poster in posters collection
 export const updatePoster = async (
   firestore,
   posterData,
@@ -123,13 +107,11 @@ export const updatePoster = async (
     if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0)
       throw new Error("At least one valid size is required");
     if (!posterId) throw new Error("Poster ID is required for update");
-    if (!posterData.sellerUsername) throw new Error("Seller username is required");
 
     // Prepare poster data with keywords
     const poster = {
       ...posterData,
       updatedAt: serverTimestamp(),
-      approved: "approved",
     };
 
     const posterRef = doc(firestore, "posters", posterId);
@@ -203,89 +185,6 @@ export const updatePoster = async (
   }
 };
 
-export const approveTempPoster = async (firestore, storage, posterData, posterId) => {
-  try {
-    // Validate inputs
-    if (!posterData.title) throw new Error("Poster title is required");
-    if (!Array.isArray(posterData.sizes) || posterData.sizes.length === 0)
-      throw new Error("At least one valid size is required");
-    if (!posterId) throw new Error("Poster ID is required for update");
-    if (!posterData.sellerUsername) throw new Error("Seller username is required");
-
-    // Upload new image if provided
-    let imageUrl = posterData.originalImageUrl;
-    if (posterData.imageFile) {
-      const storagePath = `posters/${posterData.sellerUsername}/${Date.now()}_${posterData.imageFile.name}`;
-      const imageRef = ref(storage, storagePath);
-      await uploadBytes(imageRef, posterData.imageFile);
-      imageUrl = await getDownloadURL(imageRef);
-    }
-
-    // Prepare poster data with keywords
-    const poster = {
-      ...posterData,
-      updatedAt: serverTimestamp(),
-      approved: "approved",
-      originalImageUrl: imageUrl,
-    };
-
-    const posterRef = doc(firestore, "tempPosters", posterId);
-
-    await runTransaction(firestore, async (transaction) => {
-      const existingPoster = await transaction.get(posterRef);
-      if (!existingPoster.exists()) throw new Error("Poster not found");
-
-      const collectionsToAdd = posterData.collections || [];
-
-      // Pre-normalize collections once
-      const normalizedCollections = collectionsToAdd.map((name) => ({
-        id: normalizeCollection(name),
-      }));
-
-      // Read all collection docs (normalized IDs)
-      const collectionDocsToAdd = await Promise.all(
-        normalizedCollections.map(({ id }) =>
-          transaction.get(doc(firestore, "collections", id))
-        )
-      );
-
-      // Update the poster document
-      transaction.update(posterRef, poster);
-
-      // Loop through and update each collection
-      normalizedCollections.forEach(({ id }, index) => {
-        const colDoc = collectionDocsToAdd[index];
-
-        const colRef = doc(firestore, "collections", id);
-
-        if (!colDoc.exists()) {
-          // New collection
-          transaction.set(colRef, {
-            name: denormalizeCollectionName(id),
-            posterIds: [posterData.posterId],
-            createdAt: serverTimestamp(),
-          });
-        } else {
-          // Existing collection
-          const posterIds = colDoc.data().posterIds || [];
-          if (!posterIds.includes(posterData.posterId)) {
-            transaction.update(colRef, {
-              posterIds: [...posterIds, posterData.posterId],
-            });
-          }
-        }
-      });
-    });
-
-    return { success: true, id: posterId };
-  } catch (error) {
-    console.error("Error updating temp poster in admin panel:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-
-// Reject a poster and move to sellers.rejectedPosters
 export const rejectPoster = async (firestore, storage, posterId) => {
   try {
     // Fetch the poster document first
@@ -294,14 +193,8 @@ export const rejectPoster = async (firestore, storage, posterId) => {
     if (!posterDoc.exists()) throw new Error("Poster not found");
 
     const posterData = posterDoc.data();
-    const sellerUsername = posterData.sellerUsername;
     const imageUrl = posterData.originalImageUrl;
     const collections = posterData.collections || [];
-
-    // Fetch seller document outside transaction
-    const sellerRef = doc(firestore, "sellers", sellerUsername);
-    const sellerDoc = await getDoc(sellerRef);
-    if (!sellerDoc.exists()) throw new Error("Seller not found");
 
     // Fetch collection documents outside transaction
     const collectionDocs = await Promise.all(
@@ -312,28 +205,6 @@ export const rejectPoster = async (firestore, storage, posterId) => {
 
     // Run the transaction
     await runTransaction(firestore, async (transaction) => {
-      // Get seller data
-      const sellerData = sellerDoc.data();
-      const rejectedPosters = sellerData.rejectedPosters || [];
-      const tempPosters = sellerData.tempPosters || [];
-      const updatedTempPosters = tempPosters.filter((p) => p.id !== posterId);
-
-      // Update seller's rejectedPosters
-      transaction.update(sellerRef, {
-        tempPosters: updatedTempPosters,
-        rejectedPosters: [
-          ...rejectedPosters,
-          {
-            id: posterId,
-            title: posterData.title,
-            imageUrl: posterData.originalImageUrl,
-            rejectedAt: new Date(),
-          },
-        ],
-        updatedAt: serverTimestamp(),
-      });
-
-      // Update collections
       collections.forEach((col, index) => {
         const colDoc = collectionDocs[index];
         const colId = normalizeCollection(col);

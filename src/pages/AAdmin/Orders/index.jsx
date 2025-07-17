@@ -40,20 +40,27 @@ const Orders = () => {
       filtered = pendingOrders;
     } else {
       filtered = orders.filter((order) => {
-        const matchesTab = tab === 'unforwarded' ? !order.sentToSupplier : order.sentToSupplier;
-        return matchesTab; // Include both Completed and Failed orders
+        const matchesTab = tab == 'unforwarded' ? !order.sentToSupplier : order.sentToSupplier;
+        return matchesTab;
       });
     }
     return filtered.filter((order) => {
+      if (!order) return false; // Guard against undefined orders
+      const searchTerm = filter.search ? filter.search.toLowerCase() : '';
       return (
-        filter.search === '' ||
-        order.customerName.toLowerCase().includes(filter.search.toLowerCase()) ||
-        order.id.toLowerCase().includes(filter.search.toLowerCase()) ||
-        order.items.some(
-          (item) =>
-            (item.type === 'poster' && item.posterTitle.toLowerCase().includes(filter.search.toLowerCase())) ||
-            (item.type === 'collection' && item.collectionTitle.toLowerCase().includes(filter.search.toLowerCase()))
-        )
+        searchTerm === '' ||
+        (order.customerName && typeof order.customerName === 'string' && order.customerName.toLowerCase().includes(searchTerm)) ||
+        (order.id && typeof order.id === 'string' && order.id.toLowerCase().includes(searchTerm)) ||
+        (order.items &&
+          order.items.some((item) => {
+            if (item.type === 'poster' && item.posterTitle && typeof item.posterTitle === 'string') {
+              return item.posterTitle.toLowerCase().includes(searchTerm);
+            }
+            if (item.type === 'collection' && item.collectionTitle && typeof item.collectionTitle === 'string') {
+              return item.collectionTitle.toLowerCase().includes(searchTerm);
+            }
+            return false;
+          }))
       );
     });
   };
@@ -71,7 +78,7 @@ const Orders = () => {
         supplierInfo: {
           supplierName: supplierData.supplierName,
           items: supplierData.items.map((item) => ({
-            ...item, 
+            ...item,
           })),
           address: supplierData.address,
           supplierOrderId: supplierData.supplierOrderId,
@@ -154,24 +161,34 @@ const Orders = () => {
           const orderList = await Promise.all(
             snapshot.docs.map(async (orderDoc) => {
               const orderData = orderDoc.data();
+              if (!orderData || !orderData.customerId) {
+                console.warn(`Order ${orderDoc.id} has incomplete data`);
+                return null; // Skip incomplete orders
+              }
+
               const customerDoc = await getDoc(doc(firestore, 'users', orderData.customerId));
-              const customerName = customerDoc.exists() ? customerDoc.data().name || 'Unknown' : 'Unknown';
+              const customerName = customerDoc.exists() && customerDoc.data().name ? customerDoc.data().name : 'Unknown';
 
               const items = await Promise.all(
                 (orderData.items || []).map(async (item) => {
-                  if (item.type === 'poster') {
+                  if (!item || !item.type) {
+                    console.warn(`Item in order ${orderDoc.id} is incomplete`);
+                    return { ...item, posterTitle: 'Unknown', collectionTitle: 'Unknown' };
+                  }
+                  if (item.type === 'poster' && item.posterId) {
                     const posterDoc = await getDoc(doc(firestore, 'posters', item.posterId));
                     return {
                       ...item,
-                      posterTitle: posterDoc.exists() ? posterDoc.data().title : 'Unknown Poster',
+                      posterTitle: posterDoc.exists() && posterDoc.data().title ? posterDoc.data().title : 'Unknown Poster',
                     };
-                  } else {
+                  } else if (item.type === 'collection' && item.collectionId) {
                     const collectionDoc = await getDoc(doc(firestore, 'standaloneCollections', item.collectionId));
                     return {
                       ...item,
-                      collectionTitle: collectionDoc.exists() ? collectionDoc.data().title : 'Unknown Collection',
+                      collectionTitle: collectionDoc.exists() && collectionDoc.data().title ? collectionDoc.data().title : 'Unknown Collection',
                     };
                   }
+                  return { ...item, posterTitle: 'Unknown', collectionTitle: 'Unknown' };
                 })
               );
 
@@ -179,18 +196,20 @@ const Orders = () => {
                 id: orderDoc.id,
                 ...orderData,
                 customerName,
-                items,
+                items: items.filter(item => item !== null), // Remove null items
               };
             })
           );
-          setOrders(orderList);
+          setOrders(orderList.filter(order => order !== null)); // Remove null orders
           setLoading(false);
         } catch (err) {
+          console.error('Error fetching orders:', err);
           setError(`Failed to fetch orders: ${err.message}`);
           setLoading(false);
         }
       },
       (err) => {
+        console.error('Snapshot error for orders:', err);
         setError(`Failed to fetch orders: ${err.message}`);
         setLoading(false);
       }
@@ -208,24 +227,34 @@ const Orders = () => {
           const pendingOrderList = await Promise.all(
             snapshot.docs.map(async (orderDoc) => {
               const orderData = orderDoc.data();
+              if (!orderData || !orderData.userId) {
+                console.warn(`Pending order ${orderDoc.id} has incomplete data`);
+                return null; // Skip incomplete orders
+              }
+
               const customerDoc = await getDoc(doc(firestore, 'users', orderData.userId));
-              const customerName = customerDoc.exists() ? customerDoc.data().name || 'Unknown' : 'Unknown';
+              const customerName = customerDoc.exists() && customerDoc.data().name ? customerDoc.data().name : 'Unknown';
 
               const items = await Promise.all(
                 (orderData.items || []).map(async (item) => {
-                  if (item.type === 'poster') {
+                  if (!item || !item.type) {
+                    console.warn(`Item in pending order ${orderDoc.id} is incomplete`);
+                    return { ...item, posterTitle: 'Unknown', collectionTitle: 'Unknown' };
+                  }
+                  if (item.type === 'poster' && item.posterId) {
                     const posterDoc = await getDoc(doc(firestore, 'posters', item.posterId));
                     return {
                       ...item,
-                      posterTitle: posterDoc.exists() ? posterDoc.data().title : 'Unknown Poster',
+                      posterTitle: posterDoc.exists() && posterDoc.data().title ? posterDoc.data().title : 'Unknown Poster',
                     };
-                  } else {
+                  } else if (item.type === 'collection' && item.collectionId) {
                     const collectionDoc = await getDoc(doc(firestore, 'standaloneCollections', item.collectionId));
                     return {
                       ...item,
-                      collectionTitle: collectionDoc.exists() ? collectionDoc.data().title : 'Unknown Collection',
+                      collectionTitle: collectionDoc.exists() && collectionDoc.data().title ? collectionDoc.data().title : 'Unknown Collection',
                     };
                   }
+                  return { ...item, posterTitle: 'Unknown', collectionTitle: 'Unknown' };
                 })
               );
 
@@ -233,26 +262,28 @@ const Orders = () => {
                 id: orderDoc.id,
                 customerId: orderData.userId,
                 customerName,
-                items,
-                subtotal: orderData.subtotal,
-                deliveryCharge: orderData.deliveryCharge,
-                totalPrice: orderData.total,
-                orderDate: orderData.createdAt,
-                paymentStatus: orderData.paymentStatus,
-                shippingAddress: orderData.shippingAddress,
-                razorpay_order_id: orderData.orderId,
+                items: items.filter(item => item !== null),
+                subtotal: orderData.subtotal || 0,
+                deliveryCharge: orderData.deliveryCharge || 0,
+                totalPrice: orderData.total || 0,
+                orderDate: orderData.createdAt || null,
+                paymentStatus: orderData.paymentStatus || 'Pending',
+                shippingAddress: orderData.shippingAddress || {},
+                razorpay_order_id: orderData.orderId || null,
                 razorpay_payment_id: orderData.razorpay_payment_id || null,
               };
             })
           );
-          setPendingOrders(pendingOrderList);
+          setPendingOrders(pendingOrderList.filter(order => order !== null));
           setLoading(false);
         } catch (err) {
+          console.error('Error fetching pending orders:', err);
           setError(`Failed to fetch pending orders: ${err.message}`);
           setLoading(false);
         }
       },
       (err) => {
+        console.error('Snapshot error for pending orders:', err);
         setError(`Failed to fetch pending orders: ${err.message}`);
         setLoading(false);
       }

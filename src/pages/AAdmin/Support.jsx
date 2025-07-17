@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Modal, Button, Form, Badge, Table, Spinner, Alert } from "react-bootstrap";
 import { useFirebase } from "../../context/FirebaseContext";
 import { collection, query, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import moment from 'moment';
 
 export default function AdminSupport() {
   const { firestore, userData, error: firebaseError } = useFirebase();
@@ -222,7 +223,9 @@ export default function AdminSupport() {
                 <td>{ticket.userName}</td>
                 <td>{ticket.subject}</td>
                 <td>{ticket.orderId || "N/A"}</td>
-                <td>{new Date(ticket.createdAt).toLocaleDateString('en-IN')}</td>
+                <td>{ticket.createdAt?.toDate
+                ? moment(ticket.createdAt.toDate()).format("D MMM YYYY, h:mm A")
+                : "N/A"}</td>
                 <td>
                   <Form.Select
                     size="sm"

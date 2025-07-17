@@ -7,7 +7,7 @@ import PosterView from "../Posters/PosterView";
 import PosterFrameForm from "../PosterApprovals/PosterFrameForm";
 import { useFirebase } from "../../../context/FirebaseContext";
 import { collection, onSnapshot } from "firebase/firestore";
-import { submitPoster, approveTempPoster, rejectPoster } from "../Posters/adminPosterUtils";
+import { submitPoster, rejectPoster } from "../Posters/adminPosterUtils";
 import { ref, getDownloadURL } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -111,25 +111,6 @@ const PosterApprovals = () => {
     }
   };
 
-  const approveTempPosterHandler = async (data, posterId) => {
-    if (!data || !editing) {
-      setError("No poster selected for update.");
-      return;
-    }
-    try {
-      const result = await approveTempPoster(firestore, storage, data, posterId, user);
-      if (result.success) {
-        setShowEditModal(false);
-        setEditing(null);
-      } else {
-        setError("Failed to approve poster: " + result.error);
-      }
-    } catch (error) {
-      console.error("Error approving temp poster:", error);
-      setError("Failed to approve temp poster: " + error.message);
-    }
-  };
-
   const rejectPosterHandler = async (posterId) => {
     try {
       const result = await rejectPoster(firestore, storage, posterId);
@@ -229,7 +210,6 @@ const PosterApprovals = () => {
           <PosterForm
             poster={editing}
             onSubmit={submitPosterHandler}
-            onApproveTempPoster={approveTempPosterHandler}
           />
         </Modal.Body>
       </Modal>

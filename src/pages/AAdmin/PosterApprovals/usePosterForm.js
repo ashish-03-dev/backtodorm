@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { doc, getDoc, collection, getDocs, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { ref, getDownloadURL } from "firebase/storage";
 import { centerCrop, makeAspectCrop } from "react-image-crop";
 import { useFirebase } from "../../../context/FirebaseContext";
@@ -12,14 +12,13 @@ const POSTER_SIZES = {
   "A4 x 5": { name: "A4 x 5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
 };
 
-
 const normalizeCollection = (text) => {
   if (!text) return "";
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 };
 
-export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempPoster }) => {
-  const { firestore, storage, auth } = useFirebase();
+export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
+  const { firestore, storage } = useFirebase();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [idError, setIdError] = useState(null);
@@ -28,10 +27,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
   const [availableCollections, setAvailableCollections] = useState([]);
   const [tags, setTags] = useState(poster?.tags?.join(", ") || "");
   const [selectedCollections, setSelectedCollections] = useState([]);
-  const [sellerUsername, setSellerUsername] = useState(poster?.sellerUsername || "");
-  const [sellerName, setSellerName] = useState("");
-  const [isSellerValid, setIsSellerValid] = useState(!!poster?.sellerUsername);
-  const [sellerChecked, setSellerChecked] = useState(!!poster?.sellerUsername);
   const [keywords, setKeywords] = useState(poster?.keywords?.join(", ") || "");
   const [sizes, setSizes] = useState(() => {
     const validSizes = Array.isArray(poster?.sizes) && poster.sizes.length > 0
@@ -60,6 +55,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
   const [cropping, setCropping] = useState(false);
   const [discount, setDiscount] = useState(poster?.discount?.toString() || "0");
   const [imageDownloadUrl, setImageDownloadUrl] = useState(null);
+  const [showOptionalCropNotice, setShowOptionalCropNotice] = useState(false);
   const formRef = useRef(null);
   const imgRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -84,7 +80,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     }
   }, [poster, storage]);
 
-  // Fetch collections and seller info
   useEffect(() => {
     const fetchCollections = async () => {
       try {
@@ -98,47 +93,20 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
         if (poster?.collections) {
           const selected = poster.collections.map((id) => ({
             value: id,
-            label: id, // You can customize label here if needed
+            label: id,
           }));
           setSelectedCollections(selected);
         }
-
       } catch (error) {
         console.error("Error fetching collections:", error);
         setCollectionError("Failed to load collections.");
       }
     };
 
-    const fetchSellerInfo = async () => {
-      if (sellerUsername) {
-        try {
-          const userDoc = await getDoc(doc(firestore, "sellers", sellerUsername));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setSellerName(data.sellerName || "Unknown User");
-            setIsSellerValid(true);
-            setSellerChecked(true);
-          } else {
-            setSellerName("User not found");
-            setIsSellerValid(false);
-            setSellerChecked(true);
-          }
-        } catch (error) {
-          console.error("Error fetching seller info:", error);
-          setSellerName("Error fetching user");
-          setIsSellerValid(false);
-          setSellerChecked(true);
-        }
-      } else {
-        setSellerChecked(false);
-      }
-    };
-
     if (firestore) {
       fetchCollections();
-      fetchSellerInfo();
     }
-  }, [firestore, sellerUsername, poster]);
+  }, [firestore, poster]);
 
   // Validate selected size
   useEffect(() => {
@@ -197,74 +165,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     checkIdUniqueness(generatedId);
   };
 
-  const checkSellerUsername = async () => {
-    const inputSellerUsername = formRef.current?.seller?.value?.trim();
-    if (!inputSellerUsername) {
-      setError("Please enter a Seller Username to check.");
-      setIsSellerValid(false);
-      setSellerChecked(false);
-      return;
-    }
-    try {
-      const sellerDoc = await getDoc(doc(firestore, "sellers", inputSellerUsername));
-      if (sellerDoc.exists()) {
-        const data = sellerDoc.data();
-        setSellerUsername(inputSellerUsername);
-        setSellerName(data.sellerName || "Unknown User");
-        setIsSellerValid(true);
-        setSellerChecked(true);
-      } else {
-        setSellerName("Seller not found");
-        setIsSellerValid(false);
-        setSellerChecked(true);
-      }
-    } catch (error) {
-      console.error("Error checking seller username:", error);
-      setSellerName("Error checking seller username");
-      setIsSellerValid(false);
-      setSellerChecked(true);
-    }
-  };
-
-  const insertUserId = async () => {
-    if (!auth) {
-      setError("Authentication is not initialized. Please check Firebase setup.");
-      return;
-    }
-    const user = auth.currentUser;
-    if (user) {
-      try {
-        const userDoc = await getDoc(doc(firestore, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (data.isSeller && data.sellerUsername) {
-            setSellerUsername(data.sellerUsername);
-            setSellerName(data.name || "Unknown User");
-            setIsSellerValid(true);
-            setSellerChecked(true);
-          } else {
-            setError("You are not registered as a seller. Please become a seller first.");
-            setIsSellerValid(false);
-            setSellerChecked(true);
-          }
-        } else {
-          setError("User data not found.");
-          setIsSellerValid(false);
-          setSellerChecked(true);
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        setError("Failed to fetch user data: " + error.message);
-        setIsSellerValid(false);
-        setSellerChecked(true);
-      }
-    } else {
-      setError("No user is currently signed in.");
-      setIsSellerValid(false);
-      setSellerChecked(true);
-    }
-  };
-
   // Keyword generation
   const generateKeywords = () => {
     const form = formRef.current;
@@ -277,16 +177,15 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     const normalizeText = (text, isTag = false, isTitle = false) => {
       if (!text) return [];
       if (isTag) {
-        // For tags, replace whitespace with hyphens, preserve existing hyphens
-        return [text
-          .toLowerCase()
-          .trim()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "")
+        return [
+          text
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/[^a-z0-9-]/g, ""),
         ].filter((word) => word.length > 2);
       }
       if (isTitle) {
-        // For title, split on whitespace only, preserve hyphens
         return text
           .toLowerCase()
           .trim()
@@ -294,7 +193,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
           .map((word) => word.replace(/[^a-z0-9-]/g, ""))
           .filter((word) => word.length > 2);
       }
-      // For description and collections, split on whitespace or hyphens
       return text
         .toLowerCase()
         .trim()
@@ -304,7 +202,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     };
 
     const words = [
-      ...normalizeText(title, false, true), // Preserve hyphens in title
+      ...normalizeText(title, false, true),
       ...normalizeText(description),
       ...tagArray.flatMap((tag) => normalizeText(tag, true)),
       ...collections.flatMap(normalizeText),
@@ -322,25 +220,20 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     const updatedSizes = [...sizes];
     updatedSizes[index] = { ...updatedSizes[index], [field]: value };
 
-    // If user enters an unsupported size
     if (field === "size" && !POSTER_SIZES[value]) {
       updatedSizes[index].size = "A4";
     }
 
-    // Calculate final price with correct precision
     if (field === "price" && value) {
       const price = parseFloat(value) || 0;
       const disc = parseFloat(discount) || 0;
       const discountedPrice = price - (price * disc) / 100;
-
-      // Correct floating-point issues
       const rounded = Math.round(discountedPrice * 100) / 100;
       updatedSizes[index].finalPrice = rounded.toFixed(2);
     }
 
     setSizes(updatedSizes);
 
-    // Reset image/crop if size is updated and valid
     if (field === "size" && POSTER_SIZES[value]) {
       setSelectedSize(value);
       setCroppedPreview(null);
@@ -350,17 +243,17 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       setRotation(0);
       setRecommendedSize(null);
       setOriginalImageSize({ width: 0, height: 0 });
+      setShowOptionalCropNotice(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
-
 
   const addSize = () => {
     if (sizes.length === 0 || sizes.every((s) => s.size && s.price && POSTER_SIZES[s.size])) {
       setSizes([...sizes, { size: "A4", price: "", finalPrice: "" }]);
       setSelectedSize("A4");
     } else {
-      setError("Pleasefills in the current size and price before adding a new one.");
+      setError("Please fill in the current size and price before adding a new one.");
     }
   };
 
@@ -389,6 +282,9 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       img.onload = () => {
         setOriginalImageSize({ width: img.width, height: img.height });
         const { widthPx, heightPx, aspectRatio } = POSTER_SIZES[selectedSize];
+        const actualAspect = img.width / img.height;
+        const aspectDiff = Math.abs(actualAspect - aspectRatio);
+
         const bestSize = Object.keys(POSTER_SIZES).reduce((best, size) => {
           const { widthPx: w, heightPx: h } = POSTER_SIZES[size];
           if (img.width >= w && img.height >= h && (!best || w * h > POSTER_SIZES[best].widthPx * POSTER_SIZES[best].heightPx)) {
@@ -405,7 +301,8 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
         }
 
         const imageDataUrl = event.target.result;
-        if (Math.abs(img.width / img.height - aspectRatio) > 0.05) {
+        if (aspectDiff >= 0.05) {
+          // Force crop
           setOriginalImageSrc(imageDataUrl);
           setImageSrc(imageDataUrl);
           setShowCropModal(true);
@@ -417,7 +314,9 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
               img.height
             )
           );
+          setShowOptionalCropNotice(false);
         } else {
+          // Allow auto-scaling + optional cropping
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           canvas.width = widthPx;
@@ -433,6 +332,17 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
                 fileList.items.add(scaledFile);
                 formRef.current.imageFile.files = fileList.files;
                 setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+                setOriginalImageSrc(imageDataUrl);
+                setImageSrc(imageDataUrl);
+                setShowOptionalCropNotice(true);
+                setRotation(0);
+                setCrop(
+                  centerCrop(
+                    makeAspectCrop({ unit: "%", width: 80, aspect: aspectRatio }, aspectRatio, img.width, img.height),
+                    img.width,
+                    img.height
+                  )
+                );
               }
             },
             "image/jpeg",
@@ -456,6 +366,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     setRotation(0);
     setRecommendedSize(null);
     setOriginalImageSize({ width: 0, height: 0 });
+    setShowOptionalCropNotice(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -467,17 +378,13 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       const newRotation = (rotation + 90) % 360;
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-
       canvas.width = newRotation % 180 === 0 ? img.width : img.height;
       canvas.height = newRotation % 180 === 0 ? img.height : img.width;
-
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate((newRotation * Math.PI) / 180);
       ctx.drawImage(img, -img.width / 2, -img.height / 2);
-
       setImageSrc(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
       setCrop(
         centerCrop(
@@ -510,7 +417,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       const ctx = canvas.getContext("2d");
       canvas.width = widthPx;
       canvas.height = heightPx;
-
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       const cropX = (crop.x / 100) * imgRef.current.naturalWidth;
@@ -518,7 +424,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       const cropWidth = (crop.width / 100) * imgRef.current.naturalWidth;
       const cropHeight = (crop.height / 100) * imgRef.current.naturalHeight;
       ctx.drawImage(imgRef.current, cropX, cropY, cropWidth, cropHeight, 0, 0, widthPx, heightPx);
-
       await new Promise((resolve, reject) => {
         canvas.toBlob(
           (blob) => {
@@ -531,18 +436,19 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
             fileList.items.add(croppedFile);
             formRef.current.imageFile.files = fileList.files;
             setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+            setOriginalImageSize({ width: Math.round(cropWidth), height: Math.round(cropHeight) });
             resolve();
           },
           "image/jpeg",
           IMAGE_QUALITY
         );
       });
-
       setShowCropModal(false);
       setImageSrc(null);
       setOriginalImageSrc(null);
       setCrop(null);
       setRotation(0);
+      setShowOptionalCropNotice(false);
     } catch (err) {
       setError("Failed to process crop: " + err.message);
     } finally {
@@ -554,6 +460,7 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
     if (recommendedSize && sizes.length === 1) {
       handleSizeChange(0, "size", recommendedSize);
       setRecommendedSize(null);
+      setShowOptionalCropNotice(false);
     }
   };
 
@@ -575,10 +482,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
   const validateForm = (posterId, form) => {
     if (!posterId || !idChecked || idError) {
       setError("Please provide a unique Poster ID and check its availability.");
-      return false;
-    }
-    if (!isSellerValid || !sellerUsername || !sellerChecked) {
-      setError("Please provide and verify a valid Seller Username.");
       return false;
     }
     if (sizes.some((s) => !s.size || !s.price || isNaN(s.price) || parseFloat(s.price) <= 0 || !POSTER_SIZES[s.size])) {
@@ -610,16 +513,14 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
         price: parseFloat(s.price),
         finalPrice: parseFloat(s.finalPrice) || parseFloat(s.price),
       })),
-      approved: poster?.source === "posters" ? "approved" : "pending",
       isActive: form.isActive.checked,
-      sellerUsername,
       createdAt: poster?.createdAt || serverTimestamp(),
       updatedAt: new Date().toISOString(),
       posterId: form.posterId.value,
     };
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, { onProgress, onSuccess }) => {
     e.preventDefault();
     setUploading(true);
     const form = e.target;
@@ -634,38 +535,13 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
 
     try {
       if (!poster) {
-        // New poster submission
-        await onSubmit(data, posterId);
+        await onSubmit(data, posterId, { onProgress });
       } else if (poster.source === "posters") {
-        // Update approved poster
-        await onUpdatePoster(data, posterId);
-      } else if (poster.source === "tempPosters") {
-        // Update temp poster
-        await onApproveTempPoster(data, posterId);
+        await onUpdatePoster(data, posterId, { onProgress });
       }
+      onSuccess();
     } catch (err) {
       setError(`Failed to submit poster: ${err.message}`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleApprove = async (e) => {
-    e.preventDefault();
-    setUploading(true);
-    const form = formRef.current;
-    const posterId = poster?.id;
-    if (!validateForm(posterId, form)) {
-      setUploading(false);
-      return;
-    }
-
-    const data = preparePosterData(form, posterId);
-
-    try {
-      await onApproveTempPoster(data, posterId);
-    } catch (err) {
-      setError(`Failed to approve poster: ${err.message}`);
     } finally {
       setUploading(false);
     }
@@ -681,10 +557,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       availableCollections,
       tags,
       selectedCollections,
-      sellerUsername,
-      sellerName,
-      isSellerValid,
-      sellerChecked,
       keywords,
       sizes,
       selectedSize,
@@ -699,13 +571,13 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       cropping,
       discount,
       imageDownloadUrl,
+      showOptionalCropNotice,
     },
     refs: { formRef, imgRef, fileInputRef },
     handlers: {
       setError,
       setTags,
       setSelectedCollections,
-      setSellerUsername,
       setKeywords,
       setSizes,
       setSelectedSize,
@@ -721,8 +593,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       setDiscount,
       checkIdUniqueness,
       suggestId,
-      checkSellerUsername,
-      insertUserId,
       generateKeywords,
       handleSizeChange,
       addSize,
@@ -734,10 +604,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster, onApproveTempP
       handleSwitchSize,
       handleDiscountChange,
       handleSubmit,
-      handleApprove,
-      setSellerChecked,
-      setIsSellerValid,
-      setSellerName,
     },
   };
 };

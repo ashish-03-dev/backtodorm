@@ -243,25 +243,6 @@ export default function MobileSidebar({ show, onClose }) {
                 <span>Admin Dashboard</span>
               </Link>
             )}
-            {userData?.isSeller ? (
-              <Link
-                to="/seller"
-                onClick={onClose}
-                className="d-flex align-items-center text-decoration-none text-dark py-3"
-              >
-                <BsShop className="me-3" />
-                <span>Seller Dashboard</span>
-              </Link>
-            ) : (
-              <Link
-                to="/account/become-seller"
-                onClick={onClose}
-                className="d-flex align-items-center text-decoration-none text-dark py-3"
-              >
-                <BsBriefcase className="me-3" />
-                <span>Sell Your Design</span>
-              </Link>
-            )}
           </li>
         </ul>
       </div>

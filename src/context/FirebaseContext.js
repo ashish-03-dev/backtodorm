@@ -11,8 +11,8 @@ import {
   PhoneAuthProvider,
   linkWithCredential,
 } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc} from 'firebase/firestore';
-import { getDatabase, set, ref } from 'firebase/database';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../firebase';
@@ -37,6 +37,8 @@ export const FirebaseProvider = ({ children }) => {
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [error, setError] = useState(null);
 
+
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setLoadingUserData(true);
@@ -51,17 +53,21 @@ export const FirebaseProvider = ({ children }) => {
       try {
         setUser(currentUser);
 
-        const nameToUse = currentUser.displayName || '';
-        await httpsCallable(functions, 'updateUser')({ name: nameToUse });
-
         const userRef = doc(firestore, 'users', currentUser.uid);
         const snapshot = await getDoc(userRef);
 
         if (!snapshot.exists()) {
-          throw new Error("User document not found even after updateUser");
-        }
+          const updateUser = httpsCallable(functions, 'updateUser');
+          await updateUser({});
 
-        setUserData(snapshot.data());
+          const newSnapshot = await getDoc(userRef);
+          if (!newSnapshot.exists()) {
+            throw new Error("User document still not found after updateUser");
+          }
+          setUserData(newSnapshot.data());
+        } else {
+          setUserData(snapshot.data());
+        }
       } catch (err) {
         setError(`Authentication error: ${err.message}`);
         console.error("Auth state change error:", err);

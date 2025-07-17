@@ -132,11 +132,9 @@ exports.updateUser = onCall(
           phone: auth.token.phone_number || null,
           photoURL: auth.token.picture || '',
           createdAt: docData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
-          isSeller: docData.isSeller ?? false,
           isActive: docData.isActive ?? true,
         };
 
-        // Conditionally include `isAdmin` only if it already exists
         if ('isAdmin' in docData) {
           userData.isAdmin = docData.isAdmin;
         }
@@ -147,34 +145,6 @@ exports.updateUser = onCall(
     } catch (error) {
       console.error('Failed to update user document:', error);
       throw new HttpsError('internal', 'Failed to update user document');
-    }
-  }
-);
-
-exports.setAdminStatus = onCall(
-  {
-    region: 'us-central1',
-    timeoutSeconds: 60,
-  },
-  async ({ data: { userId, isAdmin, isSeller }, auth }) => {
-    if (!auth || !auth.token.isAdmin) {
-      throw new HttpsError('permission-denied', 'Admin access required.');
-    }
-
-    if (!userId || typeof isAdmin !== 'boolean' || typeof isSeller !== 'boolean') {
-      throw new HttpsError('invalid-argument', 'Invalid userId, isAdmin, or isSeller value.');
-    }
-
-    try {
-      await admin.firestore().doc(`users/${userId}`).set(
-        { isAdmin, isSeller },
-        { merge: true }
-      );
-      return { success: true };
-
-    } catch (error) {
-      console.error('Set admin/seller status failed:', error);
-      throw new HttpsError('internal', 'Failed to set admin/seller status.');
     }
   }
 );
@@ -267,16 +237,13 @@ exports.approvePoster = onCall(
     }
 
     await db.runTransaction(async (t) => {
-      const sellerRef = db.collection("sellers").doc(posterData.sellerUsername);
       const collectionRefs = (posterData.collections || []).map((col) =>
         db.collection("standaloneCollections").doc(col)
       );
 
-      const [seller, ...collections] = await Promise.all([
-        t.get(sellerRef),
-        ...collectionRefs.map((ref) => t.get(ref)),
-      ]);
+      const collections = await Promise.all(collectionRefs.map((ref) => t.get(ref)));
 
+      // Add to posters collection
       t.set(db.collection("posters").doc(posterData.posterId), {
         ...posterData,
         imageUrl: framedCloudinaryUrl,
@@ -287,13 +254,16 @@ exports.approvePoster = onCall(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // Add to originalPoster collection
       t.set(db.collection("originalPoster").doc(posterData.posterId), {
         imageUrl: originalCloudinaryUrl,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // Remove temp poster
       t.delete(tempPosterRef);
 
+      // Update collections
       collections.forEach((col, i) => {
         if (col.exists && !col.data().posterIds?.includes(posterData.posterId)) {
           t.update(collectionRefs[i], {
@@ -301,28 +271,6 @@ exports.approvePoster = onCall(
           });
         }
       });
-
-      if (seller.exists) {
-        const sellerData = seller.data();
-        const updatedTempPosters = (sellerData.tempPosters || []).filter(
-          (entry) => entry.id !== posterId
-        );
-        t.update(sellerRef, {
-          tempPosters: updatedTempPosters,
-          approvedPosters: admin.firestore.FieldValue.arrayUnion(posterData.posterId),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      } else {
-        t.set(sellerRef, {
-          sellerUsername: posterData.sellerUsername,
-          uid: auth.uid,
-          tempPosters: [],
-          approvedPosters: [posterId],
-          rejectedPosters: [],
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
     });
 
     try {
@@ -388,29 +336,17 @@ exports.deletePoster = onCall(
 
     // Firestore transaction to delete from collections
     await db.runTransaction(async (t) => {
-      const sellerRef = db.collection("sellers").doc(posterData.sellerUsername);
       const collectionRefs = (posterData.collections || []).map((col) =>
         db.collection("standaloneCollections").doc(col)
       );
 
-      const [seller, ...collections] = await Promise.all([
-        t.get(sellerRef),
-        ...collectionRefs.map((ref) => t.get(ref)),
-      ]);
+      const collections = await Promise.all(collectionRefs.map((ref) => t.get(ref)));
 
       // Delete from posters and originalPoster collections
       t.delete(posterRef);
       t.delete(originalPosterRef);
 
-      // Remove from seller's approvedPosters
-      if (seller.exists) {
-        t.update(sellerRef, {
-          approvedPosters: admin.firestore.FieldValue.arrayRemove(posterId),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-
-      // Remove from collections
+      // Remove posterId from collections
       collections.forEach((col, i) => {
         if (col.exists && col.data().posterIds?.includes(posterId)) {
           t.update(collectionRefs[i], {
@@ -985,66 +921,6 @@ exports.razorpayWebhook = onRequest(
     } catch (error) {
       console.error("Webhook processing error:", error);
       return res.status(500).json({ error: "Failed to process webhook" });
-    }
-  }
-);
-
-exports.becomeSeller = onCall(
-  {
-    region: "us-central1",
-    timeoutSeconds: 60,
-    concurrency: 80,
-  },
-  async ({ data: { sellerUsername }, auth }) => {
-    if (!auth) throw new HttpsError("unauthenticated", "User not signed in");
-    const uid = auth.uid;
-
-    const userRef = db.doc(`users/${uid}`);
-    const sellerRef = db.doc(`sellers/${sellerUsername}`);
-
-    const usernameSnapshot = await db
-      .collection("sellers")
-      .where("sellerUsername", "==", sellerUsername)
-      .get();
-    if (!usernameSnapshot.empty) {
-      throw new HttpsError("already-exists", "Username is already taken");
-    }
-
-    try {
-      await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) {
-          throw new HttpsError("not-found", "User document does not exist");
-        }
-
-        const userData = userDoc.data();
-        const sellerName = userData.name && typeof userData.name === 'string' && userData.name.trim()
-          ? userData.name.trim()
-          : sellerUsername;
-
-        const userUpdatedData = {
-          isSeller: true,
-          sellerUsername,
-          sellerCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-
-        const sellerData = {
-          uid,
-          sellerUsername,
-          sellerName,
-          createdAt: new Date().toISOString(),
-          approvedPosters: [],
-          rejectedPosters: [],
-          tempPosters: [],
-        };
-
-        transaction.set(userRef, userUpdatedData, { merge: true });
-        transaction.set(sellerRef, sellerData);
-      });
-
-      return { success: true, sellerUsername };
-    } catch (error) {
-      throw new HttpsError("internal", error.message || "Failed to create seller account");
     }
   }
 );

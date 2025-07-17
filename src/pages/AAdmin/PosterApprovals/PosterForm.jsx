@@ -1,19 +1,18 @@
-import React from "react";
-import { Form, Button, Modal, Alert, Spinner } from "react-bootstrap";
-import Select from "react-select";
+import React, { useState, useEffect } from "react";
+import { Form, Button, Modal, Alert, Spinner, ProgressBar } from "react-bootstrap";
 import ReactCrop from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
-import { usePosterForm } from "../Posters/usePosterForm";
+import { usePosterForm } from "./usePosterForm";
 import CreatableSelect from "react-select/creatable";
 
 const POSTER_SIZES = {
   A4: { name: "A4", widthPx: 2480, heightPx: 3508, widthCm: 21, heightCm: 29.7, aspectRatio: 2480 / 3508 },
   A3: { name: "A3", widthPx: 3508, heightPx: 4961, widthCm: 29.7, heightCm: 42, aspectRatio: 3508 / 4961 },
-  "A3*3": { name: "A3*3", widthPx: 3508 * 3, heightPx: 4961, widthCm: 29.7 * 3, heightCm: 42, aspectRatio: (3508 * 3) / 4961 },
-  "A4*5": { name: "A4*5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
+  "A3 x 3": { name: "A3 x 3", widthPx: 3508 * 3, heightPx: 4961, widthCm: 29.7 * 3, heightCm: 42, aspectRatio: (3508 * 3) / 4961 },
+  "A4 x 5": { name: "A4 x 5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
 };
 
-const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster }) => {
+const PosterForm = ({ poster, onSubmit, onUpdatePoster}) => {
   const {
     state: {
       uploading,
@@ -24,15 +23,12 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       availableCollections,
       tags,
       selectedCollections,
-      sellerUsername,
-      sellerName,
-      isSellerValid,
-      sellerChecked,
       keywords,
       sizes,
       selectedSize,
       crop,
       imageSrc,
+      originalImageSrc,
       showCropModal,
       rotation,
       croppedPreview,
@@ -47,18 +43,21 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       setError,
       setTags,
       setSelectedCollections,
-      setSellerUsername,
       setKeywords,
       setSizes,
       setSelectedSize,
       setCrop,
       setImageSrc,
+      setOriginalImageSrc,
       setShowCropModal,
+      setRotation,
+      setCroppedPreview,
+      setOriginalImageSize,
+      setRecommendedSize,
+      setCropping,
       setDiscount,
       checkIdUniqueness,
       suggestId,
-      checkSellerUsername,
-      insertUserId,
       generateKeywords,
       handleSizeChange,
       addSize,
@@ -69,13 +68,21 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
       handleCropComplete,
       handleSwitchSize,
       handleDiscountChange,
-      handleSubmit,
-      handleApprove,
-      setSellerChecked,
-      setIsSellerValid,
-      setSellerName,
+      handleSubmit: originalHandleSubmit,
     },
-  } = usePosterForm({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTempPoster });
+  } = usePosterForm({ poster, onSubmit, onUpdatePoster });
+
+  const [success, setSuccess] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [showOptionalCropNotice, setShowOptionalCropNotice] = useState(false);
+
+  // Clear success message after 5 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   const getImageName = (url) => {
     if (!url) return "No image";
@@ -84,9 +91,40 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
     return isCloudinary ? `Cloudinary image: ${path}` : `Firestore image: ${path}`;
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setProgress(0);
+
+    if (!formRef.current?.title?.value.trim()) {
+      setError("Title is required.");
+      return;
+    }
+
+    if (!croppedPreview && !imageDownloadUrl) {
+      setError("Image is required.");
+      return;
+    }
+    if (!(selectedSize in POSTER_SIZES)) {
+      setError("Please select a valid size.");
+      return;
+    }
+
+    try {
+      await originalHandleSubmit(e, {
+        onProgress: (progressPercent) => setProgress(progressPercent),
+        onSuccess: () => setSuccess("Poster submitted successfully! It will be reviewed soon."),
+      });
+    } catch (err) {
+      setError("Failed to save poster: " + err.message);
+    }
+  };
+
   return (
     <div>
       {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
+      {success && <Alert variant="success" onClose={() => setSuccess("")} dismissible>{success}</Alert>}
       <Form onSubmit={handleSubmit} ref={formRef}>
         <Form.Group className="mb-3">
           <Form.Label>Poster ID</Form.Label>
@@ -219,7 +257,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                 style={{ width: "120px" }}
                 disabled={uploading}
               />
-
               <Form.Control
                 type="text"
                 placeholder="Final Price"
@@ -314,64 +351,36 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
           {recommendedSize && (
             <div className="mt-2">
               <p>
-                Image resolution is too low for {selectedSize}. Would you like to switch to {recommendedSize} (
-                {POSTER_SIZES[recommendedSize].widthPx}x{POSTER_SIZES[recommendedSize].heightPx}px)?
+                Image resolution is too low for {selectedSize} (
+                {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px). Recommended size: {recommendedSize} (
+                {POSTER_SIZES[recommendedSize].widthPx}x{POSTER_SIZES[recommendedSize].heightPx}px).
               </p>
               <Button variant="outline-primary" size="sm" onClick={handleSwitchSize}>
                 Switch to {recommendedSize}
               </Button>
             </div>
           )}
+          {showOptionalCropNotice && (
+            <Button
+              size="sm"
+              className="mt-3"
+              variant="outline-secondary"
+              onClick={() => {
+                setShowCropModal(true);
+                setShowOptionalCropNotice(false);
+              }}
+            >
+              Crop Anyway
+            </Button>
+          )}
           {croppedPreview && selectedSize && POSTER_SIZES[selectedSize] && (
             <div className="mt-3">
               <p>
-                Original image size: {originalImageSize.width}x{originalImageSize.height}px<br />
-                Preview (image will be saved at {selectedSize} resolution: {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px):
+                Source resolution: {originalImageSize.width}x{originalImageSize.height}px<br />
+                Expected resolution ({selectedSize}): {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px
               </p>
               <img src={croppedPreview} alt="Preview" style={{ maxWidth: "200px" }} />
             </div>
-          )}
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Seller Username</Form.Label>
-          <div className="input-group">
-            <Form.Control
-              name="seller"
-              value={sellerUsername}
-              onChange={(e) => {
-                setSellerUsername(e.target.value);
-                setSellerChecked(false);
-                setIsSellerValid(false);
-                setSellerName("");
-              }}
-              placeholder="Enter Seller Username"
-              required
-              isInvalid={sellerChecked && !isSellerValid}
-              isValid={sellerChecked && isSellerValid}
-              aria-describedby="sellerUsernameFeedback"
-              disabled={uploading}
-            />
-            <Button
-              variant="outline-secondary"
-              onClick={checkSellerUsername}
-              aria-label="Check Seller Username"
-              disabled={uploading}
-            >
-              Check
-            </Button>
-            <Button
-              variant="outline-secondary"
-              onClick={insertUserId}
-              aria-label="Use Current User ID"
-              disabled={uploading}
-            >
-              Use My ID
-            </Button>
-          </div>
-          {sellerChecked && (
-            <Form.Text className={isSellerValid ? "text-muted" : "text-danger"} id="sellerUsernameFeedback">
-              {isSellerValid ? `Seller: ${sellerName}` : sellerName}
-            </Form.Text>
           )}
         </Form.Group>
         <Form.Group className="mb-3">
@@ -387,19 +396,9 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             <Button
               type="submit"
               variant="primary"
-              disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
+              disabled={uploading || !idChecked || !!idError}
             >
               {uploading ? "Uploading..." : poster ? "Update Poster" : "Submit Poster"}
-            </Button>
-          )}
-          {!poster || poster.source === "tempPosters" && poster?.approved !== "approved" && (
-            <Button
-              type="button"
-              variant="success"
-              onClick={handleApprove}
-              disabled={uploading || !idChecked || !!idError || !sellerChecked || !isSellerValid}
-            >
-              Approve
             </Button>
           )}
           <Button
@@ -411,6 +410,9 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
             Cancel
           </Button>
         </div>
+        {progress > 0 && progress < 100 && (
+          <ProgressBar now={progress} label={`${Math.round(progress)}%`} className="mt-3" animated />
+        )}
       </Form>
 
       <Modal
@@ -418,6 +420,7 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
         onHide={() => {
           setShowCropModal(false);
           handleClearImage();
+          setShowOptionalCropNotice(false);
         }}
       >
         <Modal.Header closeButton>
@@ -441,6 +444,11 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
                   crossOrigin="anonymous"
                 />
               </ReactCrop>
+              <p className="mt-2">
+                Crop resolution: {Math.round((crop?.width / 100) * originalImageSize.width || 0)}x
+                {Math.round((crop?.height / 100) * originalImageSize.height || 0)}px<br />
+                Expected resolution ({selectedSize}): {POSTER_SIZES[selectedSize].widthPx}x{POSTER_SIZES[selectedSize].heightPx}px
+              </p>
               <div className="d-flex flex-column align-items-center gap-2 mt-3">
                 {cropping ? (
                   <div className="d-flex flex-column align-items-center">
@@ -474,7 +482,6 @@ const PosterForm = ({ poster, onSubmit, onApprove, onUpdatePoster, onApproveTemp
           )}
         </Modal.Body>
       </Modal>
-
     </div>
   );
 };

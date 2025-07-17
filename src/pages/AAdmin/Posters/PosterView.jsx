@@ -1,31 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, ListGroup, Image } from "react-bootstrap";
-import { useFirebase } from "../../../context/FirebaseContext";
-import { doc, getDoc } from "firebase/firestore";
 
 const PosterView = ({ poster }) => {
-  const { firestore } = useFirebase();
-  const [sellerName, setSellerName] = useState("Loading...");
   const [imageError, setImageError] = useState(false);
-
-  useEffect(() => {
-    const fetchSellerName = async () => {
-      if (poster?.sellerUsername) {
-        try {
-          const userDoc = await getDoc(doc(firestore, "users", poster.sellerUsername));
-          if (userDoc.exists()) {
-            setSellerName(userDoc.data().name || poster.sellerUsername || "Unknown User");
-          } else {
-            setSellerName("Unknown User");
-          }
-        } catch (error) {
-          console.error("Error fetching seller name:", error);
-          setSellerName("Error");
-        }
-      }
-    };
-    fetchSellerName();
-  }, [firestore, poster]);
 
   const imageSource = poster?.imageUrl || poster?.originalImageUrl || "";
   const placeholderImage = "https://via.placeholder.com/300x300?text=Image+not+found";
@@ -90,9 +67,6 @@ const PosterView = ({ poster }) => {
               <ListGroup.Item>
                 <strong>Keywords:</strong>{" "}
                 {poster.keywords?.length > 0 ? poster.keywords.join(", ") : "No items"}
-              </ListGroup.Item>
-              <ListGroup.Item>
-                <strong>Seller:</strong> ({poster.sellerUsername})
               </ListGroup.Item>
               <ListGroup.Item>
                 {/* {poster?.status && ( */}
