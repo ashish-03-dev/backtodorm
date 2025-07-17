@@ -6,119 +6,7 @@ import { useAddress } from '../context/AddressContext';
 import { httpsCallable } from 'firebase/functions';
 import { Form, Button, Alert, ListGroup, Card, Modal, Spinner } from 'react-bootstrap';
 import { BsTruck, BsTrash } from 'react-icons/bs';
-
-const AddressForm = ({ setShowForm, getAddressList, addAddress, setFormData, setSelectedAddressId, setShowOverlay }) => {
-  const [newAddress, setNewAddress] = useState({
-    title: '', name: '', phone: '', address: '', locality: '', city: '', state: '', pincode: '', landmark: '',
-  });
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!newAddress.name || !newAddress.phone || !newAddress.address || !newAddress.city || !newAddress.state || !newAddress.pincode) {
-      setError('Please fill in all required fields.');
-      return;
-    }
-    try {
-      await addAddress(newAddress);
-      const updatedList = await getAddressList();
-      const newAddr = updatedList[0] || newAddress;
-      setFormData(newAddr);
-      setSelectedAddressId(newAddr.id);
-      setShowForm(false);
-      setShowOverlay(false);
-      setError('');
-    } catch (err) {
-      setError(`Failed to add address: ${err.message}`);
-    }
-  };
-
-  return (
-    <Card>
-      <Card.Body className="p-4">
-        <h5 className="mb-4">Add Address</h5>
-        {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
-        <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="Full Name *"
-              value={newAddress.name}
-              onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="tel"
-              placeholder="Phone Number *"
-              value={newAddress.phone}
-              onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              as="textarea"
-              rows={2}
-              placeholder="Address Line *"
-              value={newAddress.address}
-              onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="Locality"
-              value={newAddress.locality}
-              onChange={(e) => setNewAddress({ ...newAddress, locality: e.target.value })}
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="City *"
-              value={newAddress.city}
-              onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="State *"
-              value={newAddress.state}
-              onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="Pincode *"
-              value={newAddress.pincode}
-              onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Control
-              type="text"
-              placeholder="Landmark (Optional)"
-              value={newAddress.landmark}
-              onChange={(e) => setNewAddress({ ...newAddress, landmark: e.target.value })}
-            />
-          </Form.Group>
-          <Form.Group className='mt-4'>
-            <Button type="submit" variant="primary" size="sm" className="me-2">Save</Button>
-            <Button variant="outline-secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
-          </Form.Group>
-        </Form>
-      </Card.Body>
-    </Card>
-  );
-};
+import AddressForm from './Account/AddressForm'; // Adjust the path as needed
 
 const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowForm }) => {
   return (
@@ -234,7 +122,7 @@ const Checkout = () => {
     setSelectedAddressId(id);
     const selected = addresses.find(addr => addr.id === id);
     if (selected) setFormData(selected);
-    else setFormData({ title: '', name: userData?.name || '', phone: userData?.phone || '', address: '', locality: '', city: '', state: '', pincode: '', landmark: ''});
+    else setFormData({ title: '', name: userData?.name || '', phone: userData?.phone || '', address: '', locality: '', city: '', state: '', pincode: '', landmark: '' });
     setShowPayment(false);
   };
 
@@ -583,15 +471,23 @@ const Checkout = () => {
             setShowForm={() => { setShowForm(true); setShowOverlay(false); }}
           />
           {showForm && (
-            <Modal show={showForm} onHide={() => setShowForm(false)} centered>
+            <Modal size="lg" show={showForm} onHide={() => setShowForm(false)} centered>
               <Modal.Body className="p-0">
                 <AddressForm
-                  setShowForm={setShowForm}
-                  getAddressList={getAddressList}
+                  fetchAddresses={getAddressList}
                   addAddress={addAddress}
-                  setFormData={setFormData}
-                  setSelectedAddressId={setSelectedAddressId}
-                  setShowOverlay={setShowOverlay}
+                  setShowForm={setShowForm}
+                  initialData={null} // or pass a specific address if editing
+                  isEditMode={false}
+                  onSubmit={(newAddress) => {
+                    setFormData(newAddress);
+                    setSelectedAddressId(newAddress.id);
+                    setShowOverlay(false);
+                  }}
+                  onCancel={() => {
+                    setShowForm(false);
+                    setShowOverlay(false);
+                  }}
                 />
               </Modal.Body>
             </Modal>

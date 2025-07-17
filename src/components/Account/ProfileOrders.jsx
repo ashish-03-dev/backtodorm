@@ -11,92 +11,89 @@ export default function ProfileOrders() {
   const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
-    if (!firestore) {
+    if (!firestore || !user?.uid) {
       setError('User or Firestore not available.');
       setLoading(false);
       return;
     }
 
-    const fetchOrders = async (snapshot, fromTemporary = false) => {
-      const fetchedOrders = await Promise.all(
-        snapshot.docs.map(async (orderDoc) => {
-          const orderData = orderDoc.data();
-          const orderId = orderData.orderId;
-          const orderRef = fromTemporary
-            ? doc(firestore, 'temporaryOrders', orderId)
-            : doc(firestore, 'orders', orderId);
-          const orderSnap = await getDoc(orderRef);
-          if (!orderSnap.exists()) return null;
+    const parseItem = async (item) => {
+      const isPoster = item.type === 'poster';
+      const ref = isPoster
+        ? doc(firestore, 'posters', item.posterId)
+        : doc(firestore, 'standaloneCollections', item.collectionId);
+      const snap = await getDoc(ref);
 
-          const fullOrderData = orderSnap.data();
+      if (isPoster) {
+        return {
+          type: 'poster',
+          name: item.title || (snap.exists() ? snap.data().title : 'Unknown Poster'),
+          quantity: item.quantity || 1,
+          size: item.size || 'N/A',
+          price: item.finalPrice || item.price || 0,
+        };
+      }
 
-          const items = await Promise.all(
-            (fullOrderData.items || []).map(async (item) => {
-              const ref = item.type === 'poster'
-                ? doc(firestore, 'posters', item.posterId)
-                : doc(firestore, 'standaloneCollections', item.collectionId);
-              const snap = await getDoc(ref);
-
-              return item.type === 'poster'
-                ? {
-                  type: 'poster',
-                  name: item.title || (snap.exists() ? snap.data().title : 'Unknown Poster'),
-                  quantity: item.quantity || 1,
-                  size: item.size || 'N/A',
-                  price: item.finalPrice || item.price || 0,
-                }
-                : {
-                  type: 'collection',
-                  name: snap.exists() ? snap.data().title : 'Unknown Collection',
-                  quantity: item.quantity || 1,
-                  collectionDiscount: item.collectionDiscount || 0,
-                  posters: (item.posters || []).map((poster) => ({
-                    name: poster.title || 'Unknown Poster',
-                    size: poster.size || 'N/A',
-                    price: poster.finalPrice || poster.price || 0,
-                  })),
-                };
-            })
-          );
-
-          return {
-            id: orderId,
-            date: new Date(fullOrderData.orderDate || orderData.createdAt?.toDate() || Date.now()).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            }),
-            items: items.filter(Boolean),
-            total: `₹${(fullOrderData.total || fullOrderData.totalPrice || 0).toLocaleString('en-IN')}`,
-            status: fromTemporary ? 'Pending Payment' : fullOrderData.status || 'Pending',
-            shippingAddress: fullOrderData.shippingAddress || null,
-            paymentStatus: fromTemporary
-              ? 'Pending'
-              : fullOrderData.paymentStatus || orderData.paymentStatus || 'Pending',
-            paymentMethod: fullOrderData.paymentMethod || (fromTemporary ? 'Razorpay' : 'N/A'),
-          };
-        })
-      );
-
-      console.log(`${fromTemporary ? '[TEMP]' : '[CONFIRMED]'} Fetched Orders:`, fetchedOrders.filter(Boolean));
-      return fetchedOrders.filter(Boolean);
+      return {
+        type: 'collection',
+        name: snap.exists() ? snap.data().title : 'Unknown Collection',
+        quantity: item.quantity || 1,
+        collectionDiscount: item.collectionDiscount || 0,
+        posters: (item.posters || []).map((poster) => ({
+          name: poster.title || 'Unknown Poster',
+          size: poster.size || 'N/A',
+          price: poster.finalPrice || poster.price || 0,
+        })),
+      };
     };
 
+    const fetchOrders = async (snapshot, isTemporary) => {
+      const orders = await Promise.all(snapshot.docs.map(async (orderDoc) => {
+        const orderData = orderDoc.data();
+        const orderId = orderData.orderId;
 
-    const ordersQuery = query(collection(firestore, `userOrders/${user.uid}/orders`));
-    const tempOrdersQuery = query(collection(firestore, 'temporaryOrders'), where('userId', '==', user.uid));
+        const orderRef = doc(firestore, isTemporary ? 'temporaryOrders' : 'orders', orderId);
+        const orderSnap = await getDoc(orderRef);
+        if (!orderSnap.exists()) return null;
 
-    const unsubscribeConfirmed = onSnapshot(ordersQuery, async (confirmedSnap) => {
+        const fullOrder = orderSnap.data();
+        const items = await Promise.all((fullOrder.items || []).map(parseItem));
+        const rawDate = fullOrder.orderDate || orderData.createdAt || null;
+
+        return {
+          id: orderId,
+          orderDate: rawDate,
+          items,
+          total: `₹${(fullOrder.total || fullOrder.totalPrice || 0).toLocaleString('en-IN')}`,
+          status: isTemporary ? 'Pending Payment' : fullOrder.status || 'Pending',
+          shippingAddress: fullOrder.shippingAddress || null,
+          paymentStatus: isTemporary
+            ? 'Pending'
+            : fullOrder.paymentStatus || orderData.paymentStatus || 'Pending',
+          paymentMethod: fullOrder.paymentMethod || (isTemporary ? 'Razorpay' : 'N/A'),
+        };
+      }));
+
+      return orders.filter(Boolean);
+    };
+
+    const confirmedOrdersRef = query(collection(firestore, `userOrders/${user.uid}/orders`));
+    const temporaryOrdersRef = query(collection(firestore, 'temporaryOrders'), where('userId', '==', user.uid));
+
+    const unsubscribeConfirmed = onSnapshot(confirmedOrdersRef, async (confirmedSnap) => {
       try {
-        const confirmedOrders = await fetchOrders(confirmedSnap, false);
+        const confirmed = await fetchOrders(confirmedSnap, false);
 
-        const unsubscribeTemp = onSnapshot(tempOrdersQuery, async (tempSnap) => {
+        const unsubscribeTemp = onSnapshot(temporaryOrdersRef, async (tempSnap) => {
           try {
-            const pendingOrders = await fetchOrders(tempSnap, true);
-            setOrders([...confirmedOrders, ...pendingOrders].sort((a, b) => new Date(b.date) - new Date(a.date)));
-            setLoading(false);
+            const pending = await fetchOrders(tempSnap, true);
+            const combined = [...confirmed, ...pending].sort((a, b) => {
+              return new Date(b.orderDate?.toDate?.() || b.orderDate) - new Date(a.orderDate?.toDate?.() || a.orderDate);
+            });
+            setOrders(combined);
           } catch (err) {
             setError(`Failed to load temporary orders: ${err.message}`);
+          } finally {
             setLoading(false);
           }
         });
@@ -110,7 +107,6 @@ export default function ProfileOrders() {
 
     return () => unsubscribeConfirmed();
   }, []);
-
 
   const renderOrders = (orderList) => (
     <div className="d-flex flex-column gap-4">
@@ -140,7 +136,16 @@ export default function ProfileOrders() {
             <div className="card-body p-4">
               <div className="row mb-3">
                 <div className="col text-muted fs-6">
-                  <i className="bi bi-calendar me-2"></i>Placed on {order.date}
+                  <i className="bi bi-calendar me-2"></i>
+                  Placed on{' '}
+                  {order.orderDate?.toDate().toLocaleString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })}
                 </div>
               </div>
               {order.isPending && (

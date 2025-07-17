@@ -116,6 +116,17 @@ const OrderTable = ({
                   >
                     View
                   </Button>
+                  {!isPendingTab && order.paymentStatus === 'Completed' && !order.verified && (
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => handleVerifyPricing(order.id)}
+                      disabled={submitting}
+                    >
+                      Verify Pricing
+                    </Button>
+                  )}
+
                   {isPendingTab ? (
                     <Button variant="secondary" size="sm" disabled>
                       Awaiting Payment
@@ -134,7 +145,7 @@ const OrderTable = ({
                         Edit Status
                       </Button>
                     </>
-                  ) : (
+                  ) : order.verified ? ( // Only show if order is verified
                     <Button
                       variant="outline-success"
                       size="sm"
@@ -162,17 +173,7 @@ const OrderTable = ({
                     >
                       Send to Supplier
                     </Button>
-                  )}
-                  {!isPendingTab && order.paymentStatus === 'Completed' && !order.verified && (
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => handleVerifyPricing(order.id)}
-                      disabled={submitting}
-                    >
-                      Verify Pricing
-                    </Button>
-                  )}
+                  ) : null}
                 </div>
               </td>
             </tr>
