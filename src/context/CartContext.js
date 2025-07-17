@@ -107,12 +107,6 @@ export const CartProvider = ({ children }) => {
   }, [user, firestore]);
 
   const addToCart = async (item, isCollection = false, collectionId = null, collectionDiscount = 0) => {
-    console.log('addToCart called with:', {
-      itemType: item.type,
-      id: isCollection ? item.collectionId : item.posterId,
-      discount: isCollection ? item.posters.map(p => p.discount) : item.discount,
-      finish: isCollection ? item.finish : item.finish,
-    });
 
     if (isCollection) {
       if (!item.collectionId || !item.finish || !Array.isArray(item.posters) || item.posters.length === 0) {

@@ -11,7 +11,7 @@ import {
   PhoneAuthProvider,
   linkWithCredential,
 } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc} from 'firebase/firestore';
 import { getDatabase, set, ref } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -40,29 +40,31 @@ export const FirebaseProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setLoadingUserData(true);
+
+      if (!currentUser) {
+        setUser(null);
+        setUserData(null);
+        setLoadingUserData(false);
+        return;
+      }
+
       try {
-        if (currentUser) {
-          setUser(currentUser);
-          const userRef = doc(firestore, 'users', currentUser.uid);
-          const snapshot = await getDoc(userRef);
-          if (snapshot.exists()) {
-            setUserData(snapshot.data());
-          } else {
-            const nameToUse = currentUser.displayName || '';
-            console.log(currentUser);
-            await httpsCallable(functions, 'updateUser')({ name: nameToUse });
-            const newSnapshot = await getDoc(userRef);
-            if (newSnapshot.exists()) {
-              setUserData(newSnapshot.data());
-            }
-          }
-        } else {
-          setUser(null);
-          setUserData(null);
+        setUser(currentUser);
+
+        const nameToUse = currentUser.displayName || '';
+        await httpsCallable(functions, 'updateUser')({ name: nameToUse });
+
+        const userRef = doc(firestore, 'users', currentUser.uid);
+        const snapshot = await getDoc(userRef);
+
+        if (!snapshot.exists()) {
+          throw new Error("User document not found even after updateUser");
         }
+
+        setUserData(snapshot.data());
       } catch (err) {
         setError(`Authentication error: ${err.message}`);
-        console.error('Auth state change error:', err);
+        console.error("Auth state change error:", err);
       } finally {
         setLoadingUserData(false);
       }

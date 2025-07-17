@@ -123,17 +123,23 @@ exports.updateUser = onCall(
     try {
       await db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
+        const docData = userDoc.exists ? userDoc.data() : {};
+
         const userData = {
           uid: userId,
-          name: name ? name.trim() : (userDoc.exists ? userDoc.data().name : auth.token.name || ''),
+          name: name ? name.trim() : docData.name || auth.token.name || '',
           email: auth.token.email || null,
           phone: auth.token.phone_number || null,
           photoURL: auth.token.picture || '',
-          createdAt: userDoc.exists ? userDoc.data().createdAt : admin.firestore.FieldValue.serverTimestamp(),
-          isSeller: userDoc.exists ? userDoc.data().isSeller : false,
-          isAdmin: userDoc.exists ? userDoc.data().isAdmin : false,
-          isActive: userDoc.exists ? userDoc.data().isActive : true,
+          createdAt: docData.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+          isSeller: docData.isSeller ?? false,
+          isActive: docData.isActive ?? true,
         };
+
+        // Conditionally include `isAdmin` only if it already exists
+        if ('isAdmin' in docData) {
+          userData.isAdmin = docData.isAdmin;
+        }
 
         transaction.set(userRef, userData, { merge: true });
       });

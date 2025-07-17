@@ -108,16 +108,6 @@ export default function ProductDetail() {
       image: poster.image,
     };
 
-    console.log("Adding to cart:", {
-      posterId: cartItem.posterId,
-      title: cartItem.title,
-      size: cartItem.size,
-      finish: cartItem.finish,
-      price: cartItem.price,
-      finalPrice: cartItem.finalPrice,
-      discount: cartItem.discount,
-    });
-
     try {
       addToCart(cartItem);
       setError(null);

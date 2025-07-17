@@ -42,7 +42,6 @@ export default function MobileSidebar({ show, onClose }) {
   const [openCategory, setOpenCategory] = useState(null);
   const [menus, setMenus] = useState({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const toggleCategory = (index) => {
     setOpenCategory(openCategory === index ? null : index);
@@ -89,21 +88,7 @@ export default function MobileSidebar({ show, onClose }) {
       }
     };
 
-    const fetchUserData = async () => {
-      if (user && firestore) {
-        try {
-          const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-          if (userDoc.exists()) {
-            setIsAdmin(userDoc.data().isAdmin || false);
-          }
-        } catch (err) {
-          console.error('Failed to fetch user data:', err);
-        }
-      }
-    };
-
     fetchMenus();
-    fetchUserData();
   }, [firestore, user]);
 
   if (isLoading) {
@@ -248,7 +233,7 @@ export default function MobileSidebar({ show, onClose }) {
               <BsQuestionCircle className="me-3" />
               <span>Help Centre</span>
             </Link>
-            {isAdmin && (
+            {userData?.isAdmin && (
               <Link
                 to="/admin"
                 onClick={onClose}

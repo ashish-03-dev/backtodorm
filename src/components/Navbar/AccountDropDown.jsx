@@ -5,27 +5,9 @@ import { doc, getDoc } from 'firebase/firestore';
 import { BsPerson, BsBoxArrowInRight, BsPersonCircle, BsBoxSeam, BsShieldLock, BsShop, BsBriefcase, BsQuestionCircle, BsBoxArrowRight } from 'react-icons/bs';
 
 export default function AccountDropdown({ isLoggedIn, logout }) {
-  const { user, firestore, userData } = useFirebase();
+  const { userData } = useFirebase();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (user && firestore) {
-        try {
-          const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-          if (userDoc.exists()) {
-            setIsAdmin(userDoc.data().isAdmin || false);
-          }
-        } catch (err) {
-          console.error('Failed to fetch user data:', err);
-        }
-      }
-    };
-
-    fetchUserData();
-  }, [user, firestore]);
 
   const toggleDropdown = () => {
     setShowDropdown((prev) => !prev);
@@ -81,7 +63,7 @@ export default function AccountDropdown({ isLoggedIn, logout }) {
             >
               <BsBoxSeam className="me-2" /> Orders
             </div>
-            {isAdmin && (
+            {userData?.isAdmin && (
               <div
                 className="dropdown-item py-2 text-dark text-decoration-none d-flex align-items-center"
                 onClick={() => handleNavigation('/admin')}
