@@ -23,7 +23,7 @@ import SecuritySettings from './components/Account/SecuritySettings';
 import BecomeSeller from './components/Account/BecomeSeller';
 import CollectionsPacks from "./pages/AAdmin/CollectionsPacks/CollectionsPacks";
 import CollectionsPacksPage from "./components/Collections/CollectionsPacksPage";
-
+import { CollectionDetailProvider } from "./context/CollectionDetailContext";
 
 const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
 const Dashboard = lazy(() => import('./pages/AAdmin/Dashboard'));
@@ -58,7 +58,14 @@ function App() {
           <Route index element={<MainLanding />} />
           <Route path="all-posters" element={<AllPosters />} />
           <Route path="collections-packs" element={<CollectionsPacksPage />} />
-          <Route path="collections/:collectionId" element={<CollectionDetail />} />
+          <Route
+            path="collections/:collectionId"
+            element={
+              <CollectionDetailProvider>
+                <CollectionDetail />
+              </CollectionDetailProvider>
+            }
+          />
           <Route path="collection/:collectionId" element={<SingleCollection />} />
           <Route path="poster/:id" element={<Poster />} />
           <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />

@@ -1,10 +1,14 @@
-// src/pages/CollectionsPacksPage.js
-import React, { useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { useFirebase } from "../../context/FirebaseContext";
 import { Link } from "react-router-dom";
 
-export default function CollectionsPacksPage() {
+// Create Context
+const CollectionsContext = createContext();
+
+export const useCollections = () => useContext(CollectionsContext);
+
+export const CollectionsPacksPageProvider = ({ children }) => {
   const { firestore } = useFirebase();
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,31 +16,77 @@ export default function CollectionsPacksPage() {
 
   const ensureString = (value) => (typeof value === "string" ? value : "");
 
-  useEffect(() => {
-    const fetchCollections = async () => {
-      try {
-        const collectionsRef = collection(firestore, "standaloneCollections");
-        const snapshot = await getDocs(collectionsRef);
-        const fetched = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          title: ensureString(doc.data().title),
-          description: ensureString(doc.data().description),
-          imageUrl: ensureString(doc.data().imageUrl),
-          discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 0,
-        }));
-        setCollections(fetched);
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load collections: " + err.message);
-        setLoading(false);
-      }
-    };
+  const fetchCollections = async () => {
+    if (!firestore) {
+      setError("Firestore is not available.");
+      setLoading(false);
+      return;
+    }
 
+    try {
+      const collectionsRef = collection(firestore, "standaloneCollections");
+      const snapshot = await getDocs(collectionsRef);
+      const fetched = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        title: ensureString(doc.data().title),
+        description: ensureString(doc.data().description),
+        imageUrl: ensureString(doc.data().imageUrl),
+        discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 0,
+      }));
+      setCollections(fetched);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching collections:", err);
+      setError("Failed to load collections: " + err.message);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCollections();
   }, [firestore]);
 
-  if (loading) return <div className="container py-5 text-center">Loading...</div>;
-  if (error) return <div className="container py-5 text-danger text-center">{error}</div>;
+  const resetState = () => {
+    setCollections([]);
+    setLoading(true);
+    setError(null);
+    fetchCollections();
+  };
+
+  const value = {
+    collections,
+    loading,
+    error,
+    resetState,
+  };
+
+  return (
+    <CollectionsContext.Provider value={value}>
+      {children}
+    </CollectionsContext.Provider>
+  );
+};
+
+export default function CollectionsPacksPage() {
+  const { collections, loading, error, resetState } = useCollections();
+
+  if (loading) {
+    return <div className="container py-5 text-center">Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="container py-5 text-center">
+        <p className="text-danger">{error}</p>
+        <button
+          className="btn btn-primary mt-3"
+          onClick={resetState}
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <section className="container py-5">

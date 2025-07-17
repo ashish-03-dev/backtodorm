@@ -9,7 +9,6 @@ const firebaseConfig = {
     messagingSenderId: "536014495018",
     appId: "1:536014495018:web:a124f8ddac1548a400d253",
     measurementId: "G-5Y6B4BZJY1",
-    databaseURL: "https://back-to-dorm-default-rtdb.firebaseio.com/",
 };
 
 export const app = initializeApp(firebaseConfig);

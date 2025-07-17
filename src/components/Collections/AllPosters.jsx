@@ -1,16 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
-import { useFirebase } from '../../context/FirebaseContext';
+import { useFirebase } from '../../context/FirebaseContext'; // Adjust path as needed
 
-export default function AllPosters() {
+// Create Context
+const AllPostersContext = createContext();
+
+export const useAllPosters = () => useContext(AllPostersContext);
+
+export const AllPostersProvider = ({ children }) => {
   const { firestore } = useFirebase();
   const [posters, setPosters] = useState([]);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
-  const [lastDoc, setLastDoc] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   const POSTERS_PER_PAGE = 12;
 
@@ -53,7 +59,7 @@ export default function AllPosters() {
         return {
           id: doc.id,
           title: data.title || 'Untitled',
-          image: data.imageUrl,
+          image: data.imageUrl || 'https://via.placeholder.com/400x500', // Fallback image
           sizes,
           price,
           finalPrice,
@@ -63,7 +69,7 @@ export default function AllPosters() {
       });
 
       setPosters(prev => startAfterDoc ? [...prev, ...fetchedPosters] : fetchedPosters);
-      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
       setHasMore(querySnapshot.docs.length === POSTERS_PER_PAGE);
       setLoading(false);
       setLoadingMore(false);
@@ -76,14 +82,57 @@ export default function AllPosters() {
   };
 
   useEffect(() => {
-    fetchPosters();
-  }, [firestore]);
+    if (posters.length === 0 && !error) {
+      fetchPosters();
+    } else if (posters.length > 0) {
+      window.scrollTo({ top: scrollPosition, behavior: 'instant' });
+    }
+  }, [firestore, posters.length, error]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollPosition(window.scrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleLoadMore = () => {
     if (!hasMore || loading || loadingMore) return;
     setLoadingMore(true);
     fetchPosters(lastDoc);
   };
+
+  const resetState = () => {
+    setPosters([]);
+    setLastDoc(null);
+    setHasMore(true);
+    setLoading(true);
+    setError(null);
+    setScrollPosition(0);
+    fetchPosters();
+  };
+
+  const value = {
+    posters,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    handleLoadMore,
+    resetState,
+  };
+
+  return (
+    <AllPostersContext.Provider value={value}>
+      {children}
+    </AllPostersContext.Provider>
+  );
+};
+
+export default function AllPosters() {
+  const { posters, loading, loadingMore, error, hasMore, handleLoadMore, resetState } = useAllPosters(); // Destructure resetState here
 
   const SkeletonCard = () => (
     <div className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch">
@@ -106,8 +155,8 @@ export default function AllPosters() {
         <div className="container">
           <h2 className="fs-2 fw-bold mb-4 text-center">All Posters</h2>
           <div className="row g-4">
-            {Array(POSTERS_PER_PAGE).fill().map((_, index) => (
-              <SkeletonCard key={index} />
+            {Array(12).fill().map((_, index) => (
+              <SkeletonCard key={`skeleton-${index}`} />
             ))}
           </div>
         </div>
@@ -118,7 +167,15 @@ export default function AllPosters() {
   if (error) {
     return (
       <section className="bg-white py-5">
-        <div className="container text-center">{error}</div>
+        <div className="container text-center">
+          <p>{error}</p>
+          <button
+            className="btn btn-primary mt-3"
+            onClick={resetState} // Use the destructured resetState
+          >
+            Try Again
+          </button>
+        </div>
       </section>
     );
   }
@@ -161,6 +218,9 @@ export default function AllPosters() {
                       aspectRatio: '4/5',
                       objectFit: 'cover',
                     }}
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/400x500';
+                    }}
                   />
                   <div className="p-3 text-center">
                     <h3 className="fs-6 fw-semibold mb-1 text-truncate">
@@ -191,7 +251,7 @@ export default function AllPosters() {
         </div>
         {loadingMore && (
           <div className="row g-4 mt-4">
-            {Array(POSTERS_PER_PAGE).fill().map((_, index) => (
+            {Array(12).fill().map((_, index) => (
               <SkeletonCard key={`loading-${index}`} />
             ))}
           </div>

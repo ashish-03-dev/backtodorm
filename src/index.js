@@ -12,6 +12,9 @@ import { SearchProvider } from './context/SearchContext';
 import { OptionalProvider } from './context/OptionalContext';
 import { NewArrivalsProvider } from './context/NewArrivalsContext';
 import { CollectionsProvider } from './context/CollectionsContext';
+import { AllPostersProvider } from './components/Collections/AllPosters';
+import { CollectionsPacksPageProvider } from './components/Collections/CollectionsPacksPage';
+import { CollectionDetailProvider } from './context/CollectionDetailContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -22,7 +25,11 @@ root.render(
           <OptionalProvider>
             <NewArrivalsProvider>
               <CollectionsProvider>
-                <App />
+                <AllPostersProvider>
+                  <CollectionsPacksPageProvider>
+                    <App />
+                  </CollectionsPacksPageProvider>
+                </AllPostersProvider>
               </CollectionsProvider>
             </NewArrivalsProvider>
           </OptionalProvider>
