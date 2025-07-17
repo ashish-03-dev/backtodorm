@@ -35,7 +35,7 @@ export default function ProductDetail() {
         }
 
         const posterData = posterSnap.data();
-        if (posterData.approved !== "approved" || !posterData.isActive) {
+        if (!posterData.isActive) {
           setError("This poster is not available for purchase.");
           setLoading(false);
           return;
@@ -54,7 +54,6 @@ export default function ProductDetail() {
           id: posterSnap.id,
           title: posterData.title || "Untitled",
           image: posterData.imageUrl || "https://via.placeholder.com/300",
-          description: posterData.description || "No description available.",
           discount: posterData.discount || 0,
           sizes: sizes.map(size => ({
             size: size.size || "N/A",
@@ -215,9 +214,6 @@ export default function ProductDetail() {
               </div>
             )}
             <h3 className='mb-3'>{poster.title}</h3>
-            {poster.description && poster.description !== "No description available." && (
-              <p className="mb-4">{poster.description}</p>
-            )}
             <div className="mb-4">
               {isDiscounted ? (
                 <div className="d-flex align-items-center">
