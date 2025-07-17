@@ -21,7 +21,6 @@ const CollectionDetail = () => {
   if (isLoading) {
     return (
       <div className="container py-5 text-center">
-        <h2 className="mb-4 text-capitalize">{title}</h2>
         <div className="spinner-border" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>

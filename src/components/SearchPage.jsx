@@ -47,13 +47,12 @@ export default function SearchPage() {
     } catch (err) {
       console.error("Error fetching from collections:", err);
     }
-
+    
     try {
       const postersRef = collection(firestore, "posters");
       const keywordQuery = query(
         postersRef,
         where("keywords", "array-contains", searchKey),
-        where("approved", "==", "approved"),
         where("isActive", "==", true)
       );
       const keywordSnapshot = await getDocs(keywordQuery);
@@ -61,7 +60,6 @@ export default function SearchPage() {
     } catch (err) {
       console.error("Error fetching from posters by keywords:", err);
     }
-
     return Array.from(posterIds);
   };
 
