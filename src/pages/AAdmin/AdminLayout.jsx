@@ -46,7 +46,7 @@ export default function AdminLayout() {
 
 
 const navItems = [
-  { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
+  // { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
   { path: "/admin/orders", label: "Orders", icon: BsCartCheck },
   { path: "/admin/home-content", label: "Home Content", icon: BsFileText },
   { path: "/admin/posters", label: "Posters", icon: BsImage },

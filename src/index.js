@@ -14,7 +14,6 @@ import { NewArrivalsProvider } from './context/NewArrivalsContext';
 import { CollectionsProvider } from './context/CollectionsContext';
 import { AllPostersProvider } from './components/Collections/AllPosters';
 import { CollectionsPacksPageProvider } from './components/Collections/CollectionsPacksPage';
-import { CollectionDetailProvider } from './context/CollectionDetailContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

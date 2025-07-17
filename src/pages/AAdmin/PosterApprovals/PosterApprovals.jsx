@@ -24,6 +24,7 @@ const PosterApprovals = () => {
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [framing, setFraming] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch tempPosters with image URLs
   useEffect(() => {
@@ -91,17 +92,18 @@ const PosterApprovals = () => {
     setShowFrameModal(true);
   };
 
-  const submitPosterHandler = async (data, posterId) => {
+  const submitPosterHandler = async (data, posterId, { onProgress } = {}) => {
     if (!data) {
       setShowEditModal(false);
       setEditing(null);
       return;
     }
     try {
-      const result = await submitPoster(firestore, storage, data, posterId, user);
+      const result = await submitPoster(firestore, storage, data, posterId, { onProgress });
       if (result.success) {
         setShowEditModal(false);
         setEditing(null);
+        setUploadProgress(0); // Reset progress on success
       } else {
         setError("Failed to submit poster: " + result.error);
       }

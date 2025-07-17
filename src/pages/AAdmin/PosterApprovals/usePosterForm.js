@@ -169,7 +169,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
   const generateKeywords = () => {
     const form = formRef.current;
     const title = form?.title?.value?.trim() || "";
-    const description = form?.description?.value?.trim() || "";
     const tagArray = tags.split(",").map((t) => t.trim()).filter(Boolean);
     const collections = selectedCollections.map((col) => col.label);
     const stopWords = new Set(["a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for"]);
@@ -203,7 +202,6 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
 
     const words = [
       ...normalizeText(title, false, true),
-      ...normalizeText(description),
       ...tagArray.flatMap((tag) => normalizeText(tag, true)),
       ...collections.flatMap(normalizeText),
     ];
@@ -236,15 +234,58 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
 
     if (field === "size" && POSTER_SIZES[value]) {
       setSelectedSize(value);
-      setCroppedPreview(null);
-      setImageSrc(null);
-      setOriginalImageSrc(null);
-      setCrop(null);
-      setRotation(0);
-      setRecommendedSize(null);
-      setOriginalImageSize({ width: 0, height: 0 });
-      setShowOptionalCropNotice(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (imageSrc) {
+        // Re-evaluate image for new size
+        const img = new Image();
+        img.onload = () => {
+          const { widthPx, heightPx, aspectRatio } = POSTER_SIZES[value];
+          const actualAspect = img.width / img.height;
+          const aspectDiff = Math.abs(actualAspect - aspectRatio);
+          if (aspectDiff >= 0.05) {
+            setShowCropModal(true);
+            setShowOptionalCropNotice(false);
+            setCroppedPreview(null);
+            setCrop(
+              centerCrop(
+                makeAspectCrop({ unit: "%", width: 80, aspect: aspectRatio }, aspectRatio, img.width, img.height),
+                img.width,
+                img.height
+              )
+            );
+          } else {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = widthPx;
+            canvas.height = heightPx;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(img, 0, 0, widthPx, heightPx);
+            canvas.toBlob(
+              (blob) => {
+                if (blob) {
+                  const scaledFile = new File([blob], `scaled_${Date.now()}.jpg`, { type: "image/jpeg" });
+                  const fileList = new DataTransfer();
+                  fileList.items.add(scaledFile);
+                  formRef.current.imageFile.files = fileList.files;
+                  setCroppedPreview(canvas.toDataURL("image/jpeg", IMAGE_QUALITY));
+                  setShowOptionalCropNotice(true);
+                  setShowCropModal(false);
+                  setCrop(
+                    centerCrop(
+                      makeAspectCrop({ unit: "%", width: 80, aspect: aspectRatio }, aspectRatio, img.width, img.height),
+                      img.width,
+                      img.height
+                    )
+                  );
+                }
+              },
+              "image/jpeg",
+              IMAGE_QUALITY
+            );
+          }
+        };
+        img.src = originalImageSrc || imageSrc;
+      }
     }
   };
 
@@ -496,16 +537,46 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
   };
 
   const preparePosterData = (form, posterId) => {
+    if (!poster) {
+      return prepareTempPosterData(form, posterId);
+    } else {
+      return prepareRegularPosterData(form, posterId);
+    }
+  };
+
+  const prepareRegularPosterData = (form, posterId) => {
     const collections = selectedCollections.map((col) => normalizeCollection(col.label));
     const tagArray = tags.split(",").map((t) => normalizeCollection(t.trim())).filter(Boolean);
+
     return {
+      posterId: form.posterId.value,
       title: form.title.value.trim(),
-      description: form.description.value.trim(),
       tags: tagArray,
       keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
       collections,
-      originalImageUrl: poster?.source === "tempPosters" ? poster?.originalImageUrl || "" : "",
-      imageUrl: poster?.source === "posters" ? poster?.imageUrl || "" : "",
+      imageUrl: poster?.imageUrl || "",
+      discount: parseFloat(discount) || 0,
+      sizes: sizes.map((s) => ({
+        size: s.size,
+        price: parseFloat(s.price),
+        finalPrice: parseFloat(s.finalPrice) || parseFloat(s.price),
+      })),
+      isActive: form.isActive.checked,
+      createdAt: poster?.createdAt,
+      updatedAt: serverTimestamp(),
+    };
+  };
+
+  const prepareTempPosterData = (form, posterId) => {
+    const collections = selectedCollections.map((col) => normalizeCollection(col.label));
+    const tagArray = tags.split(",").map((t) => normalizeCollection(t.trim())).filter(Boolean);
+
+    return {
+      posterId: form.posterId.value,
+      title: form.title.value.trim(),
+      tags: tagArray,
+      keywords: keywords.split(",").map((k) => k.trim()).filter(Boolean),
+      collections,
       imageFile: form.imageFile?.files[0] || null,
       discount: parseFloat(discount) || 0,
       sizes: sizes.map((s) => ({
@@ -514,9 +585,8 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
         finalPrice: parseFloat(s.finalPrice) || parseFloat(s.price),
       })),
       isActive: form.isActive.checked,
-      createdAt: poster?.createdAt || serverTimestamp(),
-      updatedAt: new Date().toISOString(),
-      posterId: form.posterId.value,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     };
   };
 

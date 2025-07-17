@@ -72,8 +72,8 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
         </Route>
         <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
-          <Route index element={<Dashboard />} />
-          <Route path="dashboard" element={<Dashboard />} />
+          {/* <Route index element={<Dashboard />} /> */}
+          {/* <Route path="dashboard" element={<Dashboard />} /> */}
           <Route path="orders" element={<Orders />} />
           <Route path="home-content" element={<SectionManager />} />
           <Route path="collections-packs" element={<CollectionsPacks />} />

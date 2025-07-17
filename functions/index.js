@@ -247,9 +247,6 @@ exports.approvePoster = onCall(
       t.set(db.collection("posters").doc(posterData.posterId), {
         ...posterData,
         imageUrl: framedCloudinaryUrl,
-        framedImageUrl: null,
-        originalImageUrl: null,
-        approved: "approved",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -337,7 +334,7 @@ exports.deletePoster = onCall(
     // Firestore transaction to delete from collections
     await db.runTransaction(async (t) => {
       const collectionRefs = (posterData.collections || []).map((col) =>
-        db.collection("standaloneCollections").doc(col)
+        db.collection("collections").doc(col)
       );
 
       const collections = await Promise.all(collectionRefs.map((ref) => t.get(ref)));
@@ -348,11 +345,9 @@ exports.deletePoster = onCall(
 
       // Remove posterId from collections
       collections.forEach((col, i) => {
-        if (col.exists && col.data().posterIds?.includes(posterId)) {
-          t.update(collectionRefs[i], {
-            posterIds: admin.firestore.FieldValue.arrayRemove(posterId),
-          });
-        }
+        t.update(collectionRefs[i], {
+          posterIds: admin.firestore.FieldValue.arrayRemove(posterId),
+        });
       });
     });
 

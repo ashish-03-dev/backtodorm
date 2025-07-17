@@ -8,25 +8,12 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from "firebase/storage";
 
-// Helper function to normalize collections
 const normalizeCollection = (text) => {
   if (!text) return "";
   return text.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 };
 
-const denormalizeCollectionName = (id) => {
-  if (!id) return "";
-  return id
-    .replace(/-/g, " ")                // Replace hyphens with spaces
-    .replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalize each word
-};
-
-export const submitPoster = async (
-  firestore,
-  storage,
-  posterData,
-  posterId,
-) => {
+export const submitPoster = async (firestore, storage, posterData, posterId, { onProgress }) => {
   try {
     // Validate inputs
     if (!posterData.title) throw new Error("Poster title is required");
@@ -35,10 +22,35 @@ export const submitPoster = async (
     if (!posterId) throw new Error("Poster ID is required");
     if (!posterData.imageFile) throw new Error("An image is required for new posters");
 
-    // Upload image
+    // Upload image with progress tracking
     const storagePath = `posters/${Date.now()}_${posterData.imageFile.name}`;
     const imageRef = ref(storage, storagePath);
-    await uploadBytes(imageRef, posterData.imageFile);
+    const uploadTask = uploadBytesResumable(imageRef, posterData.imageFile);
+
+    // Track upload progress
+    await new Promise((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          // Calculate progress percentage
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          if (onProgress) {
+            onProgress(progress); // Call the onProgress callback with the progress percentage
+          }
+        },
+        (error) => {
+          // Handle errors during upload
+          reject(error);
+        },
+        () => {
+          // Upload completed successfully
+          resolve();
+        }
+      );
+    });
+
+    // Get the download URL after upload
+    const imageUrl = await getDownloadURL(imageRef);
 
     // Prepare poster data, excluding imageFile
     const { imageFile, ...posterDataWithoutImage } = posterData;
@@ -49,6 +61,7 @@ export const submitPoster = async (
       updatedAt: serverTimestamp(),
       isActive: posterData.isActive !== false,
       originalImageUrl: imageRef.fullPath,
+      imageUrl, // Optionally include the download URL if needed in your Firestore document
     };
 
     await runTransaction(firestore, async (transaction) => {
@@ -64,8 +77,6 @@ export const submitPoster = async (
         )
       );
 
-      // Step 2: Perform all writes
-      // Write poster to tempPosters
       transaction.set(posterRef, poster);
 
       // Update collections

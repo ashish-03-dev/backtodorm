@@ -12,7 +12,7 @@ const POSTER_SIZES = {
   "A4 x 5": { name: "A4 x 5", widthPx: 2480 * 5, heightPx: 3508, widthCm: 21 * 5, heightCm: 29.7, aspectRatio: (2480 * 5) / 3508 },
 };
 
-const PosterForm = ({ poster, onSubmit, onUpdatePoster}) => {
+const PosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
   const {
     state: {
       uploading,
@@ -114,10 +114,14 @@ const PosterForm = ({ poster, onSubmit, onUpdatePoster}) => {
     try {
       await originalHandleSubmit(e, {
         onProgress: (progressPercent) => setProgress(progressPercent),
-        onSuccess: () => setSuccess("Poster submitted successfully! It will be reviewed soon."),
+        onSuccess: () => {
+          setSuccess("Poster saved successfully!");
+          setProgress(0); // Reset progress on success
+        },
       });
     } catch (err) {
       setError("Failed to save poster: " + err.message);
+      setProgress(0); // Reset progress on error
     }
   };
 
@@ -170,17 +174,6 @@ const PosterForm = ({ poster, onSubmit, onUpdatePoster}) => {
             defaultValue={poster?.title || ""}
             required
             placeholder="Enter poster title"
-            disabled={uploading}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Description</Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={2}
-            name="description"
-            defaultValue={poster?.description || ""}
-            placeholder="Enter poster description"
             disabled={uploading}
           />
         </Form.Group>
@@ -419,8 +412,8 @@ const PosterForm = ({ poster, onSubmit, onUpdatePoster}) => {
         show={showCropModal}
         onHide={() => {
           setShowCropModal(false);
-          handleClearImage();
-          setShowOptionalCropNotice(false);
+          // Do not call handleClearImage here; instead, revert to auto-scaled image if available
+          setShowOptionalCropNotice(!!croppedPreview); // Show notice again if auto-scaled image exists
         }}
       >
         <Modal.Header closeButton>
@@ -472,6 +465,15 @@ const PosterForm = ({ poster, onSubmit, onUpdatePoster}) => {
                       disabled={cropping || !selectedSize || !POSTER_SIZES[selectedSize]}
                     >
                       Rotate 90°
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      onClick={() => {
+                        setShowCropModal(false);
+                        setShowOptionalCropNotice(!!croppedPreview); // Revert to auto-scaled image
+                      }}
+                    >
+                      Cancel Crop
                     </Button>
                   </div>
                 )}
