@@ -360,6 +360,7 @@ exports.deletePoster = onCall(
     return { success: true };
   }
 );
+
 exports.createRazorpayOrder = onCall(
   {
     secrets: RAZORPAY_SECRETS,
@@ -446,6 +447,11 @@ exports.createRazorpayOrder = onCall(
       });
 
       await batch.commit();
+      return {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+      };
     } catch (error) {
       console.error("Razorpay order creation failed:", error);
       throw new HttpsError("internal", `Failed to create Razorpay order: ${error.message}`);
@@ -553,6 +559,7 @@ exports.verifyRazorpayPayment = onCall(
     }
   }
 );
+
 exports.verifyOrderPricing = onCall(
   {
     secrets: RAZORPAY_SECRETS,

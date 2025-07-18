@@ -382,7 +382,7 @@ const Checkout = () => {
           <Card className="mb-3">
             <Card.Body className="p-3">
               <h4 className="mb-4">Shipping Details</h4>
-              <div className="d-flex justify-content-between align-items-center mb-4 px-2">
+              <div className="d-flex justify-content-between align-items-center mb-2 p-2">
                 <span>Select Address</span>
                 <span
                   className="text-primary"
@@ -393,7 +393,7 @@ const Checkout = () => {
                 </span>
               </div>
               {selectedAddressId && formData.name && (
-                <Card className="p-2 mb-2">
+                <Card className="p-2 border-0 mb-4">
                   <p className="mb-1"><strong>{formData.title || formData.name}</strong> {formData.phone}</p>
                   <p className="mb-1 text-muted">{formData.address}, {formData.locality}, {formData.city}{formData.landmark && `, ${formData.landmark}`}</p>
                   <p className="mb-0 text-muted">{formData.state} - {formData.pincode}</p>
@@ -415,7 +415,7 @@ const Checkout = () => {
             <div className="border rounded p-3 mb-3">
               <h4 className="mb-3">Payment Options</h4>
 
-              <div className="border rounded p-2 mb-3">
+              <div className="rounded p-2 mb-3">
                 <div className="d-flex justify-content-between mb-1">
                   <span>Subtotal</span>
                   <span>₹{subtotal.toLocaleString('en-IN')}</span>

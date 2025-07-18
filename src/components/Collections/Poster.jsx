@@ -144,16 +144,6 @@ export default function ProductDetail() {
       image: poster.image,
     };
 
-    console.log("Proceeding to buy now:", {
-      posterId: item.posterId,
-      title: item.title,
-      size: item.size,
-      finish: item.finish,
-      price: item.price,
-      finalPrice: item.finalPrice,
-      discount: item.discount,
-    });
-
     try {
       buyNow(item);
       navigate('/checkout');

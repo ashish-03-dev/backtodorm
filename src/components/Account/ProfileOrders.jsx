@@ -108,110 +108,85 @@ export default function ProfileOrders() {
   }, [firestore, user?.uid]);
 
   const renderOrders = (orderList) => (
-    <div className="d-flex flex-column gap-4">
+    <div className="d-flex flex-column gap-3">
       {orderList.length === 0 ? (
-        <p className="text-muted ms-3">No Orders Yet.</p>
+        <p className="text-muted text-center my-4">No orders found.</p>
       ) : (
         orderList.map((order) => (
-          <div key={order.id} className="card shadow-sm border-0 rounded-3 overflow-hidden">
-            <div className="card-header bg-light d-flex justify-content-between align-items-center">
-              <div>
-                <strong className="fs-6">Order ID:</strong>{' '}
-                <span className="text-muted">{order.id}</span>
+          <div key={order.id} className="card border rounded-3">
+            <div className="card-body p-3">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <h6 className="mb-0 text-muted">Order #{order.id}</h6>
+                <span className={`badge bg-${order.paymentStatus === 'Failed' ? 'danger'
+                    : order.paymentStatus === 'Pending' ? 'warning'
+                      : order.status === 'Order Placed' ? 'primary'   // Blue
+                        : order.status === 'Shipped' ? 'primary'            // Blue
+                          : order.status === 'Delivered' ? 'success'          // Green
+                            : order.status === 'Cancelled' ? 'danger'           // Red
+                              : 'secondary'                                       // Fallback
+                  }`}>
+                  {order.paymentStatus === 'Completed' ? order.status : order.paymentStatus}
+                </span>
               </div>
-              <span className={`badge px-3 py-2 fs-6 bg-${order.paymentStatus === 'Completed'
-                ? order.status === 'Delivered'
-                  ? 'success'
-                  : order.status === 'Shipped'
-                    ? 'primary'
-                    : 'warning'
-                : order.paymentStatus === 'Pending'
-                  ? 'warning'
-                  : 'danger'
-                }`}>
-                {order.paymentStatus === 'Completed' ? order.status : order.paymentStatus}
-              </span>
-            </div>
-            <div className="card-body p-4">
-              <div className="row mb-3">
-                <div className="col text-muted fs-6">
-                  <i className="bi bi-calendar me-2"></i>
-                  Placed on{' '}
-                  {order.orderDate?.toDate().toLocaleString('en-IN', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                  })}
-                </div>
-              </div>
-              {order.isPending && (
-                <div className="alert alert-warning py-2 mb-4">
+              <p className="text-muted small mb-2">
+                <i className="bi bi-calendar me-1"></i>
+                {order.orderDate?.toDate().toLocaleString('en-IN', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                })}
+              </p>
+              {order.paymentStatus === 'Pending' && (
+                <div className="alert alert-warning py-1 mb-2 small">
                   Awaiting payment confirmation.
                 </div>
               )}
-              {!order.isPending && order.paymentStatus === 'Failed' && (
-                <div className="alert alert-danger py-2 fw-bold text-center mb-4">
-                  Payment Failed. Please place a new order or contact support.
+              {order.paymentStatus === 'Failed' && (
+                <div className="alert alert-danger py-1 mb-2 small">
+                  Payment Failed. Please retry or contact support.
                 </div>
               )}
-              <div className="mb-4">
-                <h6 className="fw-bold mb-3">Items</h6>
-                <ul className="list-unstyled ps-3">
-                  {order.items.map((item, idx) => (
-                    <li key={idx} className="mb-3">
-                      {item.type === 'poster' ? (
-                        <div className="d-flex justify-content-between">
-                          <span>
-                            {item.name} ({item.size}) × {item.quantity}
-                          </span>
-                          <span>₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
+              <ul className="list-unstyled mb-2">
+                {order.items.map((item, idx) => (
+                  <li key={idx} className="mb-2">
+                    {item.type === 'poster' ? (
+                      <div className="d-flex justify-content-between small">
+                        <span>{item.name} ({item.size}) × {item.quantity}</span>
+                        <span>₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="d-flex justify-content-between small">
+                          <span>Collection: {item.name} × {item.quantity}</span>
+                          <span>{item.collectionDiscount}% off</span>
                         </div>
-                      ) : (
-                        <>
-                          <div className="d-flex justify-content-between">
-                            <span>
-                              Collection: {item.name} × {item.quantity} (Discount: {item.collectionDiscount}%)
-                            </span>
-                            <span></span>
-                          </div>
-                          <ul className="list-unstyled ps-4 mt-2">
-                            {item.posters.map((poster, i) => (
-                              <li key={i} className="text-muted">
-                                <div className="d-flex justify-content-between">
-                                  <span>- {poster.name} ({poster.size})</span>
-                                  <span>₹{poster.price.toLocaleString('en-IN')}</span>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="row mb-3">
-                <div className="col">
-                  <strong>Total:</strong> {order.total}
-                </div>
+                        <ul className="list-unstyled ps-3 small text-muted">
+                          {item.posters.map((poster, i) => (
+                            <li key={i} className="d-flex justify-content-between">
+                              <span>- {poster.name} ({poster.size})</span>
+                              <span>₹{poster.price.toLocaleString('en-IN')}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="d-flex justify-content-between small mb-2">
+                <strong>Total:</strong>
+                <span>{order.total}</span>
               </div>
               {order.shippingAddress && (
-                <div className="row mb-3">
-                  <div className="col">
-                    <strong>Shipping Address:</strong>
-                    <p className="text-muted mb-0">
-                      {order.shippingAddress.name}, {order.shippingAddress.address}, {order.shippingAddress.locality}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}
-                    </p>
-                  </div>
+                <div className="small text-muted mb-2">
+                  <strong>Shipping:</strong> {order.shippingAddress.name}, {order.shippingAddress.address}, {order.shippingAddress.locality}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}
                 </div>
               )}
-              <div className="row mb-3">
-                <div className="col">
-                  <strong>Payment:</strong> {order.paymentStatus} via {order.paymentMethod}
-                </div>
+              <div className="small text-muted">
+                <strong>Payment:</strong> {order.paymentStatus} via {order.paymentMethod}
               </div>
             </div>
           </div>
@@ -222,14 +197,20 @@ export default function ProfileOrders() {
 
   if (loading) {
     return (
-      <div className="text-center d-flex align-items-center justify-content-center" style={{ height: "calc(100svh - 65px - 3rem)" }}>
-        <p className="mt-2">Loading your orders...</p>
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="alert alert-danger w-75 mx-auto mt-5">{error}</div>;
+    return (
+      <div className="alert alert-danger text-center w-50 mx-auto my-4" role="alert">
+        {error}
+      </div>
+    );
   }
 
   const filteredOrders = {
@@ -238,30 +219,20 @@ export default function ProfileOrders() {
     confirmed: orders.filter((order) => order.paymentStatus === 'Completed'),
   };
 
-
   return (
-    <div className="container p-4 p-md-5">
-      <div className="row align-items-center">
-        <div className="col">
-          <h4 className="mb-4">My Orders</h4>
-        </div>
-      </div>
-      <ul className="nav nav-pills mb-4 gap-2">
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
-            All Orders
-          </button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
-            Pending Payment
-          </button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'confirmed' ? 'active' : ''}`} onClick={() => setActiveTab('confirmed')}>
-            Confirmed Orders
-          </button>
-        </li>
+    <div className="container py-4">
+      <h5 className="mb-3 fw-bold">My Orders</h5>
+      <ul className="nav nav-tabs mb-3">
+        {['all', 'pending', 'confirmed'].map((tab) => (
+          <li key={tab} className="nav-item">
+            <button
+              className={`nav-link ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab === 'all' ? 'All Orders' : tab === 'pending' ? 'Pending' : 'Confirmed'}
+            </button>
+          </li>
+        ))}
       </ul>
       {renderOrders(filteredOrders[activeTab])}
     </div>

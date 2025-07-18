@@ -206,8 +206,7 @@ const OrderTable = ({
                 required
               >
                 <option value="">Select Status</option>
-                <option value="Order Received">Order Placed</option>
-                <option value="Processing">Processing</option>
+                <option value="Order Placed">Order Placed</option>
                 <option value="Shipped">Shipped</option>
                 <option value="Delivered">Delivered</option>
                 <option value="Cancelled">Cancelled</option>
