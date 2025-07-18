@@ -360,7 +360,6 @@ exports.deletePoster = onCall(
     return { success: true };
   }
 );
-
 exports.createRazorpayOrder = onCall(
   {
     secrets: RAZORPAY_SECRETS,
@@ -417,7 +416,7 @@ exports.createRazorpayOrder = onCall(
       });
 
       // Store temporary order with Pending status and verified: false
-      await db.collection("temporaryOrders").doc(order.id).set({
+      const tempOrderData = {
         orderId: order.id,
         userId: auth.uid,
         items,
@@ -429,15 +428,24 @@ exports.createRazorpayOrder = onCall(
         paymentStatus: "Pending",
         verified: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      const batch = db.batch();
+      const tempOrderRef = db.collection("temporaryOrders").doc(order.id);
+      batch.set(tempOrderRef, tempOrderData);
+
+      // Add to userOrders PendingOrders
+      const pendingOrderRef = db.collection("userOrders").doc(auth.uid).collection("pendingOrders").doc(order.id);
+      batch.set(pendingOrderRef, {
+        orderId: order.id,
+        orderDate: admin.firestore.FieldValue.serverTimestamp(),
+        status: "Pending Payment",
+        subtotal,
+        deliveryCharge,
+        totalPrice: total,
       });
 
-      console.log('Razorpay order created:', { orderId: order.id, amount: order.amount, currency: order.currency });
-      return {
-        success: true,
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-      };
+      await batch.commit();
     } catch (error) {
       console.error("Razorpay order creation failed:", error);
       throw new HttpsError("internal", `Failed to create Razorpay order: ${error.message}`);
@@ -510,36 +518,41 @@ exports.verifyRazorpayPayment = onCall(
         issues: [],
       };
 
-      const orderRef = await db.collection("orders").add(orderData);
-      await db.collection("userOrders").doc(tempOrderData.userId).collection("orders").add({
-        orderId: orderRef.id,
+      const batch = db.batch();
+      const orderRef = db.collection("orders").doc(orderId);
+      batch.set(orderRef, orderData);
+
+      // Update userOrders: move from pendingOrders to orders
+      const userPendingOrderRef = db.collection("userOrders").doc(tempOrderData.userId).collection("pendingOrders").doc(orderId);
+      const userOrderRef = db.collection("userOrders").doc(tempOrderData.userId).collection("orders").doc(orderId);
+      batch.set(userOrderRef, {
+        orderId: orderId,
         orderDate: orderData.orderDate,
         status: orderData.status,
         subtotal: orderData.subtotal,
         deliveryCharge: orderData.deliveryCharge,
         totalPrice: orderData.totalPrice,
       });
+      batch.delete(userPendingOrderRef);
 
       // Clear cart if not Buy Now
       if (!tempOrderData.isBuyNow) {
         const cartItems = await db.collection(`users/${tempOrderData.userId}/cart`).get();
-        const batch = db.batch();
         cartItems.forEach((doc) => batch.delete(doc.ref));
-        await batch.commit();
       }
 
       // Delete temporary order
-      await tempOrderRef.delete();
+      batch.delete(tempOrderRef);
+      await batch.commit();
 
-      console.log('Payment verified and order created:', orderRef.id);
-      return { success: true, message: "Payment verified successfully", orderId: orderRef.id };
+      console.log('Payment verified and order created:', orderId);
+      return { success: true, message: "Payment verified successfully", orderId: orderId };
     } catch (error) {
       console.error("Razorpay payment verification failed:", error);
       throw new HttpsError("internal", `Failed to verify payment: ${error.message}`);
     }
   }
 );
-
 exports.verifyOrderPricing = onCall(
   {
     secrets: RAZORPAY_SECRETS,
@@ -755,26 +768,37 @@ exports.checkPendingPayments = onCall(
           };
 
           if (payment.status === "captured" || payment.status === "failed") {
-            const orderRef = await db.collection("orders").add(orderData);
-            await db.collection("userOrders").doc(tempOrderData.userId).collection("orders").add({
-              orderId: orderRef.id,
-              orderDate: orderData.orderDate,
-              status: orderData.status,
-              subtotal: orderData.subtotal,
-              deliveryCharge: orderData.deliveryCharge,
-              totalPrice: orderData.totalPrice,
-            });
+            const batch = db.batch();
+            const orderRef = db.collection("orders").doc(orderId);
+            batch.set(orderRef, orderData);
 
+            // Move from pendingOrders to orders or delete if failed
+            const userPendingOrderRef = db.collection("userOrders").doc(tempOrderData.userId).collection("pendingOrders").doc(orderId);
+            if (payment.status === "captured") {
+              const userOrderRef = db.collection("userOrders").doc(tempOrderData.userId).collection("orders").doc(orderId);
+              batch.set(userOrderRef, {
+                orderId: orderId,
+                orderDate: orderData.orderDate,
+                status: orderData.status,
+                subtotal: orderData.subtotal,
+                deliveryCharge: orderData.deliveryCharge,
+                totalPrice: orderData.totalPrice,
+              });
+            }
+            batch.delete(userPendingOrderRef);
+
+            // Clear cart if not Buy Now and payment is captured
             if (payment.status === "captured" && !tempOrderData.isBuyNow) {
               const cartItems = await db.collection(`users/${tempOrderData.userId}/cart`).get();
-              const batch = db.batch();
               cartItems.forEach((doc) => batch.delete(doc.ref));
-              await batch.commit();
             }
 
-            await tempOrder.ref.delete();
+            // Delete temporary order
+            batch.delete(tempOrder.ref);
+            await batch.commit();
+
             console.log(`Order ${orderId} moved to orders with status: ${orderData.paymentStatus}`);
-            return { orderId, status: orderData.paymentStatus, orderRef: orderRef.id };
+            return { orderId, status: orderData.paymentStatus, orderRef: orderId };
           } else {
             console.log(`Order ${orderId} remains Pending`);
             return { orderId, status: "Pending" };
@@ -888,27 +912,35 @@ exports.razorpayWebhook = onRequest(
             issues: [],
           };
 
-          const orderRef = await db.collection("orders").add(orderData);
-          await db.collection("userOrders").doc(userId).collection("orders").add({
-            orderId: orderRef.id,
+          const batch = db.batch();
+          const orderRef = db.collection("orders").doc(order_id);
+          batch.set(orderRef, orderData);
+
+          // Move from pendingOrders to orders
+          const userPendingOrderRef = db.collection("userOrders").doc(userId).collection("pendingOrders").doc(order_id);
+          const userOrderRef = db.collection("userOrders").doc(userId).collection("orders").doc(order_id);
+          batch.set(userOrderRef, {
+            orderId: order_id,
             orderDate: orderData.orderDate,
             status: orderData.status,
             subtotal: orderData.subtotal,
             deliveryCharge: orderData.deliveryCharge,
             totalPrice: orderData.totalPrice,
           });
+          batch.delete(userPendingOrderRef);
 
-          await tempOrder.ref.delete();
-
+          // Clear cart if not Buy Now
           if (!tempOrderData.isBuyNow) {
             const cartItems = await db.collection(`users/${userId}/cart`).get();
-            const batch = db.batch();
             cartItems.forEach((doc) => batch.delete(doc.ref));
-            await batch.commit();
           }
 
-          console.log('Order processed successfully:', orderRef.id);
-          return res.status(200).json({ success: true, orderId: orderRef.id });
+          // Delete temporary order
+          batch.delete(tempOrder.ref);
+          await batch.commit();
+
+          console.log('Order processed successfully:', order_id);
+          return res.status(200).json({ success: true, orderId: order_id });
         }
       }
 

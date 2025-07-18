@@ -58,7 +58,7 @@ export default function ProfileOrders() {
 
         const fullOrder = orderSnap.data();
         const items = await Promise.all((fullOrder.items || []).map(parseItem));
-        const rawDate = fullOrder.orderDate || orderData.createdAt || null;
+        const rawDate = fullOrder.orderDate || fullOrder.createdAt || null;
 
         return {
           id: orderId,
@@ -78,27 +78,26 @@ export default function ProfileOrders() {
     };
 
     const confirmedOrdersRef = query(collection(firestore, `userOrders/${user.uid}/orders`));
-    const temporaryOrdersRef = query(collection(firestore, 'temporaryOrders'), where('userId', '==', user.uid));
+    const pendingOrdersRef = query(collection(firestore, `userOrders/${user.uid}/pendingOrders`));
 
     const unsubscribeConfirmed = onSnapshot(confirmedOrdersRef, async (confirmedSnap) => {
       try {
         const confirmed = await fetchOrders(confirmedSnap, false);
-
-        const unsubscribeTemp = onSnapshot(temporaryOrdersRef, async (tempSnap) => {
+        const unsubscribePending = onSnapshot(pendingOrdersRef, async (pendingSnap) => {
           try {
-            const pending = await fetchOrders(tempSnap, true);
+            const pending = await fetchOrders(pendingSnap, true);
             const combined = [...confirmed, ...pending].sort((a, b) => {
               return new Date(b.orderDate?.toDate?.() || b.orderDate) - new Date(a.orderDate?.toDate?.() || a.orderDate);
             });
             setOrders(combined);
           } catch (err) {
-            setError(`Failed to load temporary orders: ${err.message}`);
+            setError(`Failed to load pending orders: ${err.message}`);
           } finally {
             setLoading(false);
           }
         });
 
-        return () => unsubscribeTemp();
+        return () => unsubscribePending();
       } catch (err) {
         setError(`Failed to load confirmed orders: ${err.message}`);
         setLoading(false);
@@ -106,7 +105,7 @@ export default function ProfileOrders() {
     });
 
     return () => unsubscribeConfirmed();
-  }, []);
+  }, [firestore, user?.uid]);
 
   const renderOrders = (orderList) => (
     <div className="d-flex flex-column gap-4">

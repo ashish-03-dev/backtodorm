@@ -63,7 +63,6 @@ export default function Login() {
     } catch (err) {
       if (err.code !== "auth/popup-closed-by-user") {
         console.error("Google login failed:", err.message);
-        alert(`Google login failed: ${err.message}`);
       }
     }
   };
