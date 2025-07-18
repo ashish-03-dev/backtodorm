@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
 import { useFirebase } from "../context/FirebaseContext";
 import { Link, useLocation } from "react-router-dom";
-import { BsSearch } from 'react-icons/bs';
+import { BsSearch } from "react-icons/bs";
+import { useSearch } from "../context/SearchContext";
 
 // Module-level state to persist across navigation
 const staticState = {
@@ -42,10 +43,64 @@ const resetStaticState = () => {
 export default function SearchPage() {
   const { firestore } = useFirebase();
   const location = useLocation();
+  const { searchState, updateSearchState } = useSearch();
   const [localState, setLocalState] = useState({ ...staticState });
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   const ITEMS_PER_PAGE = 12;
+
+  // Sync staticState and localState with searchState when it changes
+  useEffect(() => {
+    const isResetState =
+      searchState.queryString === "" &&
+      searchState.results.length === 0 &&
+      !searchState.hasSearched &&
+      searchState.page === 0;
+
+    if (isResetState && (
+      localState.queryString !== "" ||
+      localState.results.length !== 0 ||
+      localState.hasSearched ||
+      localState.page !== 0
+    )) {
+      resetStaticState();
+      setLocalState({ ...staticState });
+    } else if (
+      localState.queryString !== searchState.queryString ||
+      localState.results !== searchState.results ||
+      localState.loading !== searchState.loading ||
+      localState.error !== searchState.error ||
+      localState.hasSearched !== searchState.hasSearched ||
+      localState.allPosterIds !== searchState.allPosterIds ||
+      localState.page !== searchState.page ||
+      localState.hasMore !== searchState.hasMore ||
+      localState.totalResults !== searchState.totalResults
+    ) {
+      updateStaticState({
+        queryString: searchState.queryString,
+        results: searchState.results,
+        loading: searchState.loading,
+        error: searchState.error,
+        hasSearched: searchState.hasSearched,
+        allPosterIds: searchState.allPosterIds,
+        page: searchState.page,
+        hasMore: searchState.hasMore,
+        totalResults: searchState.totalResults,
+        scrollPosition: staticState.scrollPosition,
+      });
+      setLocalState({ ...staticState });
+    }
+  }, [
+    searchState.queryString,
+    searchState.results,
+    searchState.loading,
+    searchState.error,
+    searchState.hasSearched,
+    searchState.allPosterIds,
+    searchState.page,
+    searchState.hasMore,
+    searchState.totalResults,
+  ]);
 
   const normalizeSearchTerm = (term) => {
     if (!term || typeof term !== "string") return "";
@@ -88,7 +143,7 @@ export default function SearchPage() {
 
   const fetchPosters = async (isLoadMore = false) => {
     if (!firestore) {
-      updateStaticState({
+      updateSearchState({
         error: "Firestore is not available.",
         loading: false,
         hasSearched: false,
@@ -98,12 +153,13 @@ export default function SearchPage() {
         page: 0,
         hasMore: false,
       });
+      updateStaticState({ ...searchState });
       setLocalState({ ...staticState });
       return;
     }
 
-    if (!localState.queryString.trim()) {
-      updateStaticState({
+    if (!searchState.queryString.trim()) {
+      updateSearchState({
         error: "Please enter a search term.",
         results: [],
         loading: false,
@@ -113,46 +169,51 @@ export default function SearchPage() {
         page: 0,
         hasMore: false,
       });
+      updateStaticState({ ...searchState });
       setLocalState({ ...staticState });
       return;
     }
 
-    updateStaticState({
+    updateSearchState({
       hasSearched: true,
       loading: !isLoadMore,
       error: "",
-      results: isLoadMore ? localState.results : [],
+      results: isLoadMore ? searchState.results : [],
     });
+    updateStaticState({ ...searchState });
     setLocalState({ ...staticState });
     setIsFetchingMore(isLoadMore);
 
     try {
-      const searchKey = normalizeSearchTerm(localState.queryString);
+      const searchKey = normalizeSearchTerm(searchState.queryString);
       let uniquePosterIds = [];
       let posterIdsToFetch = [];
 
       if (!isLoadMore) {
         uniquePosterIds = await fetchPosterIds(searchKey);
-        updateStaticState({
+        updateSearchState({
           page: 0,
           allPosterIds: uniquePosterIds,
           totalResults: uniquePosterIds.length,
           hasMore: uniquePosterIds.length > ITEMS_PER_PAGE,
         });
+        updateStaticState({ ...searchState });
         setLocalState({ ...staticState });
 
         if (uniquePosterIds.length === 0) {
-          updateStaticState({ results: [], loading: false, hasMore: false });
+          updateSearchState({ results: [], loading: false, hasMore: false });
+          updateStaticState({ ...searchState });
           setLocalState({ ...staticState });
           return;
         }
 
         posterIdsToFetch = uniquePosterIds.slice(0, ITEMS_PER_PAGE);
       } else {
-        const startIndex = staticState.page * ITEMS_PER_PAGE;
-        posterIdsToFetch = staticState.allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+        const startIndex = searchState.page * ITEMS_PER_PAGE;
+        posterIdsToFetch = searchState.allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
         if (posterIdsToFetch.length === 0) {
-          updateStaticState({ hasMore: false });
+          updateSearchState({ hasMore: false });
+          updateStaticState({ ...searchState });
           setLocalState({ ...staticState });
           return;
         }
@@ -188,34 +249,27 @@ export default function SearchPage() {
         }
       }
 
-      const newResults = isLoadMore ? [...localState.results, ...searchResults] : searchResults;
-      const newPage = isLoadMore ? localState.page + 1 : 1;
-      const hasMore = staticState.allPosterIds.length > newPage * ITEMS_PER_PAGE;
+      const newResults = isLoadMore ? [...searchState.results, ...searchResults] : searchResults;
+      const newPage = isLoadMore ? searchState.page + 1 : 1;
+      const hasMore = searchState.allPosterIds.length > newPage * ITEMS_PER_PAGE;
 
-      updateStaticState({
+      updateSearchState({
         results: newResults,
         loading: false,
         page: newPage,
         hasMore,
       });
+      updateStaticState({ ...searchState });
       setLocalState({ ...staticState });
-
-      // Debug log to verify state
-      console.log("fetchPosters state:", {
-        isLoadMore,
-        allPosterIdsLength: localState.allPosterIds.length,
-        page: newPage,
-        hasMore,
-        resultsLength: newResults.length,
-      });
     } catch (err) {
       console.error("Error fetching search results:", err);
-      updateStaticState({
+      updateSearchState({
         error: `Failed to fetch search results: ${err.message}`,
         loading: false,
-        results: isLoadMore ? localState.results : [],
+        results: isLoadMore ? searchState.results : [],
         hasMore: false,
       });
+      updateStaticState({ ...searchState });
       setLocalState({ ...staticState });
     } finally {
       setIsFetchingMore(false);
@@ -224,60 +278,51 @@ export default function SearchPage() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    window.scrollTo({ top: 0 });
-
-    resetStaticState();
-    updateStaticState({ queryString: localState.queryString.trim(), hasSearched: true });
-    setLocalState({ ...staticState });
-
+    updateSearchState({ queryString: searchState.queryString.trim(), hasSearched: true });
     await fetchPosters(false);
+    window.scrollTo({ top: 0 });
   };
 
   const handleLoadMore = () => {
-    if (!isFetchingMore && localState.hasMore && localState.hasSearched) {
+    if (!isFetchingMore && searchState.hasMore && searchState.hasSearched) {
       fetchPosters(true);
     }
   };
 
   useEffect(() => {
-    if (staticState.hasSearched && staticState.queryString) {
-      setLocalState({ ...staticState });
+    if (location.pathname !== "/search") return;
 
-      // Only fetch if data was cleared
-      if (
-        staticState.results.length === 0 &&
-        staticState.allPosterIds.length > 0
-      ) {
+    if (searchState.hasSearched && searchState.queryString) {
+      if (searchState.results.length > 0) {
+        // Delay scroll until DOM has rendered
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            window.scrollTo({
+              top: staticState.scrollPosition,
+              behavior: "instant", // prevent animation
+            });
+          });
+        });
+      } else if (searchState.allPosterIds.length > 0) {
         fetchPosters(false);
       }
-    } else {
-      resetStaticState();
-      setLocalState({ ...staticState });
     }
-  }, [location]);
-
-
+  }, [
+    location.pathname,
+    searchState.hasSearched,
+    searchState.queryString,
+    searchState.results.length,
+    searchState.allPosterIds.length,
+  ]);
+  
   useEffect(() => {
     const handleScroll = () => {
       updateStaticState({ scrollPosition: window.scrollY });
-      setLocalState((prev) => ({ ...prev, scrollPosition: window.scrollY }));
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  useEffect(() => {
-    if (!localState.loading && localState.results.length > 0) {
-      setTimeout(() => {
-        window.scrollTo({
-          top: staticState.scrollPosition,
-          behavior: "instant", // optional: you can also use "auto"
-        });
-      }, 0);
-    }
-  }, [localState.loading, localState.results.length]);
-
 
   return (
     <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
@@ -288,12 +333,11 @@ export default function SearchPage() {
             type="text"
             className="form-control"
             placeholder="Search here"
-            value={localState.queryString}
+            value={searchState.queryString}
             onChange={(e) => {
-              updateStaticState({ queryString: e.target.value });
-              setLocalState({ ...staticState });
+              updateSearchState({ queryString: e.target.value });
               if (!e.target.value.trim()) {
-                updateStaticState({
+                updateSearchState({
                   hasSearched: false,
                   results: [],
                   allPosterIds: [],
@@ -301,8 +345,6 @@ export default function SearchPage() {
                   hasMore: true,
                   totalResults: 0,
                 });
-                setLocalState({ ...staticState });
-                setIsFetchingMore(false);
               }
             }}
             aria-label="Search posters"
@@ -310,9 +352,9 @@ export default function SearchPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={localState.loading || isFetchingMore}
+            disabled={searchState.loading || isFetchingMore}
           >
-            {(localState.loading || isFetchingMore) ? (
+            {(searchState.loading || isFetchingMore) ? (
               <>
                 <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                 {isFetchingMore ? "Loading more..." : "Searching..."}
@@ -324,18 +366,18 @@ export default function SearchPage() {
             )}
           </button>
         </div>
-        {localState.error && <div className="alert alert-danger">{localState.error}</div>}
-        {localState.hasSearched && !localState.loading && (
+        {searchState.error && <div className="alert alert-danger">{searchState.error}</div>}
+        {searchState.hasSearched && !searchState.loading && (
           <p className="text-muted mb-3">
-            {localState.totalResults} {localState.totalResults === 1 ? "result" : "results"} found
+            {searchState.totalResults} {searchState.totalResults === 1 ? "result" : "results"} found
           </p>
         )}
       </form>
-      {(localState.loading && !isFetchingMore) ? (
+      {(searchState.loading && !isFetchingMore) ? (
         <div className="text-muted">Searching...</div>
       ) : (
         <div className="row">
-          {localState.results.map((poster) => (
+          {searchState.results.map((poster) => (
             <div key={poster.id} className="col-6 col-md-3 mb-4">
               <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
                 <div className="h-100 shadow-sm rounded-1">
@@ -377,7 +419,7 @@ export default function SearchPage() {
           ))}
         </div>
       )}
-      {localState.hasSearched && localState.hasMore && !isFetchingMore && !localState.loading && (
+      {searchState.hasSearched && searchState.hasMore && !isFetchingMore && !searchState.loading && (
         <div className="text-center my-4">
           <button
             className="btn btn-primary"

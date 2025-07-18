@@ -34,8 +34,7 @@ export default function NavbarComponent() {
 
     navigate("/search");
   };
-
-
+  
   return (
     <>
       <nav
