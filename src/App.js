@@ -22,10 +22,8 @@ import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import CollectionsPacks from "./pages/AAdmin/CollectionsPacks/CollectionsPacks";
 import CollectionsPacksPage from "./components/Collections/CollectionsPacksPage";
-import { CollectionDetailProvider } from "./context/CollectionDetailContext";
 
 const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
-const Dashboard = lazy(() => import('./pages/AAdmin/Dashboard'));
 const Orders = lazy(() => import('./pages/AAdmin/Orders/index'));
 const SectionManager = lazy(() => import('./pages/AAdmin/HomeContentManager/SectionManager'));
 const Posters = lazy(() => import('./pages/AAdmin/Posters/Posters'));
@@ -50,14 +48,7 @@ function App() {
           <Route index element={<MainLanding />} />
           <Route path="all-posters" element={<AllPosters />} />
           <Route path="collections-packs" element={<CollectionsPacksPage />} />
-          <Route
-            path="collections/:collectionId"
-            element={
-              <CollectionDetailProvider>
-                <CollectionDetail />
-              </CollectionDetailProvider>
-            }
-          />
+          <Route path="collections/:collectionId" element={<CollectionDetail />} />
           <Route path="collection/:collectionId" element={<SingleCollection />} />
           <Route path="poster/:id" element={<Poster />} />
           <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
@@ -72,8 +63,6 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
         </Route>
         <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
-          {/* <Route index element={<Dashboard />} /> */}
-          {/* <Route path="dashboard" element={<Dashboard />} /> */}
           <Route path="orders" element={<Orders />} />
           <Route path="home-content" element={<SectionManager />} />
           <Route path="collections-packs" element={<CollectionsPacks />} />

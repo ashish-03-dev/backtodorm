@@ -1,25 +1,42 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { useFirebase } from "../../context/FirebaseContext";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
-// Create Context
-const CollectionsContext = createContext();
+// Module-level state to persist across navigation
+const staticState = {
+  collections: [],
+  loading: true,
+  error: null,
+  scrollPosition: 0,
+};
 
-export const useCollections = () => useContext(CollectionsContext);
+// Helper to update and retrieve static state
+const updateStaticState = (newState) => {
+  Object.assign(staticState, newState);
+};
 
-export const CollectionsPacksPageProvider = ({ children }) => {
+// Reset state function
+const resetStaticState = () => {
+  updateStaticState({
+    collections: [],
+    loading: true,
+    error: null,
+    scrollPosition: 0,
+  });
+};
+
+export default function CollectionsPacksPage() {
   const { firestore } = useFirebase();
-  const [collections, setCollections] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const location = useLocation(); // To detect navigation changes
+  const [localState, setLocalState] = useState({ ...staticState });
 
   const ensureString = (value) => (typeof value === "string" ? value : "");
 
   const fetchCollections = async () => {
     if (!firestore) {
-      setError("Firestore is not available.");
-      setLoading(false);
+      updateStaticState({ error: "Firestore is not available.", loading: false });
+      setLocalState({ ...staticState });
       return;
     }
 
@@ -33,55 +50,52 @@ export const CollectionsPacksPageProvider = ({ children }) => {
         imageUrl: ensureString(doc.data().imageUrl),
         discount: Number.isFinite(doc.data().discount) ? doc.data().discount : 0,
       }));
-      setCollections(fetched);
-      setLoading(false);
+      updateStaticState({ collections: fetched, loading: false });
+      setLocalState({ ...staticState });
     } catch (err) {
       console.error("Error fetching collections:", err);
-      setError("Failed to load collections: " + err.message);
-      setLoading(false);
+      updateStaticState({ error: "Failed to load collections: " + err.message, loading: false });
+      setLocalState({ ...staticState });
     }
   };
 
   useEffect(() => {
-    fetchCollections();
-  }, [firestore]);
+    // Restore state and scroll position when navigating back
+    if (staticState.collections.length > 0) {
+      setLocalState({ ...staticState });
+      window.scrollTo({ top: staticState.scrollPosition, behavior: "instant" });
+    } else if (!staticState.error) {
+      resetStaticState();
+      setLocalState({ ...staticState });
+      fetchCollections();
+    }
+  }, [firestore, location]); // Trigger on location change
+
+  useEffect(() => {
+    const handleScroll = () => {
+      updateStaticState({ scrollPosition: window.scrollY });
+      setLocalState((prev) => ({ ...prev, scrollPosition: window.scrollY }));
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const resetState = () => {
-    setCollections([]);
-    setLoading(true);
-    setError(null);
+    resetStaticState();
+    setLocalState({ ...staticState });
     fetchCollections();
   };
 
-  const value = {
-    collections,
-    loading,
-    error,
-    resetState,
-  };
-
-  return (
-    <CollectionsContext.Provider value={value}>
-      {children}
-    </CollectionsContext.Provider>
-  );
-};
-
-export default function CollectionsPacksPage() {
-  const { collections, loading, error, resetState } = useCollections();
-
-  if (loading) {
+  if (localState.loading && localState.collections.length === 0) {
     return <div className="container py-5 text-center">Loading...</div>;
   }
 
-  if (error) {
+  if (localState.error) {
     return (
       <div className="container py-5 text-center">
-        <p className="text-danger">{error}</p>
-        <button
-          className="btn btn-primary mt-3"
-          onClick={resetState}
-        >
+        <p className="text-danger">{localState.error}</p>
+        <button className="btn btn-primary mt-3" onClick={resetState}>
           Try Again
         </button>
       </div>
@@ -92,7 +106,7 @@ export default function CollectionsPacksPage() {
     <section className="container py-5">
       <h1 className="fw-bold mb-4 text-center">All Collections</h1>
       <div className="row g-4">
-        {collections.map((col) => (
+        {localState.collections.map((col) => (
           <div key={col.id} className="col-6 col-md-4 col-lg-3">
             <Link to={`/collection/${col.id}`} className="text-decoration-none text-dark">
               <div className="card h-100 border">

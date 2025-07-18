@@ -7,7 +7,7 @@ const ScrollManager = () => {
   const prevPathRef = useRef(null);
 
   useEffect(() => {
-    const keepScrollPaths = ["/", "/search", "/collections/", "/collection/"];
+    const keepScrollPaths = ["/", "/search"];
 
     const shouldRememberScroll = keepScrollPaths.some(path =>
       pathname === path || pathname.startsWith(path)

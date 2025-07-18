@@ -1,29 +1,47 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { useFirebase } from '../../context/FirebaseContext'; // Adjust path as needed
 
-// Create Context
-const AllPostersContext = createContext();
+// Module-level state to persist across navigation
+const staticState = {
+  posters: [],
+  lastDoc: null,
+  hasMore: true,
+  loading: true,
+  loadingMore: false,
+  error: null,
+  scrollPosition: 0,
+};
 
-export const useAllPosters = () => useContext(AllPostersContext);
+// Helper to update and retrieve static state
+const updateStaticState = (newState) => {
+  Object.assign(staticState, newState);
+};
 
-export const AllPostersProvider = ({ children }) => {
+// Reset state function
+const resetStaticState = () => {
+  updateStaticState({
+    posters: [],
+    lastDoc: null,
+    hasMore: true,
+    loading: true,
+    error: null,
+    scrollPosition: 0,
+  });
+};
+
+export default function AllPosters() {
   const { firestore } = useFirebase();
-  const [posters, setPosters] = useState([]);
-  const [lastDoc, setLastDoc] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
+  const location = useLocation(); // To detect navigation changes
+  const [localState, setLocalState] = useState({ ...staticState });
 
   const POSTERS_PER_PAGE = 12;
 
   const fetchPosters = async (startAfterDoc = null) => {
     if (!firestore) {
-      setError('Firestore is not available.');
-      setLoading(false);
+      updateStaticState({ error: 'Firestore is not available.', loading: false });
+      setLocalState({ ...staticState });
       return;
     }
 
@@ -68,30 +86,36 @@ export const AllPostersProvider = ({ children }) => {
         };
       });
 
-      setPosters(prev => startAfterDoc ? [...prev, ...fetchedPosters] : fetchedPosters);
-      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
-      setHasMore(querySnapshot.docs.length === POSTERS_PER_PAGE);
-      setLoading(false);
-      setLoadingMore(false);
+      const newPosters = startAfterDoc ? [...staticState.posters, ...fetchedPosters] : fetchedPosters;
+      updateStaticState({
+        posters: newPosters,
+        lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1] || null,
+        hasMore: querySnapshot.docs.length === POSTERS_PER_PAGE,
+        loading: false,
+        loadingMore: false,
+      });
+      setLocalState({ ...staticState });
     } catch (err) {
       console.error('Error fetching posters:', err);
-      setError('Failed to load posters: ' + err.message);
-      setLoading(false);
-      setLoadingMore(false);
+      updateStaticState({ error: 'Failed to load posters: ' + err.message, loading: false, loadingMore: false });
+      setLocalState({ ...staticState });
     }
   };
 
   useEffect(() => {
-    if (posters.length === 0 && !error) {
+    // Restore scroll position and state when navigating back
+    if (staticState.posters.length > 0) {
+      setLocalState({ ...staticState });
+      window.scrollTo({ top: staticState.scrollPosition, behavior: 'instant' });
+    } else if (!staticState.error) {
       fetchPosters();
-    } else if (posters.length > 0) {
-      window.scrollTo({ top: scrollPosition, behavior: 'instant' });
     }
-  }, [firestore, posters.length, error]);
+  }, [firestore, location]); // Trigger on location change to handle navigation
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrollPosition(window.scrollY);
+      updateStaticState({ scrollPosition: window.scrollY });
+      setLocalState(prev => ({ ...prev, scrollPosition: window.scrollY }));
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -99,40 +123,17 @@ export const AllPostersProvider = ({ children }) => {
   }, []);
 
   const handleLoadMore = () => {
-    if (!hasMore || loading || loadingMore) return;
-    setLoadingMore(true);
-    fetchPosters(lastDoc);
+    if (!staticState.hasMore || staticState.loading || staticState.loadingMore) return;
+    updateStaticState({ loadingMore: true });
+    setLocalState({ ...staticState });
+    fetchPosters(staticState.lastDoc);
   };
 
   const resetState = () => {
-    setPosters([]);
-    setLastDoc(null);
-    setHasMore(true);
-    setLoading(true);
-    setError(null);
-    setScrollPosition(0);
+    resetStaticState();
+    setLocalState({ ...staticState });
     fetchPosters();
   };
-
-  const value = {
-    posters,
-    loading,
-    loadingMore,
-    error,
-    hasMore,
-    handleLoadMore,
-    resetState,
-  };
-
-  return (
-    <AllPostersContext.Provider value={value}>
-      {children}
-    </AllPostersContext.Provider>
-  );
-};
-
-export default function AllPosters() {
-  const { posters, loading, loadingMore, error, hasMore, handleLoadMore, resetState } = useAllPosters(); // Destructure resetState here
 
   const SkeletonCard = () => (
     <div className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch">
@@ -149,7 +150,7 @@ export default function AllPosters() {
     </div>
   );
 
-  if (loading && posters.length === 0) {
+  if (localState.loading && localState.posters.length === 0) {
     return (
       <section className="bg-white py-5">
         <div className="container">
@@ -164,14 +165,14 @@ export default function AllPosters() {
     );
   }
 
-  if (error) {
+  if (localState.error) {
     return (
       <section className="bg-white py-5">
         <div className="container text-center">
-          <p>{error}</p>
+          <p>{localState.error}</p>
           <button
             className="btn btn-primary mt-3"
-            onClick={resetState} // Use the destructured resetState
+            onClick={resetState}
           >
             Try Again
           </button>
@@ -185,7 +186,7 @@ export default function AllPosters() {
       <div className="container">
         <h2 className="fs-2 fw-bold mb-4 text-center">All Posters</h2>
         <div className="row g-4">
-          {posters.map((poster) => (
+          {localState.posters.map((poster) => (
             <div
               key={poster.id}
               className="col-6 col-md-4 col-lg-3 d-flex align-items-stretch"
@@ -249,25 +250,25 @@ export default function AllPosters() {
             </div>
           ))}
         </div>
-        {loadingMore && (
+        {localState.loadingMore && (
           <div className="row g-4 mt-4">
             {Array(12).fill().map((_, index) => (
               <SkeletonCard key={`loading-${index}`} />
             ))}
           </div>
         )}
-        {hasMore && (
+        {localState.hasMore && (
           <div className="text-center mt-5">
             <button
               className="btn btn-primary"
               onClick={handleLoadMore}
-              disabled={loadingMore}
+              disabled={localState.loadingMore}
             >
-              {loadingMore ? 'Loading...' : 'Load More'}
+              {localState.loadingMore ? 'Loading...' : 'Load More'}
             </button>
           </div>
         )}
-        {!hasMore && posters.length > 0 && (
+        {!localState.hasMore && localState.posters.length > 0 && (
           <div className="text-center mt-5">
             <p className="text-muted">No more posters to load.</p>
           </div>

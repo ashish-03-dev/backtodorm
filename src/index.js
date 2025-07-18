@@ -12,28 +12,28 @@ import { SearchProvider } from './context/SearchContext';
 import { OptionalProvider } from './context/OptionalContext';
 import { NewArrivalsProvider } from './context/NewArrivalsContext';
 import { CollectionsProvider } from './context/CollectionsContext';
-import { AllPostersProvider } from './components/Collections/AllPosters';
-import { CollectionsPacksPageProvider } from './components/Collections/CollectionsPacksPage';
+import { SectionProvider } from './context/SectionScrollContext';
+import { CartProvider } from './context/CartContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <FirebaseProvider>
-      <AddressProvider>
-        <SearchProvider>
-          <OptionalProvider>
-            <NewArrivalsProvider>
-              <CollectionsProvider>
-                <AllPostersProvider>
-                  <CollectionsPacksPageProvider>
+      <CartProvider>
+        <SectionProvider>
+          <AddressProvider>
+            <SearchProvider>
+              <OptionalProvider>
+                <NewArrivalsProvider>
+                  <CollectionsProvider>
                     <App />
-                  </CollectionsPacksPageProvider>
-                </AllPostersProvider>
-              </CollectionsProvider>
-            </NewArrivalsProvider>
-          </OptionalProvider>
-        </SearchProvider>
-      </AddressProvider>
+                  </CollectionsProvider>
+                </NewArrivalsProvider>
+              </OptionalProvider>
+            </SearchProvider>
+          </AddressProvider>
+        </SectionProvider>
+      </CartProvider>
     </FirebaseProvider>
   </React.StrictMode>
 );

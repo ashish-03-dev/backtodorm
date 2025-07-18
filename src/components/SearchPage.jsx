@@ -1,24 +1,48 @@
-import React, { useState } from "react";
-import { useFirebase } from "../context/FirebaseContext";
+import React, { useEffect, useState } from "react";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
-import { Link } from "react-router-dom";
-import { useSearch } from "../context/SearchContext";
+import { useFirebase } from "../context/FirebaseContext";
+import { Link, useLocation } from "react-router-dom";
 import { BsSearch } from 'react-icons/bs';
+
+// Module-level state to persist across navigation
+const staticState = {
+  queryString: "",
+  results: [],
+  loading: false,
+  error: "",
+  hasSearched: false,
+  hasMore: true,
+  allPosterIds: [],
+  page: 0,
+  totalResults: 0,
+  scrollPosition: 0,
+};
+
+// Helper to update and retrieve static state
+const updateStaticState = (newState) => {
+  Object.assign(staticState, newState);
+};
+
+// Reset state function
+const resetStaticState = () => {
+  updateStaticState({
+    queryString: "",
+    results: [],
+    loading: false,
+    error: "",
+    hasSearched: false,
+    hasMore: true,
+    allPosterIds: [],
+    page: 0,
+    totalResults: 0,
+    scrollPosition: 0,
+  });
+};
 
 export default function SearchPage() {
   const { firestore } = useFirebase();
-  const { searchState, updateSearchState } = useSearch();
-  const {
-    queryString,
-    results,
-    loading,
-    error,
-    hasSearched,
-    hasMore,
-    allPosterIds,
-    page,
-    totalResults,
-  } = searchState;
+  const location = useLocation();
+  const [localState, setLocalState] = useState({ ...staticState });
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   const ITEMS_PER_PAGE = 12;
@@ -42,12 +66,11 @@ export default function SearchPage() {
         const collectionData = collectionDocSnap.data();
         const posterIdsArray = collectionData.posterIds || [];
         posterIdsArray.forEach((id) => typeof id === "string" && posterIds.add(id));
-        return Array.from(posterIds);
       }
     } catch (err) {
       console.error("Error fetching from collections:", err);
     }
-    
+
     try {
       const postersRef = collection(firestore, "posters");
       const keywordQuery = query(
@@ -64,54 +87,73 @@ export default function SearchPage() {
   };
 
   const fetchPosters = async (isLoadMore = false) => {
-    if (!queryString.trim()) {
-      updateSearchState({ error: "Please enter a search term.", results: [], loading: false });
-      updateSearchState({
+    if (!firestore) {
+      updateStaticState({
+        error: "Firestore is not available.",
+        loading: false,
+        hasSearched: false,
+        results: [],
+        totalResults: 0,
+        allPosterIds: [],
+        page: 0,
+        hasMore: false,
+      });
+      setLocalState({ ...staticState });
+      return;
+    }
+
+    if (!localState.queryString.trim()) {
+      updateStaticState({
+        error: "Please enter a search term.",
+        results: [],
+        loading: false,
         hasSearched: false,
         totalResults: 0,
         allPosterIds: [],
         page: 0,
-        hasMore: true,
+        hasMore: false,
       });
+      setLocalState({ ...staticState });
       return;
     }
 
-    updateSearchState({ hasSearched: true });
-    updateSearchState({
+    updateStaticState({
+      hasSearched: true,
       loading: !isLoadMore,
       error: "",
-      results: isLoadMore ? results : []
+      results: isLoadMore ? localState.results : [],
     });
+    setLocalState({ ...staticState });
     setIsFetchingMore(isLoadMore);
 
     try {
-      const searchKey = normalizeSearchTerm(queryString);
+      const searchKey = normalizeSearchTerm(localState.queryString);
       let uniquePosterIds = [];
       let posterIdsToFetch = [];
 
       if (!isLoadMore) {
-        const posterIds = await fetchPosterIds(searchKey);
-        uniquePosterIds = posterIds;
-        const hasMorePages = uniquePosterIds.length > ITEMS_PER_PAGE;
-
-        updateSearchState({
+        uniquePosterIds = await fetchPosterIds(searchKey);
+        updateStaticState({
           page: 0,
           allPosterIds: uniquePosterIds,
           totalResults: uniquePosterIds.length,
-          hasMore: hasMorePages,
+          hasMore: uniquePosterIds.length > ITEMS_PER_PAGE,
         });
+        setLocalState({ ...staticState });
 
         if (uniquePosterIds.length === 0) {
-          updateSearchState({ results: [], loading: false });
+          updateStaticState({ results: [], loading: false, hasMore: false });
+          setLocalState({ ...staticState });
           return;
         }
 
         posterIdsToFetch = uniquePosterIds.slice(0, ITEMS_PER_PAGE);
       } else {
-        const startIndex = page * ITEMS_PER_PAGE;
-        posterIdsToFetch = allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+        const startIndex = staticState.page * ITEMS_PER_PAGE;
+        posterIdsToFetch = staticState.allPosterIds.slice(startIndex, startIndex + ITEMS_PER_PAGE);
         if (posterIdsToFetch.length === 0) {
-          updateSearchState({ hasMore: false });
+          updateStaticState({ hasMore: false });
+          setLocalState({ ...staticState });
           return;
         }
       }
@@ -138,33 +180,43 @@ export default function SearchPage() {
               ...posterData,
               cheapestPrice,
               originalPrice,
-              discount
+              discount,
             });
           }
         } catch (err) {
-          // Handle or log error if needed
+          console.warn(`Error fetching poster ${posterId}:`, err);
         }
       }
 
-      updateSearchState({
-        results: isLoadMore ? [...results, ...searchResults] : searchResults,
+      const newResults = isLoadMore ? [...localState.results, ...searchResults] : searchResults;
+      const newPage = isLoadMore ? localState.page + 1 : 1;
+      const hasMore = staticState.allPosterIds.length > newPage * ITEMS_PER_PAGE;
+
+      updateStaticState({
+        results: newResults,
         loading: false,
+        page: newPage,
+        hasMore,
       });
+      setLocalState({ ...staticState });
 
-      const totalPosters = isLoadMore ? allPosterIds.length : uniquePosterIds.length;
-      const nextPage = isLoadMore ? page + 1 : 1;
-      updateSearchState({
-        page: nextPage,
-        hasMore: totalPosters > nextPage * ITEMS_PER_PAGE,
+      // Debug log to verify state
+      console.log("fetchPosters state:", {
+        isLoadMore,
+        allPosterIdsLength: localState.allPosterIds.length,
+        page: newPage,
+        hasMore,
+        resultsLength: newResults.length,
       });
-
     } catch (err) {
-      updateSearchState({
+      console.error("Error fetching search results:", err);
+      updateStaticState({
         error: `Failed to fetch search results: ${err.message}`,
         loading: false,
-        results: isLoadMore ? results : [],
+        results: isLoadMore ? localState.results : [],
         hasMore: false,
       });
+      setLocalState({ ...staticState });
     } finally {
       setIsFetchingMore(false);
     }
@@ -174,28 +226,58 @@ export default function SearchPage() {
     e.preventDefault();
     window.scrollTo({ top: 0 });
 
-    updateSearchState({
-      queryString: queryString.trim(),
-      results: [],
-      error: "",
-      loading: false,
-      allPosterIds: [],
-      page: 0,
-      hasMore: true,
-      hasSearched: false,
-      totalResults: 0,
-    });
+    resetStaticState();
+    updateStaticState({ queryString: localState.queryString.trim(), hasSearched: true });
+    setLocalState({ ...staticState });
 
-    setTimeout(() => {
-      fetchPosters(false);
-    }, 0);
+    await fetchPosters(false);
   };
 
   const handleLoadMore = () => {
-    if (!isFetchingMore && hasMore && hasSearched) {
+    if (!isFetchingMore && localState.hasMore && localState.hasSearched) {
       fetchPosters(true);
     }
   };
+
+  useEffect(() => {
+    if (staticState.hasSearched && staticState.queryString) {
+      setLocalState({ ...staticState });
+
+      // Only fetch if data was cleared
+      if (
+        staticState.results.length === 0 &&
+        staticState.allPosterIds.length > 0
+      ) {
+        fetchPosters(false);
+      }
+    } else {
+      resetStaticState();
+      setLocalState({ ...staticState });
+    }
+  }, [location]);
+
+
+  useEffect(() => {
+    const handleScroll = () => {
+      updateStaticState({ scrollPosition: window.scrollY });
+      setLocalState((prev) => ({ ...prev, scrollPosition: window.scrollY }));
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!localState.loading && localState.results.length > 0) {
+      setTimeout(() => {
+        window.scrollTo({
+          top: staticState.scrollPosition,
+          behavior: "instant", // optional: you can also use "auto"
+        });
+      }, 0);
+    }
+  }, [localState.loading, localState.results.length]);
+
 
   return (
     <div className="container py-4" style={{ minHeight: "calc(100svh - 65px)" }}>
@@ -206,11 +288,12 @@ export default function SearchPage() {
             type="text"
             className="form-control"
             placeholder="Search here"
-            value={queryString}
+            value={localState.queryString}
             onChange={(e) => {
-              updateSearchState({ queryString: e.target.value });
+              updateStaticState({ queryString: e.target.value });
+              setLocalState({ ...staticState });
               if (!e.target.value.trim()) {
-                updateSearchState({
+                updateStaticState({
                   hasSearched: false,
                   results: [],
                   allPosterIds: [],
@@ -218,13 +301,18 @@ export default function SearchPage() {
                   hasMore: true,
                   totalResults: 0,
                 });
+                setLocalState({ ...staticState });
                 setIsFetchingMore(false);
               }
             }}
             aria-label="Search posters"
           />
-          <button type="submit" className="btn btn-primary" disabled={loading || isFetchingMore}>
-            {(loading || isFetchingMore) ? (
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={localState.loading || isFetchingMore}
+          >
+            {(localState.loading || isFetchingMore) ? (
               <>
                 <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                 {isFetchingMore ? "Loading more..." : "Searching..."}
@@ -236,18 +324,18 @@ export default function SearchPage() {
             )}
           </button>
         </div>
-        {error && <div className="alert alert-danger">{error}</div>}
-        {hasSearched && !loading && (
+        {localState.error && <div className="alert alert-danger">{localState.error}</div>}
+        {localState.hasSearched && !localState.loading && (
           <p className="text-muted mb-3">
-            {totalResults} {totalResults === 1 ? "result" : "results"} found
+            {localState.totalResults} {localState.totalResults === 1 ? "result" : "results"} found
           </p>
         )}
       </form>
-      {(loading && !isFetchingMore) ? (
-        <div className="text-muted ">Searching...</div>
+      {(localState.loading && !isFetchingMore) ? (
+        <div className="text-muted">Searching...</div>
       ) : (
         <div className="row">
-          {results.map((poster) => (
+          {localState.results.map((poster) => (
             <div key={poster.id} className="col-6 col-md-3 mb-4">
               <Link to={`/poster/${poster.id}`} className="text-decoration-none text-dark">
                 <div className="h-100 shadow-sm rounded-1">
@@ -289,7 +377,7 @@ export default function SearchPage() {
           ))}
         </div>
       )}
-      {hasSearched && hasMore && !isFetchingMore && !loading && (
+      {localState.hasSearched && localState.hasMore && !isFetchingMore && !localState.loading && (
         <div className="text-center my-4">
           <button
             className="btn btn-primary"
