@@ -47,7 +47,7 @@ export default function HelpCentre() {
     );
 
     // Fetch support tickets
-    const ticketsQuery = query(collection(firestore, `userSupportTickets/${user.uid}/tickets`));
+    const ticketsQuery = query(collection(firestore, `users/${user.uid}/tickets`));
     const ticketsUnsubscribe = onSnapshot(
       ticketsQuery,
       (snapshot) => {
@@ -107,8 +107,8 @@ export default function HelpCentre() {
       // Add to supportTickets collection
       const ticketRef = await addDoc(collection(firestore, 'supportTickets'), ticketData);
 
-      // Mirror in userSupportTickets collection
-      await setDoc(doc(firestore, `userSupportTickets/${user.uid}/tickets`, ticketRef.id), {
+      // Store in users/userId/tickets collection
+      await setDoc(doc(firestore, `users/${user.uid}/tickets`, ticketRef.id), {
         ...ticketData,
         ticketId: ticketRef.id,
       });
