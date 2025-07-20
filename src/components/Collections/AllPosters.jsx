@@ -49,7 +49,6 @@ export default function AllPosters() {
       const postersQuery = query(
         collection(firestore, 'posters'),
         where('isActive', '==', true),
-        orderBy('createdAt', 'desc'),
         limit(POSTERS_PER_PAGE),
         ...(startAfterDoc ? [startAfter(startAfterDoc)] : [])
       );

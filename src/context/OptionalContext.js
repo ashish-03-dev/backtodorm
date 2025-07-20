@@ -28,7 +28,6 @@ export const OptionalProvider = ({ children }) => {
         const postersQuery = query(
           collection(firestore, 'posters'),
           where('isActive', '==', true),
-          orderBy('createdAt', 'desc'),
           limit(6)
         );
 
