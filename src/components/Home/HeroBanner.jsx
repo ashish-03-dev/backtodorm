@@ -6,12 +6,12 @@ export default function HeroBanner() {
     <div className="position-relative text-center text-white py-5">
       <div className="position-absolute top-0 start-0 w-100 h-100">
         <img
-          src="https://res.cloudinary.com/dqu3mzqfj/image/upload/v1753045214/Untitled_design_boki7q.png" // Replace with your desktop background image
+          src="https://res.cloudinary.com/dqu3mzqfj/image/upload/v1753045882/Untitled_design_iyrxvr.webp" // Replace with your desktop background image
           alt="Background"
           className="d-none d-md-block w-100 h-100 object-fit-cover"
         />
         <img
-          src="https://res.cloudinary.com/dqu3mzqfj/image/upload/v1753042816/starts_60_1_saamxl.png" // Replace with your mobile background image
+          src="https://res.cloudinary.com/dqu3mzqfj/image/upload/v1753045932/starts_60_1_qv3qaw.webp" // Replace with your mobile background image
           alt="Background"
           className="d-block d-md-none w-100 h-100 object-fit-cover"
         />
