@@ -23,7 +23,7 @@ export default function HeroBanner() {
       <div className="position-relative container py-5">
         <h1 className="display-5 fw-bold">Give Your Room a Cool Vibe</h1>
         <p className="lead">
-          Awesome, high-quality 300 DPI posters made to match your style. Make your space feel like you.
+          Awesome, high-quality 300 DPI posters made to match your style.
         </p>
         <Link to="/all-posters" className="btn btn-light btn-lg mt-3">
           Browse All Posters
