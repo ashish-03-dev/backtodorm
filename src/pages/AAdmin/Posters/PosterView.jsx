@@ -1,11 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, ListGroup, Image } from "react-bootstrap";
+import { useFirebase } from "../../../context/FirebaseContext";
+import { doc, getDoc } from "firebase/firestore";
 
 const PosterView = ({ poster }) => {
   const [imageError, setImageError] = useState(false);
+  const [originalPosterData, setOriginalPosterData] = useState(null);
+  const { firestore } = useFirebase();
 
   const imageSource = poster?.imageUrl || poster?.originalImageUrl || "";
   const placeholderImage = "https://via.placeholder.com/300x300?text=Image+not+found";
+
+  // Fetch original poster data from Firestore
+  useEffect(() => {
+    const fetchOriginalPoster = async () => {
+      if (poster?.posterId) {
+        try {
+          const posterRef = doc(firestore, "originalPoster", poster.posterId);
+          const posterSnap = await getDoc(posterRef);
+          if (posterSnap.exists()) {
+            setOriginalPosterData(posterSnap.data());
+          }
+        } catch (error) {
+          console.error("Error fetching original poster:", error);
+        }
+      }
+    };
+
+    fetchOriginalPoster();
+  }, [firestore, poster?.posterId]);
 
   return (
     <Card>
@@ -30,9 +53,7 @@ const PosterView = ({ poster }) => {
             )}
           </div>
           <div className="col-md-6">
-
             <Card.Title className="mb-3">{poster.title || "Untitled"}</Card.Title>
-            <Card.Text>{poster.description || "No description available."}</Card.Text>
             <ListGroup variant="flush">
               <ListGroup.Item>
                 <strong>Sizes and Prices:</strong>{" "}
@@ -69,18 +90,7 @@ const PosterView = ({ poster }) => {
                 {poster.keywords?.length > 0 ? poster.keywords.join(", ") : "No items"}
               </ListGroup.Item>
               <ListGroup.Item>
-                {/* {poster?.status && ( */}
-                <>
-                  <strong>Status:</strong>{" "}
-                  {/* {poster.status.charAt(0).toUpperCase() + poster.status.slice(1)} */}
-                  {typeof poster?.isActive === "boolean" && " | "}
-                </>
-                {/* // )} */}
-                {typeof poster?.isActive === "boolean" && (
-                  <>
-                    <strong>Active:</strong> {poster.isActive ? "Yes" : "No"}
-                  </>
-                )}
+                <strong>Active:</strong> {poster.isActive ? "Yes" : "No"}
               </ListGroup.Item>
               <ListGroup.Item>
                 <small>
@@ -95,7 +105,23 @@ const PosterView = ({ poster }) => {
               </ListGroup.Item>
               <ListGroup.Item>
                 <small>
-                  <strong>Poster:</strong> {poster.posterId || poster.id || "N/A"}
+                  <strong>Poster ID:</strong> {poster.posterId || poster.id || "N/A"}
+                </small>
+              </ListGroup.Item>
+              <ListGroup.Item>
+                <small>
+                  <strong>Original Poster Link:</strong>{" "}
+                  {originalPosterData?.imageUrl ? (
+                    <a
+                      href={originalPosterData.imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View Original Poster
+                    </a>
+                  ) : (
+                    "N/A"
+                  )}
                 </small>
               </ListGroup.Item>
             </ListGroup>
