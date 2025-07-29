@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useFirebase } from '../context/FirebaseContext';
 import { useAddress } from '../context/AddressContext';
 import { httpsCallable } from 'firebase/functions';
-import { Form, Button, Alert, ListGroup, Card, Modal, Spinner } from 'react-bootstrap';
-import { BsTruck, BsTrash } from 'react-icons/bs';
+import { Button, Alert, ListGroup, Card, Modal, Spinner } from 'react-bootstrap';
 import AddressForm from './Account/AddressForm'; // Adjust the path as needed
 
 const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowForm }) => {
@@ -64,7 +63,7 @@ const AddressOverlay = ({ show, onHide, addresses, handleAddressSelect, setShowF
 const Checkout = () => {
   const { user, firestore, userData, authLoading, loadingUserData, functions } = useFirebase();
   const { addresses, getAddressList, addAddress, loading: addressLoading } = useAddress();
-  const { cartItems = [], buyNowItem, setCartItems, setBuyNowItem, removeFromCart, loading: cartLoading, deliveryCharge = 0, freeDeliveryThreshold = 0 } = useCartContext();
+  const { cartItems = [], buyNowItem, setCartItems, setBuyNowItem, loading: cartLoading, deliveryCharge = 0, freeDeliveryThreshold = 0 } = useCartContext();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -75,7 +74,6 @@ const Checkout = () => {
   const [showForm, setShowForm] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
@@ -124,20 +122,6 @@ const Checkout = () => {
     if (selected) setFormData(selected);
     else setFormData({ title: '', name: userData?.name || '', phone: userData?.phone || '', address: '', locality: '', city: '', state: '', pincode: '', landmark: '' });
     setShowPayment(false);
-  };
-
-  const handleRemoveItem = (item) => {
-    const isCollection = item.type === 'collection';
-    const id = isCollection ? item.collectionId : item.posterId;
-    const size = isCollection ? '' : item.size;
-    const finish = item.finish || 'Gloss';
-
-    removeFromCart(id, size, finish, isCollection);
-
-    // If the removed item is the buyNowItem, clear it
-    if (buyNowItem && buyNowItem.id === item.id) {
-      setBuyNowItem(null);
-    }
   };
 
   const handleProceedToPayment = (e) => {
@@ -283,7 +267,7 @@ const Checkout = () => {
               ) : (
                 <ListGroup variant="flush">
                   {items.map((item, index) => (
-                    <ListGroup.Item key={`${item.posterId || item.collectionId}-${item.size || 'collection'}-${item.finish || 'Gloss'}-${index}`} className="py-2">
+                    <ListGroup.Item key={`${item.posterId || item.collectionId}-${item.size || 'collection'}-${item.finish || 'Gloss'}-${index}`} className="py-2 border-0">
                       <div className="d-flex align-items-center">
                         <img
                           src={item.image || (item.posters && item.posters[0]?.image) || 'https://via.placeholder.com/50'}
@@ -296,29 +280,50 @@ const Checkout = () => {
                               ? `Collection: ${item.collectionId || 'Untitled'} (Finish: ${item.finish || 'Gloss'})`
                               : `${item.title || 'Untitled'} (${item.size || 'N/A'}, Finish: ${item.finish || 'Gloss'})`}
                           </h6>
-                          <p className="mb-0">Quantity: {item.quantity || 1}</p>
-                          {item.type !== 'collection' && item.discount > 0 && <p className="mb-0 text-success">Discount: {item.discount}%</p>}
-                          {item.type === 'collection' && item.collectionDiscount > 0 && <p className="mb-0 text-success">Collection Discount: {item.collectionDiscount}%</p>}
-                        </div>
-                        <div className="d-flex align-items-center">
-                          <p className="me-3 mb-0">
-                            ₹{(
-                              item.type === 'collection'
-                                ? (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) * (item.quantity || 1) * (1 - (item.collectionDiscount || 0) / 100)
-                                : (item.finalPrice || item.price || 0) * (item.quantity || 1)
-                            ).toLocaleString('en-IN')}
+                          <p className="mb-0">
+                            Quantity: {item.quantity || 1}
+                            {(item.type !== 'collection' && item.discount > 0) && (
+                              <span className="ms-3">Discount: {item.discount}%</span>
+                            )}
+                            {(item.type === 'collection' && item.collectionDiscount > 0) && (
+                              <span className="ms-3">Collection Discount: {item.collectionDiscount}%</span>
+                            )}
                           </p>
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={() => handleRemoveItem(item)}
-                            className="d-flex align-items-center justify-content-center"
-                            style={{ width: '30px', height: '30px', lineHeight: '1' }}
-                            aria-label={`Remove ${item.title || item.collectionId || 'item'} from cart`}
-                          >
-                            <BsTrash className="fs-6" />
-                          </Button>
                         </div>
+                        <p className="mb-0 text-end">
+                          {item.type === 'collection' ? (
+                            <>
+                              {/* Original total */}
+                              {item.collectionDiscount > 0 && (
+                                <span className="text-decoration-line-through me-2 text-muted">
+                                  ₹{(
+                                    (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) *
+                                    (item.quantity || 1)
+                                  ).toLocaleString('en-IN')}
+                                </span>
+                              )}
+                              {/* Final discounted total */}
+                              <span className="text-success fw-semibold">
+                                ₹{(
+                                  (item.posters || []).reduce((sum, p) => sum + (p.finalPrice || p.price || 0), 0) *
+                                  (item.quantity || 1) *
+                                  (1 - (item.collectionDiscount || 0) / 100)
+                                ).toLocaleString('en-IN')}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {item.discount > 0 && (
+                                <span className="text-decoration-line-through me-2 text-muted">
+                                  ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
+                                </span>
+                              )}
+                              <span className="text-success fw-semibold">
+                                ₹{((item.finalPrice || item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
+                              </span>
+                            </>
+                          )}
+                        </p>
                       </div>
                       {item.type === 'collection' && (
                         <ul className="mt-2 ps-3 small text-muted">
@@ -336,15 +341,14 @@ const Checkout = () => {
               )}
               <hr className="my-2" />
               {items.length > 0 ? (
-                <div>
+                <div className='px-3'>
                   <div className="d-flex justify-content-between mb-2">
                     <span>Subtotal</span>
                     <span>₹{subtotal.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="d-flex align-items-center">
-                      <BsTruck className="me-2 text-primary" style={{ fontSize: '1rem' }} />
-                      Delivery
+                      Shipping
                     </span>
                     <span>
                       {isFreeDelivery ? (
@@ -364,7 +368,7 @@ const Checkout = () => {
                       Add ₹{(freeDeliveryThreshold - subtotal).toLocaleString('en-IN')} more for free delivery!
                     </p>
                   )}
-                  <div className="d-flex justify-content-between mt-2 pt-2 border-top">
+                  <div className="d-flex justify-content-between mt-2 pt-2">
                     <h5>Total</h5>
                     <h5>₹{totalPrice.toLocaleString('en-IN')}</h5>
                   </div>
@@ -393,7 +397,7 @@ const Checkout = () => {
                 </span>
               </div>
               {selectedAddressId && formData.name && (
-                <Card className="p-2 border-0 mb-4">
+                <Card className="p-3 border-0 mb-4 bg-light">
                   <p className="mb-1"><strong>{formData.title || formData.name}</strong> {formData.phone}</p>
                   <p className="mb-1 text-muted">{formData.address}, {formData.locality}, {formData.city}{formData.landmark && `, ${formData.landmark}`}</p>
                   <p className="mb-0 text-muted">{formData.state} - {formData.pincode}</p>
@@ -404,7 +408,7 @@ const Checkout = () => {
                   variant="primary"
                   className="w-100"
                   onClick={handleProceedToPayment}
-                  disabled={submitting || items.length === 0 || (!selectedAddressId && !formData.name) || cartLoading}
+                  disabled={items.length === 0 || (!selectedAddressId && !formData.name) || cartLoading}
                 >
                   Proceed to Payment
                 </Button>

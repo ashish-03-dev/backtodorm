@@ -1,11 +1,10 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
-import { Tabs, Tab, Modal, Spinner, Alert, Button } from "react-bootstrap";
+import { Modal, Spinner, Alert, Button } from "react-bootstrap";
 import PosterTable from "./PosterTable";
 import PosterForm from "../PosterApprovals/PosterForm";
 import PosterView from "./PosterView";
-import CollectionsManager from "./CollectionsManager";
 import { useFirebase } from "../../../context/FirebaseContext";
-import { collection, query, getDocs, orderBy, limit, where } from "firebase/firestore";
+import { collection, query, getDocs, getDoc, doc, orderBy, limit, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { updatePoster, submitPoster } from "./adminPosterUtils";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -24,16 +23,6 @@ const Posters = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ search: "" });
-  const [tabFilters, setTabFilters] = useState(() => {
-    const saved = sessionStorage.getItem("postersTabFilters");
-    return saved ? JSON.parse(saved) : {
-      inactive: { search: "" },
-      collections: { search: "" },
-    };
-  });
-  const [activeTab, setActiveTab] = useState(() => {
-    return sessionStorage.getItem("postersActiveTab") || "all";
-  });
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -42,18 +31,49 @@ const Posters = () => {
   const [deletingPoster, setDeletingPoster] = useState(null);
   const [searchInput, setSearchInput] = useState("");
 
-  // Persist state to sessionStorage (excluding filter.search)
-  useEffect(() => {
-    sessionStorage.setItem("postersTabFilters", JSON.stringify(tabFilters));
-  }, [tabFilters]);
-
-  useEffect(() => {
-    sessionStorage.setItem("postersActiveTab", activeTab);
-  }, [activeTab]);
-
+  // Persist state to sessionStorage
   useEffect(() => {
     sessionStorage.setItem("postersData", JSON.stringify(posters));
   }, [posters]);
+
+  const normalizeSearchTerm = (term) => {
+    if (!term || typeof term !== "string") return "";
+    return term
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/^-+|-+$/g, "");
+  };
+
+  const fetchPosterIds = async (searchKey) => {
+    const posterIds = new Set();
+
+    try {
+      const collectionDocSnap = await getDoc(doc(firestore, "collections", searchKey));
+      if (collectionDocSnap.exists()) {
+        const collectionData = collectionDocSnap.data();
+        const posterIdsArray = collectionData.posterIds || [];
+        posterIdsArray.forEach((id) => typeof id === "string" && posterIds.add(id));
+      }
+    } catch (err) {
+      console.error("Error fetching from collections:", err);
+    }
+
+    try {
+      const postersRef = collection(firestore, "posters");
+      const keywordQuery = query(
+        postersRef,
+        where("keywords", "array-contains", searchKey),
+        where("isActive", "==", true)
+      );
+      const keywordSnapshot = await getDocs(keywordQuery);
+      keywordSnapshot.forEach((doc) => posterIds.add(doc.id));
+    } catch (err) {
+      console.error("Error fetching from posters by keywords:", err);
+    }
+    return Array.from(posterIds);
+  };
 
   // Fetch posters with search
   const fetchPosters = async () => {
@@ -66,37 +86,36 @@ const Posters = () => {
 
     setLoading(true);
     try {
-      let q = query(collection(firestore, "posters"), orderBy("createdAt", "desc"), limit(5));
-      if (activeTab === "all" && filter.search) {
-        q = query(
-          collection(firestore, "posters"),
-          where("keywords", "array-contains", filter.search.toLowerCase()),
-          orderBy("createdAt", "desc"),
-          limit(5)
-        );
-      } else if (activeTab === "inactive" && tabFilters.inactive.search) {
-        q = query(
-          collection(firestore, "posters"),
-          where("keywords", "array-contains", tabFilters.inactive.search.toLowerCase()),
-          where("isActive", "==", false),
-          where("approved", "==", "approved"),
-          orderBy("createdAt", "desc"),
-          limit(5)
-        );
-      } else if (activeTab === "inactive") {
-        q = query(
-          collection(firestore, "posters"),
-          where("isActive", "==", false),
-          where("approved", "==", "approved"),
-          limit(5)
-        );
+      let posterIds = [];
+      let postersData = [];
+
+      if (filter.search) {
+        const searchKey = normalizeSearchTerm(filter.search);
+        if (searchKey) {
+          posterIds = await fetchPosterIds(searchKey);
+        }
+      } else {
+        const q = query(collection(firestore, "posters"), where("isActive", "==", true), orderBy("createdAt", "desc"), limit(5));
+        const snapshot = await getDocs(q);
+        posterIds = snapshot.docs.map((doc) => doc.id);
       }
-      const snapshot = await getDocs(q);
-      const postersData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        source: "posters",
-      }));
+
+      for (const posterId of posterIds) {
+        try {
+          const posterRef = doc(firestore, "posters", posterId);
+          const docSnap = await getDoc(posterRef);
+          if (docSnap.exists()) {
+            const posterData = docSnap.data();
+            postersData.push({
+              id: docSnap.id,
+              ...posterData,
+              source: "posters",
+            });
+          }
+        } catch (err) {
+          console.warn(`Error fetching poster ${posterId}:`, err);
+        }
+      }
 
       setPosters(postersData);
     } catch (error) {
@@ -110,20 +129,11 @@ const Posters = () => {
   // Fetch initial posters
   useEffect(() => {
     fetchPosters();
-  }, [firestore, storage, activeTab]);
+  }, [firestore, storage, filter.search]);
 
   const handleSearch = () => {
-    if (activeTab === "all") {
-      setFilter({ ...filter, search: searchInput });
-    } else if (activeTab === "inactive") {
-      setTabFilters({ ...tabFilters, inactive: { ...tabFilters.inactive, search: searchInput } });
-    }
+    setFilter({ ...filter, search: searchInput });
   };
-
-  // Trigger search on filter or tabFilters change
-  useEffect(() => {
-    fetchPosters();
-  }, [filter.search, tabFilters.inactive.search]);
 
   const deletePoster = async (posterId) => {
     try {
@@ -214,10 +224,6 @@ const Posters = () => {
     }
   };
 
-  const handleTabFilterChange = (tab, newFilter) => {
-    setTabFilters((prev) => ({ ...prev, [tab]: newFilter }));
-  };
-
   if (loadingUserData || loading) {
     return (
       <div
@@ -232,7 +238,7 @@ const Posters = () => {
   }
 
   return (
-    <PostersContext.Provider value={{ filter, setFilter, tabFilters, setTabFilters, activeTab, setActiveTab, posters, setPosters }}>
+    <PostersContext.Provider value={{ filter, setFilter, posters, setPosters }}>
       <div className="p-4 p-md-5" style={{ maxWidth: "1400px" }}>
         <h3 className="mb-4">🖼️ Posters Management</h3>
         {error && (
@@ -240,59 +246,24 @@ const Posters = () => {
             {error}
           </Alert>
         )}
-        <Tabs
-          id="posters-tabs"
-          activeKey={activeTab}
-          onSelect={(k) => setActiveTab(k)}
-          className="mb-3"
-        >
-          <Tab eventKey="all" title="📋 All Posters">
-            <div className="input-group mb-3">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by keywords..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-              <Button variant="primary" onClick={handleSearch}>
-                Search
-              </Button>
-            </div>
-            <PosterTable
-              posters={posters}
-              onEdit={openEdit}
-              onView={openView}
-              onDelete={openDelete}
-            />
-          </Tab>
-          <Tab eventKey="inactive" title="🔒 Inactive">
-            <div className="input-group mb-3">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by keywords..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-              <Button variant="primary" onClick={handleSearch}>
-                Search
-              </Button>
-            </div>
-            <PosterTable
-              posters={posters.filter((p) => !p.isActive && p.approved === "approved")}
-              onEdit={openEdit}
-              onView={openView}
-              onDelete={openDelete}
-            />
-          </Tab>
-          <Tab eventKey="collections" title="📦 Collections">
-            <CollectionsManager
-              onEdit={openEdit}
-              onView={openView}
-            />
-          </Tab>
-        </Tabs>
+        <div className="input-group mb-3">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Search by keywords..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <Button variant="primary" onClick={handleSearch}>
+            Search
+          </Button>
+        </div>
+        <PosterTable
+          posters={posters}
+          onEdit={openEdit}
+          onView={openView}
+          onDelete={openDelete}
+        />
 
         <Modal
           show={showEditModal}

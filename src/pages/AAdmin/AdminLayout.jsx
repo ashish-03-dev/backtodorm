@@ -7,6 +7,7 @@ import {
   BsImage,
   BsCheckCircle,
   BsCollection,
+  BsCollectionPlay,
   BsBoxes,
   BsPeople,
   BsGear,
@@ -45,20 +46,21 @@ export default function AdminLayout() {
 
 
 
-const navItems = [
-  // { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
-  { path: "/admin/orders", label: "Orders", icon: BsCartCheck },
-  { path: "/admin/home-content", label: "Home Content", icon: BsFileText },
-  { path: "/admin/posters", label: "Posters", icon: BsImage },
-  { path: "/admin/poster-approvals", label: "Poster Approvals", icon: BsCheckCircle },
-  { path: "/admin/frames", label: "Frames", icon: BsCollection },
-  { path: "/admin/collections-packs", label: "Collections-Packs", icon: BsBoxes },
-  { path: "/admin/users", label: "Users", icon: BsPeople },
-  { path: "/admin/settings", label: "Site Settings", icon: BsGear },
-  { path: "/admin/admin-users", label: "Admin Users", icon: BsPersonGear },
-  { path: "/admin/support", label: "Support", icon: BsQuestionCircle },
-  { path: "/", label: "Home", icon: BsHouseDoor },
-];
+  const navItems = [
+    // { path: "/admin/dashboard", label: "Dashboard", icon: BsHouse },
+    { path: "/admin/orders", label: "Orders", icon: BsCartCheck },
+    { path: "/admin/home-content", label: "Home Content", icon: BsFileText },
+    { path: "/admin/posters", label: "Posters", icon: BsImage },
+    { path: "/admin/poster-approvals", label: "Poster Approvals", icon: BsCheckCircle },
+    { path: "/admin/frames", label: "Frames", icon: BsCollection },
+    { path: "/admin/collections", label: "Collections", icon: BsCollectionPlay }, // ✅ New item added
+    { path: "/admin/collections-packs", label: "Collections-Packs", icon: BsBoxes },
+    { path: "/admin/users", label: "Users", icon: BsPeople },
+    { path: "/admin/settings", label: "Site Settings", icon: BsGear },
+    { path: "/admin/admin-users", label: "Admin Users", icon: BsPersonGear },
+    { path: "/admin/support", label: "Support", icon: BsQuestionCircle },
+    { path: "/", label: "Home", icon: BsHouseDoor },
+  ];
 
 
   return (

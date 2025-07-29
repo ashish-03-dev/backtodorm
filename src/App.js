@@ -22,6 +22,7 @@ import ProfileAddresses from './components/Account/ProfileAddresses';
 import SecuritySettings from './components/Account/SecuritySettings';
 import CollectionsPacks from "./pages/AAdmin/CollectionsPacks/CollectionsPacks";
 import CollectionsPacksPage from "./components/Collections/CollectionsPacksPage";
+import CollectionsManager from "./pages/AAdmin/CollectionsManager";
 
 const AdminLayout = lazy(() => import('./pages/AAdmin/AdminLayout'));
 const Orders = lazy(() => import('./pages/AAdmin/Orders/index'));
@@ -65,6 +66,7 @@ function App() {
         <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute >} >
           <Route path="orders" element={<Orders />} />
           <Route path="home-content" element={<SectionManager />} />
+          <Route path="collections" element={<CollectionsManager />} />
           <Route path="collections-packs" element={<CollectionsPacks />} />
           <Route path="posters" element={<Posters />} />
           <Route path="poster-approvals" element={<PosterApprovals />} />

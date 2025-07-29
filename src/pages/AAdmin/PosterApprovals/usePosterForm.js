@@ -225,9 +225,13 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
     if (field === "price" && value) {
       const price = parseFloat(value) || 0;
       const disc = parseFloat(discount) || 0;
-      const discountedPrice = price - (price * disc) / 100;
-      const rounded = Math.round(discountedPrice * 100) / 100;
-      updatedSizes[index].finalPrice = rounded.toFixed(2);
+
+      // Use fixed precision math using integer cents
+      const priceCents = Math.round(price * 100);
+      const discountCents = Math.round((priceCents * disc) / 100);
+      const finalCents = priceCents - discountCents;
+
+      updatedSizes[index].finalPrice = (finalCents / 100).toFixed(2);
     }
 
     setSizes(updatedSizes);
@@ -509,13 +513,24 @@ export const usePosterForm = ({ poster, onSubmit, onUpdatePoster }) => {
   const handleDiscountChange = (e) => {
     const disc = parseFloat(e.target.value) || 0;
     setDiscount(disc.toString());
+
     const updatedSizes = sizes.map((s) => {
       if (s.price) {
         const price = parseFloat(s.price) || 0;
-        return { ...s, finalPrice: (price - (price * disc) / 100).toFixed(2) };
+
+        // Convert to cents to avoid floating point precision issues
+        const priceCents = Math.round(price * 100);
+        const discountCents = Math.round((priceCents * disc) / 100);
+        const finalCents = priceCents - discountCents;
+
+        return {
+          ...s,
+          finalPrice: (finalCents / 100).toFixed(2),
+        };
       }
       return s;
     });
+
     setSizes(updatedSizes);
   };
 

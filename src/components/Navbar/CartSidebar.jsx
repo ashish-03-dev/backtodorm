@@ -108,13 +108,6 @@ export default function CartSidebar({ show, onClose }) {
             <ListGroup variant="flush">
               {Object.entries(groupedByCollection).map(([groupId, group]) => (
                 <React.Fragment key={groupId}>
-                  {group.type === 'collection' && (
-                    <div className="mb-2">
-                      <h6 className="fw-semibold">
-                        Collection Pack: {group.collectionId || 'Untitled'} (Finish: {group.finish}, Discount: {group.collectionDiscount}%)
-                      </h6>
-                    </div>
-                  )}
                   {group.items.map((item, index) => (
                     <ListGroup.Item
                       key={`${groupId}-${index}`}
@@ -137,7 +130,7 @@ export default function CartSidebar({ show, onClose }) {
                                   {poster.title || 'Untitled'} ({poster.size || 'N/A'}) -{' '}
                                   {poster.discount > 0 ? (
                                     <>
-                                      <span className="text-danger">↓ {poster.discount}%</span>
+                                      <span className="text-danger me-1">↓ {poster.discount}%</span>
                                       <span className="text-decoration-line-through me-1">
                                         ₹{(poster.price || 0).toLocaleString('en-IN')}
                                       </span>

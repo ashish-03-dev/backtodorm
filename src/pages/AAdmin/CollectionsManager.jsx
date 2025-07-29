@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Modal, Alert, Button, Form, Badge, ListGroup } from "react-bootstrap";
 import { collection, getDocs, setDoc, doc, deleteDoc, query, where } from "firebase/firestore";
 import { BiPlus, BiClipboard, BiTrash, BiImage } from "react-icons/bi";
-import { useFirebase } from "../../../context/FirebaseContext";
+import { useFirebase } from "../../context/FirebaseContext";
 
 // Debounce utility
 const debounce = (func, wait) => {
