@@ -6,14 +6,14 @@ import PosterForm from "./PosterForm";
 import PosterView from "../Posters/PosterView";
 import PosterFrameForm from "../PosterApprovals/PosterFrameForm";
 import { useFirebase } from "../../../context/FirebaseContext";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { submitPoster, rejectPoster } from "../Posters/adminPosterUtils";
 import { ref, getDownloadURL } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 const PosterApprovals = () => {
-  const { firestore, functions, storage, user } = useFirebase();
+  const { firestore, functions, storage } = useFirebase();
   const [tempPosters, setTempPosters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,18 +26,22 @@ const PosterApprovals = () => {
   const [framing, setFraming] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Fetch tempPosters with image URLs
   useEffect(() => {
-    if (!firestore || !storage) {
-      console.error("Firestore or Storage instance is undefined");
-      setError("Firestore or Storage is not available.");
-      setLoading(false);
-      return;
-    }
+    const fetchPosters = async () => {
+      if (!firestore || !storage) {
+        console.error("Firestore or Storage instance is undefined");
+        setError("Firestore or Storage is not available.");
+        setLoading(false);
+        return;
+      }
 
-    const unsubscribeTempPosters = onSnapshot(
-      collection(firestore, "tempPosters"),
-      async (snapshot) => {
+      try {
+        const postersQuery = query(
+          collection(firestore, "tempPosters"),
+          orderBy("createdAt", "desc") // Sort by timestamp descending
+        );
+        const snapshot = await getDocs(postersQuery);
+
         const tempPostersData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -46,7 +50,7 @@ const PosterApprovals = () => {
           frameSet: doc.data().frameSet || false,
         }));
 
-        // Fetch download URLs for tempPosters
+        // Fetch image URLs
         const tempPostersWithUrls = await Promise.all(
           tempPostersData.map(async (poster) => {
             if (poster.originalImageUrl) {
@@ -64,16 +68,15 @@ const PosterApprovals = () => {
         );
 
         setTempPosters(tempPostersWithUrls);
-        setLoading(false);
-      },
-      (error) => {
+      } catch (error) {
         console.error("Error fetching temp posters:", error);
         setError(`Failed to fetch temp posters: ${error.message}`);
+      } finally {
         setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribeTempPosters();
+    fetchPosters();
   }, [firestore, storage]);
 
   // Poster management functions

@@ -24,9 +24,9 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
   const [posterImage, setPosterImage] = useState(null);
   const [useCssShadow, setUseCssShadow] = useState(true); // Changed to true for default checked
   const [cssShadow, setCssShadow] = useState({
-    xOffset: -8,
+    xOffset: -7,
     yOffset: 5,
-    blurRadius: 8,
+    blurRadius: 6,
     spreadRadius: 0,
     color: "rgba(0, 0, 0, 0.5)",
   });
@@ -180,9 +180,11 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
 
         // Restore the context to remove shadow settings
         ctx.restore();
+        setLoading(false);
       } catch (err) {
         console.error("Canvas rendering error:", err);
         setError(`Failed to render canvas: ${err.message}. Check image URLs or Firebase Storage rules.`);
+        setLoading(false);
       }
     };
     drawCanvas();
@@ -222,24 +224,22 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
     }
   };
 
-  if (!isPosterValid) {
-    return (
-      <Alert variant="danger">
-        Invalid or missing poster sizes. Please provide a valid poster.
-      </Alert>
-    );
-  }
-
-  if (loading) {
+  if (!isPosterValid || loading) {
     return (
       <div className="d-flex justify-content-center align-items-center p-4">
-        <Spinner animation="border" variant="primary" />
+        {loading ? (
+          <Spinner animation="border" variant="primary" />
+        ) : (
+          <Alert variant="danger">
+            Invalid or missing poster sizes. Please provide a valid poster.
+          </Alert>
+        )}
       </div>
     );
   }
 
   return (
-    <Modal show={true} onHide={onClose} size="lg" backdrop="static">
+    <>
       <Modal.Header closeButton>
         <Modal.Title>Frame Poster: {poster?.title || "Untitled"}</Modal.Title>
       </Modal.Header>
@@ -307,48 +307,48 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
             />
           </Form.Group>
           {/* {useCssShadow && ( */}
-            <div className="d-flex gap-2">
-              <Form.Group className="mb-2">
-                <Form.Label>X-Offset (px)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={cssShadow.xOffset}
-                  onChange={(e) =>
-                    setCssShadow({ ...cssShadow, xOffset: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </Form.Group>
-              <Form.Group className="mb-2">
-                <Form.Label>Y-Offset (px)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={cssShadow.yOffset}
-                  onChange={(e) =>
-                    setCssShadow({ ...cssShadow, yOffset: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </Form.Group>
-              <Form.Group className="mb-2">
-                <Form.Label>Blur Radius (px)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={cssShadow.blurRadius}
-                  onChange={(e) =>
-                    setCssShadow({ ...cssShadow, blurRadius: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </Form.Group>
-              <Form.Group className="mb-2">
-                <Form.Label>Spread Radius (px)</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={cssShadow.spreadRadius}
-                  onChange={(e) =>
-                    setCssShadow({ ...cssShadow, spreadRadius: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </Form.Group>
-            </div>
+          <div className="d-flex gap-2">
+            <Form.Group className="mb-2">
+              <Form.Label>X-Offset (px)</Form.Label>
+              <Form.Control
+                type="number"
+                value={cssShadow.xOffset}
+                onChange={(e) =>
+                  setCssShadow({ ...cssShadow, xOffset: parseInt(e.target.value) || 0 })
+                }
+              />
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Y-Offset (px)</Form.Label>
+              <Form.Control
+                type="number"
+                value={cssShadow.yOffset}
+                onChange={(e) =>
+                  setCssShadow({ ...cssShadow, yOffset: parseInt(e.target.value) || 0 })
+                }
+              />
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Blur Radius (px)</Form.Label>
+              <Form.Control
+                type="number"
+                value={cssShadow.blurRadius}
+                onChange={(e) =>
+                  setCssShadow({ ...cssShadow, blurRadius: parseInt(e.target.value) || 0 })
+                }
+              />
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Spread Radius (px)</Form.Label>
+              <Form.Control
+                type="number"
+                value={cssShadow.spreadRadius}
+                onChange={(e) =>
+                  setCssShadow({ ...cssShadow, spreadRadius: parseInt(e.target.value) || 0 })
+                }
+              />
+            </Form.Group>
+          </div>
           {/* )} */}
           <div className="mb-3">
             <strong>Current Size: </strong>
@@ -378,7 +378,7 @@ const PosterFrameForm = ({ poster, onClose, onSave }) => {
           {loading ? "Saving..." : "Save Framed Image"}
         </Button>
       </Modal.Footer>
-    </Modal>
+    </>
   );
 };
 
