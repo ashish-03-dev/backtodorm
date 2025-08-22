@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BsHouse,
   BsCartCheck,
   BsFileText,
   BsImage,
@@ -30,7 +29,7 @@ export default function AdminLayout() {
   }, [location.pathname, isMobile]);
 
   const handleSectionClick = (path) => {
-    navigate(path);
+    navigate(path, { replace: true });
     if (isMobile) {
       setShowContentOnMobile(true);
     }
@@ -39,7 +38,7 @@ export default function AdminLayout() {
   // Highlight Dashboard on /admin only when not mobile
   const isActive = (path) => {
     if (path === "/admin") {
-      return !isMobile && location.pathname === "/admin" || location.pathname === "./admin/dashboard";
+      return (!isMobile && (location.pathname === "/admin")) || (location.pathname === "./admin/dashboard");
     }
     return location.pathname === path;
   };

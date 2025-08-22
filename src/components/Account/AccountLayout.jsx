@@ -32,7 +32,7 @@ export default function AccountLayout() {
   };
 
   const handleSectionClick = (path) => {
-    navigate(path);
+    navigate(path, { replace: true });
     if (isMobile) {
       setShowContentOnMobile(true);
     }
