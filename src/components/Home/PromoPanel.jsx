@@ -65,7 +65,7 @@ const PromoPanel = () => {
               <Row className="text-muted small">
                 <Col md={6} className="mb-4">
                   <ul>
-                    <li>Stripe-powered secure checkout</li>
+                    <li>RazorPay-powered secure checkout</li>
                     <li>Supports UPI, cards, and wallets</li>
                     <li>Encrypted and privacy-first payment handling</li>
                   </ul>
